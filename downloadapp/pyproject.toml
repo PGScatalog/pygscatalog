@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "downloadapp"
+version = "0.1.0"
+description = ""
+authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>"]
+readme = "README.md"
+packages = [
+    { include = "pgscatalog", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+"corelib" = {path = "../corelib"} 
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+pgscatalog-download = 'pgscatalog.downloadapp.cli:run'
