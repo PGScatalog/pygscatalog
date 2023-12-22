@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pgscatalog.downloadapp"
+name = "pgscatalog-calclib"
 version = "0.1.0"
 description = ""
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>"]
@@ -10,12 +10,8 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-"pgscatalog.corelib" = {path = "../pgscatalog.corelib"} 
-"pgscatalog.calclib" = {path = "../pgscatalog.calclib"} 
+
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
-pgscatalog-download = 'pgscatalog.downloadapp.cli:run'
