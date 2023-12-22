@@ -14,3 +14,5 @@ $ poetry run pgscatalog-download
 I imported a test object <pgscatalog.corelib.scoringfile.ScoringFile object at 0x100ab6310>
 I imported a test object <pgscatalog.calclib.testclass.TestClass object at 0x100a464d0> from a different package
 ```
+
+[Helpful naming conventions](https://peps.python.org/pep-0423/)

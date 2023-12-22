@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pgscatalog-calclib"
+name = "pgscatalog.calclib"
 version = "0.1.0"
 description = ""
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>"]
