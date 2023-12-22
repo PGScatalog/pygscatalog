@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "downloadapp"
+name = "pgscatalog.downloadapp"
 version = "0.1.0"
 description = ""
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>"]
@@ -10,7 +10,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-"corelib" = {path = "../corelib"} 
+"pgscatalog.corelib" = {path = "../pgscatalog.corelib"} 
 
 [build-system]
 requires = ["poetry-core"]
