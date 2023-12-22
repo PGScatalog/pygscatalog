@@ -7,11 +7,10 @@ The CLI subpackage imports a public object from the library subpackage and print
 Both the CLI package and library package are in the namespace `pgscatalog`.
 
 ```
-$ cd downloadapp
+$ cd pgscatalog.downloadapp
 $ poetry shell
 $ poetry install
 $ poetry run pgscatalog-download
-I imported a test object <pgscatalog.corelib.scoringfile.ScoringFile object at 0x104e561d0>
+I imported a test object <pgscatalog.corelib.scoringfile.ScoringFile object at 0x100ab6310>
+I imported a test object <pgscatalog.calclib.testclass.TestClass object at 0x100a464d0> from a different package
 ```
-
-**TODO: look at importing subpackages in root pyproject.toml**
