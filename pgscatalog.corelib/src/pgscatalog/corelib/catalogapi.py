@@ -220,8 +220,11 @@ class ScoreQueryResult:
         """
         Create a ScoreQueryResult from PGS Catalog API response
 
-        >>> CatalogQuery(accession="PGS000001").score_query() # doctest: +ELLIPSIS
-        ScoreQueryResult(pgs_id='PGS000001', ftp_url=...
+        >>> fake_response = {"id": "fake", "ftp_harmonized_scoring_files":
+        ... {"GRCh37": {"positions": "fake.txt.gz"}, "GRCh38": {"positions": "fake.txt.gz"}},
+        ... "license": "fake", "ftp_scoring_file": "fake.txt.gz"}
+        >>> ScoreQueryResult.from_query(fake_response) # doctest: +ELLIPSIS
+        ScoreQueryResult(pgs_id='fake', ftp_url='fake.txt.gz',...
         """
         try:
             pgs_id = result_response["id"]
