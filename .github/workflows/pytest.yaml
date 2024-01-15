@@ -32,6 +32,7 @@ jobs:
       - run: pip install poetry
 
       - run: poetry install --with dev
+        working-directory: ${{ inputs.package-directory }}
 
       - run: poetry run pytest
         working-directory: ${{ inputs.package-directory }}
