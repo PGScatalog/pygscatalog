@@ -1,6 +1,5 @@
 """ Classes and functions related to the PGS Catalog API """
 import enum
-from enum import Enum
 
 import httpx
 from tenacity import retry, stop_after_attempt
@@ -180,10 +179,14 @@ class CatalogQuery:
                     results += r['results']
 
                 # return the same type as the accession input to be consistent
-                if len(results) == 1:
-                    return ScoreQueryResult.from_query(results[0])
-                else:
-                    return ScoreQueryResult.from_query(results)
+                match self.accession:
+                    case list():
+                        return ScoreQueryResult.from_query(results)
+                    case str():
+                        # a PGS string accession input can only ever return one result
+                        return ScoreQueryResult.from_query(results[0])
+                    case _:
+                        raise ValueError
             case CatalogCategory.PUBLICATION:
                 url = self.get_query_url()
                 r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
@@ -266,7 +269,7 @@ class ScoreQueryResult:
                 raise ValueError(f"Invalid genome build {build!r}")
 
 
-class GenomeBuild(Enum):
+class GenomeBuild(enum.Enum):
     """Enumeration of genome build: the reference genome release that a scoring file
     is aligned to.
 

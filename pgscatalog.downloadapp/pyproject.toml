@@ -10,8 +10,8 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-"pgscatalog.corelib" = {path = "../pgscatalog.corelib"} 
-"pgscatalog.calclib" = {path = "../pgscatalog.calclib"} 
+"pgscatalog.calclib" = {path = "../pgscatalog.calclib/", develop = true}
+"pgscatalog.corelib" = {path = "../pgscatalog.corelib/", develop = true}
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,9 +1,10 @@
 """ This module contains classes that compose a ScoringFile: a file in the
 PGS Catalog that contains a list of genetic variants and their effect weights.
 Scoring files are used to calculate PGS for new target genomes. """
-
+import collections
 import gzip
 import hashlib
+import itertools
 import os
 import pathlib
 import tempfile
@@ -13,7 +14,7 @@ import tenacity
 from tenacity import retry
 
 from pgscatalog.corelib import config
-from pgscatalog.corelib.catalogapi import CatalogQuery, GenomeBuild
+from pgscatalog.corelib.catalogapi import CatalogQuery, GenomeBuild, ScoreQueryResult
 
 
 class ScoringFileHeader:
@@ -142,35 +143,63 @@ class ScoringFileHeader:
 
 
 class ScoringFile:
-    def __init__(self, identifier, target_build=None):
+    """ Represents a single scoring file.
+
+
+
+    Can also be constructed with a ScoreQueryResult to avoid hitting the API during instantiation
+    """
+    def __init__(self, identifier, target_build=None, query_result=None):
+        if query_result is None:
+            self._identifier = identifier
+        else:
+            self._identifier = query_result
+
         try:
-            self.header = ScoringFileHeader.from_path(identifier)
-        except FileNotFoundError:
-            self._init_from_accession(identifier, target_build)
+            self.header = ScoringFileHeader.from_path(self._identifier)
+        except (FileNotFoundError, TypeError):
+            self._init_from_accession(self._identifier, target_build)
         else:
             # init from file path
             if target_build:
-                # todo: liftover
-                raise ValueError("Don't set a target build with a path")
+                raise NotImplementedError("Can't liftover")
+            raise NotImplementedError("Local files not supported")
 
-            self.path = identifier
-            self.catalog_response = None
+    def __repr__(self):
+        return f"{type(self).__name__}({repr(self._identifier)})"
+
+    def __hash__(self):
+        return hash(self.pgs_id)
+
+    def __eq__(self, other):
+        if isinstance(other, ScoringFile):
+            return self.pgs_id == other.pgs_id
+        return False
 
     def _init_from_accession(self, accession, target_build):
-        score = CatalogQuery(accession=accession).score_query()
+        match self._identifier:
+            case ScoreQueryResult():
+                # skip hitting the API unnecessarily
+                score = self._identifier
+                self._identifier = self._identifier.pgs_id
+            case str():
+                score = CatalogQuery(accession=accession).score_query()
+            case _:
+                raise TypeError(f"Can't init from accession: {self._identifier!r}")
+
         try:
-            len(score)  # was a list returned?
+            len(score)  # was a list returned from the Catalog query?
         except TypeError:
-            pass  # just a normal ScoreQueryResult
+            pass  # just a normal ScoreQueryResult, continue
         else:
-            # a list of score results can't be used to make a ScoringFile
+            # this class can only instantiate and represent one scoring file
             raise ValueError(f"Can't create a ScoringFile with accession: {accession!r}. "
                              "Only PGS ids are supported. Try ScoringFiles()")
 
+        self.pgs_id = score.pgs_id
         self.header = None
         self.catalog_response = score
         self.path = score.get_download_url(target_build)
-
 
     @retry(stop=tenacity.stop_after_attempt(5), retry=tenacity.retry_if_exception_type(httpx.RequestError))
     def download(self, directory, overwrite=False):
@@ -214,6 +243,91 @@ class ScoringFile:
                     os.rename(f.name, out_path)
         except httpx.UnsupportedProtocol:
             raise ValueError(f"Can't download a local file: {self.path!r}")
+
+
+class ScoringFiles:
+    """ This class provides methods to work with multiple ScoringFile objects.
+
+    You can use publications or trait accessions to instantiate:
+    >>> pub = ScoringFiles("PGP000001")
+    >>> len(pub)
+    3
+
+    Or multiple PGS IDs:
+    >>> score = ScoringFiles("PGS000001", "PGS000002")
+    >>> len(score)
+    2
+
+    List input is OK too:
+    >>> score = ScoringFiles(["PGS000001", "PGS000002"])
+    >>> len(score)
+    2
+
+    Or any mixture of publications, traits, and scores:
+    >>> score = ScoringFiles("PGP000001", "PGS000001", "PGS000002")
+    >>> len(score)
+    3
+
+    Scoring files with duplicate PGS IDs (accessions) are automatically dropped.
+    In the example above PGP000001 contains PGS000001, PGS000002, and PGS000003.
+
+    You can slice and iterate over ScoringFiles:
+    >>> score[0]
+    ScoringFile('PGS000001')
+    >>> for x in score:
+    ...     x
+    ScoringFile('PGS000001')
+    ScoringFile('PGS000002')
+    ScoringFile('PGS000003')
+    """
+    def __init__(self, *args, target_build=None):
+        # flatten args to provide a more flexible interface
+        flargs =  list(itertools.chain.from_iterable(arg if isinstance(arg, list) else [arg] for arg in args))
+        scorefiles = []
+        pgs_batch = []
+        for arg in flargs:
+            match arg:
+                case _ if pathlib.Path(arg).is_file():
+                    raise NotImplementedError
+                case str() if arg.startswith("PGP") or "_" in arg:
+                    pgp_scorefiles = CatalogQuery(accession=arg).score_query()
+                    scorefiles.extend([ScoringFile(x.pgs_id, target_build=target_build) for x in pgp_scorefiles])
+                case str() if arg.startswith("PGS"):
+                    pgs_batch.append(arg)
+                case str():
+                    raise ValueError(f"{arg!r} is not a valid path or an accession")
+                case _:
+                    raise TypeError
+
+        # build scorefiles from a batch query of PGS IDs to avoid smashing the API
+        batched_queries = CatalogQuery(accession=pgs_batch, target_build=target_build).score_query()
+        batched_scores = [ScoringFile(x) for x in batched_queries]
+        scorefiles.extend(batched_scores)
+
+        self._elements = list(dict.fromkeys(scorefiles))
+
+    def __repr__(self):
+        args = ", ".join([repr(x.pgs_id) for x in self.elements])
+        return f"{type(self).__name__}({args})"
+
+    def __iter__(self):
+        return iter(self.elements)
+
+    def __len__(self):
+        return len(self.elements)
+
+    def __getitem__(self, item):
+        return self.elements[item]
+
+    @property
+    def elements(self):
+        return self._elements
+
+    def combine(self):
+        """ Combining multiple scoring files yields ScoreVariants in a consistent genome build and data format.
+
+        This process takes care of data munging and some quality control steps. """
+        raise NotImplementedError
 
 
 def read_header(path: pathlib.Path):
