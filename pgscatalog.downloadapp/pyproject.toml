@@ -13,9 +13,19 @@ python = "^3.11"
 "pgscatalog.calclib" = {path = "../pgscatalog.calclib/", develop = true}
 "pgscatalog.corelib" = {path = "../pgscatalog.corelib/", develop = true}
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 pgscatalog-download = 'pgscatalog.downloadapp.cli:run'
+
+[tool.pytest.ini_options]
+
+pythonpath = [
+  "src"
+]
+
