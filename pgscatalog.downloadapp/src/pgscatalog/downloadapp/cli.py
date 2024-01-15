@@ -21,9 +21,13 @@ def run():
     with ThreadPoolExecutor() as executor:
         futures = []
         for scorefile in sfs:
-            futures.append(executor.submit(scorefile.download,
-                                           overwrite=args.overwrite_existing_file,
-                                           directory=args.outdir))
+            futures.append(
+                executor.submit(
+                    scorefile.download,
+                    overwrite=args.overwrite_existing_file,
+                    directory=args.outdir,
+                )
+            )
 
         for future in concurrent.futures.as_completed(futures):
             # nothing returned, but important to raise exceptions
@@ -63,7 +67,7 @@ def parse_args(args=None):
         nargs="+",
         dest="pgs",
         default=[],
-        help="PGS Catalog ID(s) (e.g. PGS000001)"
+        help="PGS Catalog ID(s) (e.g. PGS000001)",
     )
 
     parser.add_argument(
@@ -80,7 +84,7 @@ def parse_args(args=None):
         dest="efo_include_children",
         action="store_false",
         help="<Optional> Return only PGS tagged with exact EFO term "
-             "(e.g. no PGS for child/descendant terms in the ontology)",
+        "(e.g. no PGS for child/descendant terms in the ontology)",
     )
     parser.add_argument(
         "-p",
@@ -96,7 +100,7 @@ def parse_args(args=None):
         dest="build",
         choices=["GRCh37", "GRCh38"],
         help="Download Harmonized Scores with Positions in Genome build: GRCh37 or "
-             "GRCh38",
+        "GRCh38",
     )
     parser.add_argument(
         "-o",
@@ -112,14 +116,14 @@ def parse_args(args=None):
         dest="overwrite_existing_file",
         action="store_true",
         help="<Optional> Overwrite existing Scoring File if a new version is "
-             "available for download on the FTP",
+        "available for download on the FTP",
     )
     parser.add_argument(
         "-c",
         "--pgsc_calc",
         dest="pgsc_calc",
         help="<Optional> Provide information about downloading scoring files via "
-             "pgsc_calc",
+        "pgsc_calc",
     )
 
     args = parser.parse_args(args)

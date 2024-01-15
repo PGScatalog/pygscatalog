@@ -1,7 +1,6 @@
 """ This module contains classes that compose a ScoringFile: a file in the
 PGS Catalog that contains a list of genetic variants and their effect weights.
 Scoring files are used to calculate PGS for new target genomes. """
-import collections
 import gzip
 import hashlib
 import itertools
@@ -37,6 +36,7 @@ class ScoringFileHeader:
     >>> header.genome_build
     GenomeBuild.GRCh37
     """
+
     # slots are used here because we want a controlled vocabulary
     # random extra attributes would be bad without thinking about them
     __slots__ = (
@@ -65,22 +65,22 @@ class ScoringFileHeader:
     )
 
     def __init__(
-            self,
-            *,
-            pgs_name,
-            genome_build,
-            pgs_id=None,
-            pgp_id=None,
-            variants_number=None,
-            trait_reported=None,
-            trait_efo=None,
-            trait_mapped=None,
-            weight_type=None,
-            citation=None,
-            HmPOS_build=None,
-            HmPOS_date=None,
-            format_version=None,
-            license=None,
+        self,
+        *,
+        pgs_name,
+        genome_build,
+        pgs_id=None,
+        pgp_id=None,
+        variants_number=None,
+        trait_reported=None,
+        trait_efo=None,
+        trait_mapped=None,
+        weight_type=None,
+        citation=None,
+        HmPOS_build=None,
+        HmPOS_date=None,
+        format_version=None,
+        license=None,
     ):
         """kwargs are forced because this is a complicated init and from_path() is
         almost always the correct thing to do.
@@ -143,12 +143,13 @@ class ScoringFileHeader:
 
 
 class ScoringFile:
-    """ Represents a single scoring file.
+    """Represents a single scoring file.
 
 
 
     Can also be constructed with a ScoreQueryResult to avoid hitting the API during instantiation
     """
+
     def __init__(self, identifier, target_build=None, query_result=None):
         if query_result is None:
             self._identifier = identifier
@@ -193,15 +194,20 @@ class ScoringFile:
             pass  # just a normal ScoreQueryResult, continue
         else:
             # this class can only instantiate and represent one scoring file
-            raise ValueError(f"Can't create a ScoringFile with accession: {accession!r}. "
-                             "Only PGS ids are supported. Try ScoringFiles()")
+            raise ValueError(
+                f"Can't create a ScoringFile with accession: {accession!r}. "
+                "Only PGS ids are supported. Try ScoringFiles()"
+            )
 
         self.pgs_id = score.pgs_id
         self.header = None
         self.catalog_response = score
         self.path = score.get_download_url(target_build)
 
-    @retry(stop=tenacity.stop_after_attempt(5), retry=tenacity.retry_if_exception_type(httpx.RequestError))
+    @retry(
+        stop=tenacity.stop_after_attempt(5),
+        retry=tenacity.retry_if_exception_type(httpx.RequestError),
+    )
     def download(self, directory, overwrite=False):
         """
         Download a ScoringFile to a specified directory with checksum validation
@@ -238,7 +244,9 @@ class ScoringFile:
 
                 if (calc := md5.hexdigest()) != (remote := checksum.split()[0]):
                     # will attempt to download again (see decorator)
-                    raise httpx.RequestError(f"Calculated checksum {calc} doesn't match {remote}")
+                    raise httpx.RequestError(
+                        f"Calculated checksum {calc} doesn't match {remote}"
+                    )
                 else:
                     os.rename(f.name, out_path)
         except httpx.UnsupportedProtocol:
@@ -246,7 +254,7 @@ class ScoringFile:
 
 
 class ScoringFiles:
-    """ This class provides methods to work with multiple ScoringFile objects.
+    """This class provides methods to work with multiple ScoringFile objects.
 
     You can use publications or trait accessions to instantiate:
     >>> pub = ScoringFiles("PGP000001")
@@ -280,9 +288,14 @@ class ScoringFiles:
     ScoringFile('PGS000002')
     ScoringFile('PGS000003')
     """
+
     def __init__(self, *args, target_build=None):
         # flatten args to provide a more flexible interface
-        flargs =  list(itertools.chain.from_iterable(arg if isinstance(arg, list) else [arg] for arg in args))
+        flargs = list(
+            itertools.chain.from_iterable(
+                arg if isinstance(arg, list) else [arg] for arg in args
+            )
+        )
         scorefiles = []
         pgs_batch = []
         for arg in flargs:
@@ -291,7 +304,12 @@ class ScoringFiles:
                     raise NotImplementedError
                 case str() if arg.startswith("PGP") or "_" in arg:
                     pgp_scorefiles = CatalogQuery(accession=arg).score_query()
-                    scorefiles.extend([ScoringFile(x.pgs_id, target_build=target_build) for x in pgp_scorefiles])
+                    scorefiles.extend(
+                        [
+                            ScoringFile(x.pgs_id, target_build=target_build)
+                            for x in pgp_scorefiles
+                        ]
+                    )
                 case str() if arg.startswith("PGS"):
                     pgs_batch.append(arg)
                 case str():
@@ -300,7 +318,9 @@ class ScoringFiles:
                     raise TypeError
 
         # build scorefiles from a batch query of PGS IDs to avoid smashing the API
-        batched_queries = CatalogQuery(accession=pgs_batch, target_build=target_build).score_query()
+        batched_queries = CatalogQuery(
+            accession=pgs_batch, target_build=target_build
+        ).score_query()
         batched_scores = [ScoringFile(x) for x in batched_queries]
         scorefiles.extend(batched_scores)
 
@@ -324,9 +344,9 @@ class ScoringFiles:
         return self._elements
 
     def combine(self):
-        """ Combining multiple scoring files yields ScoreVariants in a consistent genome build and data format.
+        """Combining multiple scoring files yields ScoreVariants in a consistent genome build and data format.
 
-        This process takes care of data munging and some quality control steps. """
+        This process takes care of data munging and some quality control steps."""
         raise NotImplementedError
 
 
