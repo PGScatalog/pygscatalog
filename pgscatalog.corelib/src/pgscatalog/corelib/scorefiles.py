@@ -197,7 +197,7 @@ class ScoringFile:
             self.header = ScoringFileHeader.from_path(self._identifier)
         except (FileNotFoundError, TypeError):
             self.include_children = kwargs.get("include_children", None)
-            self._init_from_accession(self._identifier, target_build)
+            self._init_from_accession(self._identifier, target_build=target_build)
         else:
             # init from file path
             if target_build:
@@ -379,10 +379,10 @@ class ScoringFiles:
                     raise TypeError
 
         # batch PGS IDs to avoid overloading the API
-        batched_queries = CatalogQuery(
-            accession=pgs_batch, target_build=target_build
-        ).score_query()
-        batched_scores = [ScoringFile(x) for x in batched_queries]
+        batched_queries = CatalogQuery(accession=pgs_batch).score_query()
+        batched_scores = [
+            ScoringFile(x, target_build=target_build) for x in batched_queries
+        ]
         scorefiles.extend(batched_scores)
 
         self._elements = list(dict.fromkeys(scorefiles))
