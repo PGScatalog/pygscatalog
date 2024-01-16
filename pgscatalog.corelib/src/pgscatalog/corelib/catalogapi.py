@@ -1,15 +1,14 @@
 """ Classes and functions related to the PGS Catalog API """
 import enum
-from enum import Enum
 
 import httpx
-from tenacity import retry, stop_after_attempt
+import tenacity
 
 from pgscatalog.corelib import config
 
 
 class CatalogCategory(enum.Enum):
-    """ The main categories in the PGS Catalog. Enumeration values don't mean anything.
+    """The main categories in the PGS Catalog. Enumeration values don't mean anything.
 
     >>> CatalogCategory.SCORE
     <CatalogCategory.SCORE: 1>
@@ -21,7 +20,7 @@ class CatalogCategory(enum.Enum):
 
 
 class CatalogQuery:
-    """ Efficiently batch query the PGS Catalog API using trait (EFO), score (PGS ID),
+    """Efficiently batch query the PGS Catalog API using trait (EFO), score (PGS ID),
     or publication identifier (PGP ID).
 
     >>> CatalogQuery(accession="PGS000001")
@@ -41,6 +40,7 @@ class CatalogQuery:
     >>> CatalogQuery(accession="EFO_0001645")
     CatalogQuery(accession='EFO_0001645', category=CatalogCategory.TRAIT, include_children=False)
     """
+
     _rest_url_root = "https://www.pgscatalog.org/rest"
 
     def __init__(self, *, accession, include_children=False, **kwargs):
@@ -62,11 +62,13 @@ class CatalogQuery:
                 raise ValueError(f"Bad category: {self.category!r}")
 
     def __repr__(self):
-        return (f"{type(self).__name__}(accession={repr(self.accession)}, category="
-                f"{self.category}, include_children={self.include_children})")
+        return (
+            f"{type(self).__name__}(accession={repr(self.accession)}, category="
+            f"{self.category}, include_children={self.include_children})"
+        )
 
     def infer_category(self) -> CatalogCategory:
-        """ Inspect an accession and guess the Catalog category
+        """Inspect an accession and guess the Catalog category
 
         Assume lists of accessions only contain PGS IDs:
         >>> CatalogQuery(accession=["PGS000001", "PGS000002"]).infer_category()
@@ -88,12 +90,14 @@ class CatalogQuery:
             case list() if all([x.startswith("PGS") for x in accession]):
                 category = CatalogCategory.SCORE
             case list():
-                raise ValueError(f"Invalid accession in list: {accession!r}. Lists must only contain PGS IDs.")
+                raise ValueError(
+                    f"Invalid accession in list: {accession!r}. Lists must only contain PGS IDs."
+                )
             case str() if accession.startswith("PGS"):
                 category = CatalogCategory.SCORE
             case str() if accession.startswith("PGP"):
                 category = CatalogCategory.PUBLICATION
-            case str() if '_' in accession:
+            case str() if "_" in accession:
                 # simple check for structured text like EFO_ACCESSION, HP_ACCESSION, etc
                 category = CatalogCategory.TRAIT
             case _:
@@ -139,25 +143,30 @@ class CatalogQuery:
                     chunked_accession = ",".join(chunk)
                     urls.append(
                         f"{self._rest_url_root}/score/search?pgs_ids="
-                        f"{chunked_accession}")
+                        f"{chunked_accession}"
+                    )
                 return urls
             case CatalogCategory.PUBLICATION, str():
                 return f"{self._rest_url_root}/publication/{self.accession}"
             case _:
                 raise ValueError(
                     f"Invalid CatalogCategory and accession type: {self.category!r}, "
-                    f"type({self.accession!r})")
+                    f"type({self.accession!r})"
+                )
 
     def _chunk_accessions(self):
         size = 50  # /rest/score/{pgs_id} limit when searching multiple IDs
         # using a dict to get unique elements instead of a set to preserve order
         accessions = self.accession
-        return (accessions[pos: pos + size] for pos in
-                range(0, len(accessions), size))
+        return (accessions[pos : pos + size] for pos in range(0, len(accessions), size))
 
-    @retry(stop=stop_after_attempt(5))
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
+        retry=tenacity.retry_if_exception_type(httpx.RequestError),
+        wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
+    )
     def score_query(self):
-        """ Query the PGS Catalog API and return ScoreQueryResult
+        """Query the PGS Catalog API and return ScoreQueryResult
 
         Information about a single score is returned as a dict:
         >>> CatalogQuery(accession="PGS000001").score_query() # doctest: +ELLIPSIS
@@ -177,33 +186,43 @@ class CatalogQuery:
 
                 for url in self.get_query_url():
                     r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
-                    results += r['results']
+
+                    if "request limit exceeded" in r.get("message", ""):
+                        raise httpx.RequestError("request limit exceeded")
+                    else:
+                        results += r["results"]
 
                 # return the same type as the accession input to be consistent
-                if len(results) == 1:
-                    return ScoreQueryResult.from_query(results[0])
-                else:
-                    return ScoreQueryResult.from_query(results)
+                match self.accession:
+                    case list():
+                        return ScoreQueryResult.from_query(results)
+                    case str():
+                        # a PGS string accession input can only ever return one result
+                        return ScoreQueryResult.from_query(results[0])
+                    case _:
+                        raise ValueError
             case CatalogCategory.PUBLICATION:
                 url = self.get_query_url()
                 r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
-                pgs_ids = [score for scores in list(r["associated_pgs_ids"].values())
-                           for score in scores]
+                pgs_ids = [
+                    score
+                    for scores in list(r["associated_pgs_ids"].values())
+                    for score in scores
+                ]
                 return CatalogQuery(accession=pgs_ids).score_query()
             case CatalogCategory.TRAIT:
                 url = self.get_query_url()
                 r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
-                pgs_ids = r['associated_pgs_ids']
+                pgs_ids = r["associated_pgs_ids"]
                 if self.include_children:
-                    pgs_ids.extend(r['child_associated_pgs_ids'])
+                    pgs_ids.extend(r["child_associated_pgs_ids"])
                 return CatalogQuery(accession=pgs_ids).score_query()
 
 
 class ScoreQueryResult:
-    """ Class that holds score metadata with methods to extract important fields """
-    def __init__(self, *,
-                 pgs_id, ftp_url, ftp_grch37_url, ftp_grch38_url, license
-                 ):
+    """Class that holds score metadata with methods to extract important fields"""
+
+    def __init__(self, *, pgs_id, ftp_url, ftp_grch37_url, ftp_grch38_url, license):
         self.pgs_id = pgs_id
         self.ftp_url = ftp_url
         self.ftp_grch37_url = ftp_grch37_url
@@ -211,9 +230,11 @@ class ScoreQueryResult:
         self.license = license
 
     def __repr__(self):
-        return (f"{type(self).__name__}(pgs_id={self.pgs_id!r}, ftp_url={self.ftp_url!r}, "
-                f"ftp_grch37_url={self.ftp_grch37_url!r},ftp_grch38_url={self.ftp_grch38_url!r},"
-                f"license={self.license!r})")
+        return (
+            f"{type(self).__name__}(pgs_id={self.pgs_id!r}, ftp_url={self.ftp_url!r}, "
+            f"ftp_grch37_url={self.ftp_grch37_url!r},ftp_grch38_url={self.ftp_grch38_url!r},"
+            f"license={self.license!r})"
+        )
 
     @classmethod
     def from_query(cls, result_response):
@@ -241,8 +262,13 @@ class ScoreQueryResult:
             ftp_grch37_url = harmonised_urls["GRCh37"]["positions"]
             ftp_grch38_url = harmonised_urls["GRCh38"]["positions"]
             license = result_response["license"]
-            return cls(pgs_id=pgs_id, ftp_url=ftp_url, ftp_grch37_url=ftp_grch37_url, ftp_grch38_url=ftp_grch38_url,
-                       license=license)
+            return cls(
+                pgs_id=pgs_id,
+                ftp_url=ftp_url,
+                ftp_grch37_url=ftp_grch37_url,
+                ftp_grch38_url=ftp_grch38_url,
+                license=license,
+            )
 
     def get_download_url(self, genome_build=None):
         """
@@ -266,7 +292,7 @@ class ScoreQueryResult:
                 raise ValueError(f"Invalid genome build {build!r}")
 
 
-class GenomeBuild(Enum):
+class GenomeBuild(enum.Enum):
     """Enumeration of genome build: the reference genome release that a scoring file
     is aligned to.
 

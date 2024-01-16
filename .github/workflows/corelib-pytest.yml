@@ -1,0 +1,13 @@
+on:
+  push:
+    paths:
+      - 'pgscatalog.corelib/**.py'
+  pull_request:
+    paths:
+      - 'pgscatalog.corelib/**.py'
+
+jobs:
+  downloadapp-corelib:
+    uses: ./.github/workflows/pytest.yaml
+    with:
+      package-directory: "pgscatalog.corelib"

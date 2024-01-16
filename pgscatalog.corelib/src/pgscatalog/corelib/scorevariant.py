@@ -67,7 +67,7 @@ class EffectAllele:
 
 
 class EffectType(Enum):
-    """ Enums that represent inheritance models. The vast majority of variants have
+    """Enums that represent inheritance models. The vast majority of variants have
     an additive effect type.
 
     EffectType changes downstream PGS calculation:
@@ -83,6 +83,7 @@ class EffectType(Enum):
     >>> str(EffectType.ADDITIVE)
     'additive'
     """
+
     RECESSIVE = "recessive"
     DOMINANT = "dominant"
     ADDITIVE = "additive"
@@ -96,9 +97,8 @@ class EffectType(Enum):
 
 
 class ScoreVariant:
-    """
+    """ """
 
-    """
     mandatory_fields: tuple[str] = (
         "effect_allele",
         "effect_weight",
@@ -150,29 +150,29 @@ class ScoreVariant:
     # (yes, effect_weight is treated as a str, want to avoid rounding errors at this
     # stage)
     def __init__(
-            self,
-            *,
-            effect_allele: str,
-            effect_weight: str,
-            accession: str,
-            row_nr: int,
-            chr_name: str = None,
-            chr_position: int = None,
-            rsID: str = None,
-            other_allele: str = None,
-            hm_chr: str = None,
-            hm_pos: int = None,
-            hm_inferOtherAllele: str = None,
-            hm_source: str = None,
-            is_dominant: str = None,
-            is_recessive: str = None,
-            hm_rsID: str = None,
-            hm_match_chr: str = None,
-            hm_match_pos: str = None,
-            is_duplicated: bool = False,
-            effect_type: EffectType = EffectType.ADDITIVE,
-            is_complex: bool = False,
-            **kwargs,
+        self,
+        *,
+        effect_allele: str,
+        effect_weight: str,
+        accession: str,
+        row_nr: int,
+        chr_name: str = None,
+        chr_position: int = None,
+        rsID: str = None,
+        other_allele: str = None,
+        hm_chr: str = None,
+        hm_pos: int = None,
+        hm_inferOtherAllele: str = None,
+        hm_source: str = None,
+        is_dominant: str = None,
+        is_recessive: str = None,
+        hm_rsID: str = None,
+        hm_match_chr: str = None,
+        hm_match_pos: str = None,
+        is_duplicated: bool = False,
+        effect_type: EffectType = EffectType.ADDITIVE,
+        is_complex: bool = False,
+        **kwargs,
     ):
         # start with mandatory attributes
         self.effect_allele: EffectAllele = EffectAllele(effect_allele)

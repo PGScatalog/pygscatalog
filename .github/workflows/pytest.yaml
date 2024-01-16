@@ -1,0 +1,38 @@
+name: Run pytest
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        required: false
+        default: "3.11"
+      package-directory:
+        type: string
+        required: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: 'pip'
+
+      - uses: actions/cache@v3
+        with:
+          path: ${{ inputs.package-directory }}/.venv
+          key: venv-${{ hashFiles('poetry.lock') }}
+
+      - run: pip install poetry
+
+      - run: poetry install --with dev
+        working-directory: ${{ inputs.package-directory }}
+
+      - run: poetry run pytest --doctest-modules
+        working-directory: ${{ inputs.package-directory }}
