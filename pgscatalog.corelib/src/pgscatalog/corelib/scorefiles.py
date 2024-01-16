@@ -13,13 +13,30 @@ import httpx
 import tenacity
 from tenacity import retry
 
-from pgscatalog.corelib import config
+from pgscatalog.corelib import config, pgsexceptions
 from pgscatalog.corelib.catalogapi import CatalogQuery, GenomeBuild, ScoreQueryResult
+
+
+def _score_download_failed(retry_state):
+    """Every attempt to download went wrong, let's be specific about what went wrong"""
+    try:
+        retry_state.outcome.result()
+    except pgsexceptions.ScoreChecksumError as e:
+        # the checksum kept could never be matched
+        raise e
+    except Exception as download_exc:
+        # stuff all other exceptions into a ScoreDownloadError
+        raise pgsexceptions.ScoreDownloadError(
+            "Downloading score failed"
+        ) from download_exc
 
 
 @retry(
     stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
-    retry=tenacity.retry_if_exception_type(IOError),
+    retry=tenacity.retry_if_exception_type(
+        (pgsexceptions.ScoreDownloadError, pgsexceptions.ScoreChecksumError)
+    ),
+    retry_error_callback=_score_download_failed,
     wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
 )
 def _ftp_fallback(retry_state):
@@ -37,20 +54,28 @@ def _ftp_fallback(retry_state):
     out_path = pathlib.Path(directory) / fn
     md5 = hashlib.md5()
 
-    with tempfile.NamedTemporaryFile(
-        dir=directory, delete=False
-    ) as score_f, tempfile.NamedTemporaryFile(dir=directory, delete=True) as checksum_f:
-        urllib.request.urlretrieve(ftp_url, score_f.name)
-        urllib.request.urlretrieve(checksum_url, checksum_f.name)
-
-        md5.update(score_f.read())
-
-        if (checksum := md5.hexdigest()) != (
-            remote := checksum_f.read().decode().split()[0]
+    try:
+        with (
+            tempfile.NamedTemporaryFile(dir=directory, delete=False) as score_f,
+            tempfile.NamedTemporaryFile(dir=directory, delete=True) as checksum_f,
         ):
-            raise IOError(f"Local checksum {checksum} doesn't match remote {remote}")
-        else:
-            os.rename(score_f.name, out_path)
+            urllib.request.urlretrieve(ftp_url, score_f.name)
+            urllib.request.urlretrieve(checksum_url, checksum_f.name)
+
+            md5.update(score_f.read())
+
+            if (checksum := md5.hexdigest()) != (
+                remote := checksum_f.read().decode().split()[0]
+            ):
+                raise pgsexceptions.ScoreChecksumError(
+                    f"Local checksum {checksum} doesn't match remote {remote}"
+                )
+            else:
+                os.rename(score_f.name, out_path)
+    except urllib.error.URLError as download_exc:
+        raise pgsexceptions.ScoreDownloadError(
+            f"Can't download {scorefile} over FTP"
+        ) from download_exc
 
 
 class ScoringFileHeader:
@@ -182,8 +207,6 @@ class ScoringFileHeader:
 class ScoringFile:
     """Represents a single scoring file.
 
-
-
     Can also be constructed with a ScoreQueryResult to avoid hitting the API during instantiation
     """
 
@@ -246,7 +269,9 @@ class ScoringFile:
 
     @retry(
         stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
-        retry=tenacity.retry_if_exception_type(httpx.RequestError),
+        retry=tenacity.retry_if_exception_type(
+            (pgsexceptions.ScoreDownloadError, pgsexceptions.ScoreChecksumError)
+        ),
         retry_error_callback=_ftp_fallback,
         wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
     )
@@ -270,7 +295,9 @@ class ScoringFile:
         if config.FTP_EXCLUSIVE:
             # replace wait function to hit callback quickly
             self.download.retry.wait = tenacity.wait_none()
-            raise httpx.RequestError("HTTPS downloads disabled by config.FTP_EXCLUSIVE")
+            raise pgsexceptions.ScoreDownloadError(
+                "HTTPS downloads disabled by config.FTP_EXCLUSIVE"
+            )
 
         try:
             fn = pathlib.Path(self.path).name
@@ -291,13 +318,19 @@ class ScoringFile:
 
                 if (calc := md5.hexdigest()) != (remote := checksum.split()[0]):
                     # will attempt to download again (see decorator)
-                    raise httpx.RequestError(
+                    raise pgsexceptions.ScoreChecksumError(
                         f"Calculated checksum {calc} doesn't match {remote}"
                     )
                 else:
                     os.rename(f.name, out_path)
-        except httpx.UnsupportedProtocol:
-            raise ValueError(f"Can't download a local file: {self.path!r}")
+        except httpx.UnsupportedProtocol as protocol_exc:
+            raise ValueError(
+                f"Can't download a local file: {self.path!r}"
+            ) from protocol_exc
+        except httpx.RequestError as download_exc:
+            raise pgsexceptions.ScoreDownloadError(
+                "HTTPS download failed"
+            ) from download_exc
 
 
 class ScoringFiles:

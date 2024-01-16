@@ -5,9 +5,9 @@ This repository contains Python applications and libraries for working with poly
 
 These CLI applications are used by the PGS Catalog Calculator workflow. 
 
-| Application           | Description                                    | Link                                                  |
-|-----------------------|------------------------------------------------|-------------------------------------------------------|
-| `pgscatalog-download` | Download scoring files from the PGS Catalog    | [README](pgscatalog.downloadapp/pgscatalog/README.md) |
+| Application           | Description                                    | Link                                                 |
+|-----------------------|------------------------------------------------|------------------------------------------------------|
+| `pgscatalog-download` | Download scoring files from the PGS Catalog    | [README](pgscatalog.downloadapp/README.md) |
 | `pgscatalog-combine`  | Combine scoring files into a consistent format |
 
 
