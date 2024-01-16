@@ -360,13 +360,15 @@ class ScoringFiles:
                     raise NotImplementedError
                 case str() if arg.startswith("PGP") or "_" in arg:
                     self.include_children = kwargs.get("include_children", None)
-                    pgp_scorefiles = CatalogQuery(
+                    traitpub_query = CatalogQuery(
                         accession=arg, include_children=self.include_children
                     ).score_query()
+
+                    # avoid unnecessary API hits by using CatalogQuery objects
                     scorefiles.extend(
                         [
-                            ScoringFile(x.pgs_id, target_build=target_build)
-                            for x in pgp_scorefiles
+                            ScoringFile(x, target_build=target_build)
+                            for x in traitpub_query
                         ]
                     )
                 case str() if arg.startswith("PGS"):
@@ -376,7 +378,7 @@ class ScoringFiles:
                 case _:
                     raise TypeError
 
-        # build scorefiles from a batch query of PGS IDs to avoid smashing the API
+        # batch PGS IDs to avoid overloading the API
         batched_queries = CatalogQuery(
             accession=pgs_batch, target_build=target_build
         ).score_query()

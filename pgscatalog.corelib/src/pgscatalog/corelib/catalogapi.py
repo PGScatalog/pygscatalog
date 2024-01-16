@@ -2,7 +2,7 @@
 import enum
 
 import httpx
-from tenacity import retry, stop_after_attempt
+import tenacity
 
 from pgscatalog.corelib import config
 
@@ -160,7 +160,11 @@ class CatalogQuery:
         accessions = self.accession
         return (accessions[pos : pos + size] for pos in range(0, len(accessions), size))
 
-    @retry(stop=stop_after_attempt(5))
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
+        retry=tenacity.retry_if_exception_type(httpx.RequestError),
+        wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
+    )
     def score_query(self):
         """Query the PGS Catalog API and return ScoreQueryResult
 
@@ -182,7 +186,11 @@ class CatalogQuery:
 
                 for url in self.get_query_url():
                     r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
-                    results += r["results"]
+
+                    if "request limit exceeded" in r.get("message", ""):
+                        raise httpx.RequestError("request limit exceeded")
+                    else:
+                        results += r["results"]
 
                 # return the same type as the accession input to be consistent
                 match self.accession:

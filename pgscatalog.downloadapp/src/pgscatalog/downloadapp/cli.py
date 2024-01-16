@@ -22,9 +22,9 @@ def run():
     if args.verbose:
         logger.setLevel(logging.INFO)
 
-    if args.pgsc_calc is not None:
-        logger.info(f"Setting user agent to {args.pgsc_calc}")
-        config.API_HEADER = {"user-agent": args.pgsc_calc}
+    if args.user_agent is not None:
+        logger.info(f"Setting user agent to {args.user_agent}")
+        config.API_HEADER = {"user-agent": args.user_agent}
 
     build = GenomeBuild.from_string(args.build)
     logger.info(f"Genome build set to: {build!r}")
@@ -49,7 +49,7 @@ def run():
             )
 
         for future in concurrent.futures.as_completed(futures):
-            # nothing returned, but important to raise exceptions
+            # nothing returned, but important to grab result to raise exceptions
             future.result()
             logger.info("Download complete")
 
@@ -141,10 +141,9 @@ def parse_args(args=None):
     )
     parser.add_argument(
         "-c",
-        "--pgsc_calc",
-        dest="pgsc_calc",
-        help="<Optional> Provide information about downloading scoring files via "
-        "pgsc_calc",
+        "--user_agent",
+        dest="user_agent",
+        help="<Optional> Provide custom user agent when querying PGS Catalog API",
     )
     parser.add_argument(
         "-v",
