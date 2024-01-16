@@ -7,6 +7,7 @@ import itertools
 import os
 import pathlib
 import tempfile
+import urllib
 
 import httpx
 import tenacity
@@ -14,6 +15,42 @@ from tenacity import retry
 
 from pgscatalog.corelib import config
 from pgscatalog.corelib.catalogapi import CatalogQuery, GenomeBuild, ScoreQueryResult
+
+
+@retry(
+    stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
+    retry=tenacity.retry_if_exception_type(IOError),
+    wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
+)
+def _ftp_fallback(retry_state):
+    """When ScoringFile.download() fails, it invokes this callback function
+
+    Try downloading from PGS Catalog using FTP protocol instead of HTTPS.
+    """
+    scorefile = retry_state.args[0]
+    directory = retry_state.args[1]
+
+    ftp_url = scorefile.path.replace("https://", "ftp://")
+    checksum_url = (scorefile.path + ".md5").replace("https://", "ftp://")
+
+    fn = pathlib.Path(scorefile.path).name
+    out_path = pathlib.Path(directory) / fn
+    md5 = hashlib.md5()
+
+    with tempfile.NamedTemporaryFile(
+        dir=directory, delete=False
+    ) as score_f, tempfile.NamedTemporaryFile(dir=directory, delete=True) as checksum_f:
+        urllib.request.urlretrieve(ftp_url, score_f.name)
+        urllib.request.urlretrieve(checksum_url, checksum_f.name)
+
+        md5.update(score_f.read())
+
+        if (checksum := md5.hexdigest()) != (
+            remote := checksum_f.read().decode().split()[0]
+        ):
+            raise IOError(f"Local checksum {checksum} doesn't match remote {remote}")
+        else:
+            os.rename(score_f.name, out_path)
 
 
 class ScoringFileHeader:
@@ -208,8 +245,10 @@ class ScoringFile:
         self.path = score.get_download_url(target_build)
 
     @retry(
-        stop=tenacity.stop_after_attempt(5),
+        stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
         retry=tenacity.retry_if_exception_type(httpx.RequestError),
+        retry_error_callback=_ftp_fallback,
+        wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
     )
     def download(self, directory, overwrite=False):
         """
@@ -228,6 +267,11 @@ class ScoringFile:
         ...     print(os.listdir(tmp_dir))
         ['PGS000001_hmPOS_GRCh38.txt.gz']
         """
+        if config.FTP_EXCLUSIVE:
+            # replace wait function to hit callback quickly
+            self.download.retry.wait = tenacity.wait_none()
+            raise httpx.RequestError("HTTPS downloads disabled by config.FTP_EXCLUSIVE")
+
         try:
             fn = pathlib.Path(self.path).name
             out_path = pathlib.Path(directory) / fn
