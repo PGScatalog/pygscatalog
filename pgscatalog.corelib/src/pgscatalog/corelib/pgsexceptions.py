@@ -9,6 +9,26 @@ complicated things like logging to an external location
 
 So the plan is to override sys.excepthook, intercept errors defined here, and map them
 to custom exit codes defined below
+
+The hierarchy:
+
+- BasePGSException
+  - MatchError
+    - DuplicateMatchError
+    - MatchRateError
+    - ZeroMatchesError
+    - MatchValueError
+  - CombineError
+    - BuildError
+    - ScoreFormatError
+  - CatalogError
+    - ScoreDownloadError
+    - ScoreChecksumError
+    - QueryError
+    - InvalidAccessionError
+  - SamplesheetError
+    - GenomesNotFound
+    - SamplesheetFormatError
 """
 import sys
 from types import MappingProxyType

@@ -109,7 +109,9 @@ class CatalogQuery:
                 # simple check for structured text like EFO_ACCESSION, HP_ACCESSION, etc
                 category = CatalogCategory.TRAIT
             case _:
-                raise ValueError(f"Invalid accession: {accession!r}. Only")
+                raise pgsexceptions.InvalidAccessionError(
+                    f"Invalid accession: {accession!r}"
+                )
 
         return category
 
@@ -207,7 +209,12 @@ class CatalogQuery:
                         return ScoreQueryResult.from_query(results)
                     case str():
                         # a PGS string accession input can only ever return one result
-                        return ScoreQueryResult.from_query(results[0])
+                        try:
+                            return ScoreQueryResult.from_query(results[0])
+                        except IndexError:
+                            raise pgsexceptions.InvalidAccessionError(
+                                f"No Catalog result for accession {self.accession!r}"
+                            )
                     case _:
                         raise ValueError
             case CatalogCategory.PUBLICATION:

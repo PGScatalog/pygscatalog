@@ -291,6 +291,18 @@ class ScoringFile:
         ...     ScoringFile("PGS000001", GenomeBuild.GRCh38).download(tmp_dir)
         ...     print(os.listdir(tmp_dir))
         ['PGS000001_hmPOS_GRCh38.txt.gz']
+
+        >>> with tempfile.TemporaryDirectory() as tmp_dir:
+        ...     ScoringFile("potato", GenomeBuild.GRCh38).download(tmp_dir)
+        Traceback (most recent call last):
+        ...
+        pgscatalog.corelib.pgsexceptions.InvalidAccessionError: Invalid accession: 'potato'
+
+        >>> with tempfile.TemporaryDirectory() as tmp_dir:
+        ...     ScoringFile("PGSinvalidaccession", GenomeBuild.GRCh38).download(tmp_dir)
+        Traceback (most recent call last):
+        ...
+        pgscatalog.corelib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGSinvalidaccession'
         """
         if config.FTP_EXCLUSIVE:
             # replace wait function to hit callback quickly
@@ -376,6 +388,8 @@ class ScoringFiles:
     ScoringFile('PGS000001')
     ScoringFile('PGS000002')
     ScoringFile('PGS000003')
+
+    >>> ScoringFiles("PGPpotato")
     """
 
     def __init__(self, *args, target_build=None, **kwargs):
