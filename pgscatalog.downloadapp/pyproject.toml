@@ -1,7 +1,8 @@
 [tool.poetry]
 name = "pgscatalog.downloadapp"
 version = "0.1.0"
-description = ""
+description = "CLI application to download scoring files from the PGS Catalog"
+license = "Apache-2.0"
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>"]
 readme = "README.md"
 packages = [
@@ -10,7 +11,6 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-"pgscatalog.calclib" = {path = "../pgscatalog.calclib/", develop = true}
 "pgscatalog.corelib" = {path = "../pgscatalog.corelib/", develop = true}
 
 [tool.poetry.group.dev.dependencies]

@@ -1,18 +1,32 @@
-# pygscatalog (namespace package test)
+# pygscatalog
 
-Test set up of a library subpackage and a CLI subpackage. 
+This repository contains Python applications and libraries for working with polygenic scores (PGS) and the [PGS Catalog](https://www.pgscatalog.org/), an open database of polygenic scores and the relevant metadata required for accurate application and evaluation. 
+## User applications 
 
-The CLI subpackage imports a public object from the library subpackage and prints it. 
+These CLI applications are used by the PGS Catalog Calculator workflow. 
 
-Both the CLI package and library package are in the namespace `pgscatalog`.
+| Application           | Description                                    | Link                                                  |
+|-----------------------|------------------------------------------------|-------------------------------------------------------|
+| `pgscatalog-download` | Download scoring files from the PGS Catalog    | [README](pgscatalog.downloadapp/pgscatalog/README.md) |
+| `pgscatalog-combine`  | Combine scoring files into a consistent format |
 
-```
-$ cd pgscatalog.downloadapp
-$ poetry shell
-$ poetry install
-$ poetry run pgscatalog-download
-I imported a test object <pgscatalog.corelib.scoringfile.ScoringFile object at 0x100ab6310>
-I imported a test object <pgscatalog.calclib.testclass.TestClass object at 0x100a464d0> from a different package
-```
 
-[Helpful naming conventions](https://peps.python.org/pep-0423/)
+## Developer libraries
+
+If you write  code to work with PGS, we publish some libraries that might be helpful:
+
+
+| Library                | Description                                              | Link                                              |
+|------------------------|----------------------------------------------------------|---------------------------------------------------|
+| `pgscatalog-corelib`   | Core classes and functions                               | [README](pgscatalog.corelib/pgscatalog/README.md) |
+| `pgscatalog-matchlib`  | Variant matching across scoring files and target genomes |
+| `pgscatalog-calclib`   | Ancestry estimation and normalisation                    |
+
+
+## Documentation
+
+Full documentation is provided.. 
+
+## License
+
+All of our code is open source and licensed with [Apache 2](LICENSE).
