@@ -1,19 +1,33 @@
 import argparse
 import concurrent
+import logging
 import textwrap
 from concurrent.futures import ThreadPoolExecutor
 
 from pgscatalog.corelib import ScoringFiles, GenomeBuild
 from pgscatalog.corelib import config
 
+logger = logging.getLogger(__name__)
+
 
 def run():
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
+        level=logging.WARNING,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     args = parse_args()
 
+    if args.verbose:
+        logger.setLevel(logging.INFO)
+
     if args.pgsc_calc is not None:
+        logger.info(f"Setting user agent to {args.pgsc_calc}")
         config.API_HEADER = {"user-agent": args.pgsc_calc}
 
     build = GenomeBuild.from_string(args.build)
+    logger.info(f"Genome build set to: {build!r}")
 
     # unpack all accessions into a single flat list
     sfs = ScoringFiles(
@@ -25,6 +39,7 @@ def run():
     with ThreadPoolExecutor() as executor:
         futures = []
         for scorefile in sfs:
+            logger.info(f"Submitting {scorefile!r} download")
             futures.append(
                 executor.submit(
                     scorefile.download,
@@ -36,6 +51,9 @@ def run():
         for future in concurrent.futures.as_completed(futures):
             # nothing returned, but important to raise exceptions
             future.result()
+            logger.info("Download complete")
+
+        logger.info("All downloads finished")
 
 
 description_text = textwrap.dedent(
@@ -73,7 +91,6 @@ def parse_args(args=None):
         default=[],
         help="PGS Catalog ID(s) (e.g. PGS000001)",
     )
-
     parser.add_argument(
         "-t",
         "--efo",
@@ -128,6 +145,13 @@ def parse_args(args=None):
         dest="pgsc_calc",
         help="<Optional> Provide information about downloading scoring files via "
         "pgsc_calc",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="<Optional> Extra logging information",
     )
 
     args = parser.parse_args(args)
