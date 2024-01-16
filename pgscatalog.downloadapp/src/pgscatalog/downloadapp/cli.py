@@ -1,6 +1,7 @@
 import argparse
 import concurrent
 import logging
+import pathlib
 import textwrap
 from concurrent.futures import ThreadPoolExecutor
 
@@ -21,6 +22,9 @@ def run():
 
     if args.verbose:
         logger.setLevel(logging.INFO)
+
+    if not (outdir := pathlib.Path(args.outdir)).exists():
+        raise FileNotFoundError(f"--outdir {outdir.name} doesn't exist")
 
     if args.user_agent is not None:
         logger.info(f"Setting user agent to {args.user_agent}")
@@ -58,21 +62,24 @@ def run():
 
 description_text = textwrap.dedent(
     """\
-Download a set of scoring files from the PGS Catalog using PGS
-Scoring IDs, traits, or publication IDs.
+Download a set of scoring files from the PGS Catalog using PGS Scoring
+IDs, traits, or publication accessions.
 
-The PGS Catalog API is queried to get a list of scoring file
-URLs. Scoring files are downloaded via FTP to a specified
-directory. PGS Catalog scoring files are staged with the name:
+The PGS Catalog API is queried to get a list of scoring file URLs.
+Scoring files are downloaded asynchronously via HTTPS to a specified
+directory. Downloaded files are automatically validated against an md5
+checksum.
 
-        {PGS_ID}.txt.gz
+PGS Catalog scoring files are staged with the name:
+
+    {PGS_ID}.txt.gz
 
 If a valid build is specified harmonized files are downloaded as:
 
     {PGS_ID}_hmPOS_{genome_build}.txt.gz
 
-These harmonised scoring files contain genomic coordinates,
-remapped from author-submitted information such as rsids.
+These harmonised scoring files contain genomic coordinates, remapped
+from author-submitted information such as rsIDs.
 """
 )
 
@@ -120,7 +127,7 @@ def parse_args(args=None):
         "--build",
         dest="build",
         choices=["GRCh37", "GRCh38"],
-        help="Download Harmonized Scores with Positions in Genome build: GRCh37 or "
+        help="Download harmonized scores with positions in genome build: GRCh37 or "
         "GRCh38",
     )
     parser.add_argument(

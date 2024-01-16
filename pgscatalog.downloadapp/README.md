@@ -6,27 +6,41 @@ This simple CLI application makes it easy to download scoring files in bulk from
 
 ```
 $ pip install pgscatalog-download
-$ pgscatalog-download -i PGS000822 -b GRCh38 -o scorefiles/
+$ mkdir scorefiles
+$ pgscatalog-download --pgs PGS000822 --pgp PGP000001 PGP000002 --efo EFO_0004214 -b GRCh38 -o scorefiles/
+$ tree scorefiles
+scorefiles
+├── PGS000001_hmPOS_GRCh38.txt.gz
+├── PGS000002_hmPOS_GRCh38.txt.gz
+├── PGS000003_hmPOS_GRCh38.txt.gz
+...
 ```
 
 ## Help
 
 ```
-Download a set of scoring files from the PGS Catalog using PGS
-Scoring IDs, traits, or publication IDs.
+$ pgscatalog-download --help
 
-The PGS Catalog API is queried to get a list of scoring file
-URLs. Scoring files are downloaded via FTP to a specified
-directory. PGS Catalog scoring files are staged with the name:
+usage: pgscatalog-download [-h] [-i PGS [PGS ...]] [-t EFO [EFO ...]] [-e] [-p PGP [PGP ...]] [-b {GRCh37,GRCh38}] -o OUTDIR [-w] [-c USER_AGENT] [-v]
 
-        {PGS_ID}.txt.gz
+Download a set of scoring files from the PGS Catalog using PGS Scoring
+IDs, traits, or publication accessions.
+
+The PGS Catalog API is queried to get a list of scoring file URLs.
+Scoring files are downloaded asynchronously via HTTPS to a specified
+directory. Downloaded files are automatically validated against an md5
+checksum.
+
+PGS Catalog scoring files are staged with the name:
+
+    {PGS_ID}.txt.gz
 
 If a valid build is specified harmonized files are downloaded as:
 
     {PGS_ID}_hmPOS_{genome_build}.txt.gz
 
-These harmonised scoring files contain genomic coordinates,
-remapped from author-submitted information such as rsids.
+These harmonised scoring files contain genomic coordinates, remapped
+from author-submitted information such as rsIDs.
 
 options:
   -h, --help            show this help message and exit
@@ -38,10 +52,11 @@ options:
   -p PGP [PGP ...], --pgp PGP [PGP ...]
                         PGP publication ID(s) (e.g. PGP000007)
   -b {GRCh37,GRCh38}, --build {GRCh37,GRCh38}
-                        Download Harmonized Scores with Positions in Genome build: GRCh37 or GRCh38
+                        Download harmonized scores with positions in genome build: GRCh37 or GRCh38
   -o OUTDIR, --outdir OUTDIR
                         <Required> Output directory to store downloaded files
   -w, --overwrite       <Optional> Overwrite existing Scoring File if a new version is available for download on the FTP
-  -c PGSC_CALC, --pgsc_calc PGSC_CALC
-                        <Optional> Provide information about downloading scoring files via pgsc_calc
+  -c USER_AGENT, --user_agent USER_AGENT
+                        <Optional> Provide custom user agent when querying PGS Catalog API
+  -v, --verbose         <Optional> Extra logging information
 ```
