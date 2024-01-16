@@ -4,7 +4,7 @@ import enum
 import httpx
 import tenacity
 
-from pgscatalog.corelib import config
+from pgscatalog.corelib import config, pgsexceptions
 
 
 class CatalogCategory(enum.Enum):
@@ -17,6 +17,14 @@ class CatalogCategory(enum.Enum):
     SCORE = enum.auto()
     TRAIT = enum.auto()
     PUBLICATION = enum.auto()
+
+
+def _query_error(retry_state):
+    """Couldn't query the PGS Catalog API after retrying and waiting a bunch"""
+    try:
+        retry_state.outcome.result()
+    except Exception as e:
+        raise pgsexceptions.QueryError("Can't query PGS Catalog API") from e
 
 
 class CatalogQuery:
@@ -163,6 +171,7 @@ class CatalogQuery:
     @tenacity.retry(
         stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
         retry=tenacity.retry_if_exception_type(httpx.RequestError),
+        retry_error_callback=_query_error,
         wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
     )
     def score_query(self):
