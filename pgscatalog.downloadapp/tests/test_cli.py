@@ -26,7 +26,7 @@ def test_score_download_harmonised(tmp_path, build):
     """Test downloading harmonised scoring files in different genome builds"""
     out_dir = str(tmp_path.resolve())
 
-    harmonised_args: list[str] = [
+    args: list[str] = [
         "pgscatalog-download",
         "-i",
         pgs_id,
@@ -37,7 +37,7 @@ def test_score_download_harmonised(tmp_path, build):
         "-v",
     ]
 
-    with patch("sys.argv", harmonised_args):
+    with patch("sys.argv", args):
         run()
         hm_score_filename = f"{pgs_id}_hmPOS_{build}.txt.gz"
         assert hm_score_filename in os.listdir(out_dir)
@@ -47,7 +47,7 @@ def test_download_pub(tmp_path):
     """Test downloading scoring files with a PGP ID"""
     out_dir = str(tmp_path.resolve())
 
-    harmonised_args: list[str] = [
+    args: list[str] = [
         "pgscatalog-download",
         "--pgp",
         pgp_id,
@@ -58,7 +58,7 @@ def test_download_pub(tmp_path):
         "-v",
     ]
 
-    with patch("sys.argv", harmonised_args):
+    with patch("sys.argv", args):
         run()
         assert len(os.listdir(out_dir)) == 3
 
@@ -67,7 +67,7 @@ def test_download_trait(tmp_path):
     """Test downloading scoring files with a trait"""
     out_dir = str(tmp_path.resolve())
 
-    harmonised_args: list[str] = [
+    args: list[str] = [
         "pgscatalog-download",
         "--efo",
         trait,
@@ -78,7 +78,7 @@ def test_download_trait(tmp_path):
         "-v",
     ]
 
-    with patch("sys.argv", harmonised_args):
+    with patch("sys.argv", args):
         run()
         # 6 PGS for Abdominal Aortic Aneurysm 2024-01-16
         assert len(os.listdir(out_dir)) >= 6
@@ -88,7 +88,7 @@ def test_download_mix(tmp_path):
     """Test downloading scoring files with a mix of traits, publication, and score accessions"""
     out_dir = str(tmp_path.resolve())
 
-    harmonised_args: list[str] = [
+    args: list[str] = [
         "pgscatalog-download",
         "--efo",
         trait,
@@ -103,7 +103,7 @@ def test_download_mix(tmp_path):
         "-v",
     ]
 
-    with patch("sys.argv", harmonised_args):
+    with patch("sys.argv", args):
         run()
         n_pgp = 3
         n_pgs = 1

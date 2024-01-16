@@ -1,5 +1,7 @@
 # `pgscatalog-download`
 
+[![.github/workflows/downloadapp-pytest.yml](https://github.com/PGScatalog/pygscatalog/actions/workflows/downloadapp-pytest.yml/badge.svg)](https://github.com/PGScatalog/pygscatalog/actions/workflows/downloadapp-pytest.yml)
+
 This simple CLI application makes it easy to download scoring files in bulk from the [PGS Catalog](https://www.pgscatalog.org/) with a mixture of PGS, publication, or trait accessions.
 
 ```
