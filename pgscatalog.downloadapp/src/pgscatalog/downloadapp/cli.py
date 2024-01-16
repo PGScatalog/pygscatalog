@@ -16,7 +16,11 @@ def run():
     build = GenomeBuild.from_string(args.build)
 
     # unpack all accessions into a single flat list
-    sfs = ScoringFiles([*args.pgs, *args.pgp, *args.efo], target_build=build)
+    sfs = ScoringFiles(
+        [*args.pgs, *args.pgp, *args.efo],
+        target_build=build,
+        include_children=args.efo_include_children,
+    )
 
     with ThreadPoolExecutor() as executor:
         futures = []

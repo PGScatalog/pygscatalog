@@ -21,8 +21,8 @@ class ScoringFileHeader:
     header expects a PGS Catalog header format.
 
     It's always best to build headers with from_path():
-    >>> import pgscatalog, importlib.resources
-    >>> testpath = importlib.resources.files(pgscatalog).joinpath(".").parent.parent / "tests" / "testdata" / "PGS000001_hmPOS_GRCh38.txt.gz"
+    >>> import pgscatalog.corelib.config
+    >>> testpath = config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz"
     >>> ScoringFileHeader.from_path(testpath) # doctest: +ELLIPSIS
     ScoringFileHeader(pgs_id='PGS000001', pgp_id='PGP000001', pgs_name='PRS77_BC', ...
 
@@ -150,7 +150,7 @@ class ScoringFile:
     Can also be constructed with a ScoreQueryResult to avoid hitting the API during instantiation
     """
 
-    def __init__(self, identifier, target_build=None, query_result=None):
+    def __init__(self, identifier, target_build=None, query_result=None, **kwargs):
         if query_result is None:
             self._identifier = identifier
         else:
@@ -159,6 +159,7 @@ class ScoringFile:
         try:
             self.header = ScoringFileHeader.from_path(self._identifier)
         except (FileNotFoundError, TypeError):
+            self.include_children = kwargs.get("include_children", None)
             self._init_from_accession(self._identifier, target_build)
         else:
             # init from file path
@@ -184,7 +185,9 @@ class ScoringFile:
                 score = self._identifier
                 self._identifier = self._identifier.pgs_id
             case str():
-                score = CatalogQuery(accession=accession).score_query()
+                score = CatalogQuery(
+                    accession=accession, include_children=self.include_children
+                ).score_query()
             case _:
                 raise TypeError(f"Can't init from accession: {self._identifier!r}")
 
@@ -279,6 +282,15 @@ class ScoringFiles:
     Scoring files with duplicate PGS IDs (accessions) are automatically dropped.
     In the example above PGP000001 contains PGS000001, PGS000002, and PGS000003.
 
+    Traits can have children. To include these traits, use the include_children parameter:
+
+    >>> score_with_children = ScoringFiles("MONDO_0004975", include_children=True)
+    >>> score_wo_children = ScoringFiles("MONDO_0004975", include_children=False)
+    >>> len(score_with_children) > len(score_wo_children)
+    True
+
+    For example, Alzheimer's disease (MONDO_0004975) includes Late-onset Alzheier's disease (EFO_1001870) as a child trait.
+
     You can slice and iterate over ScoringFiles:
     >>> score[0]
     ScoringFile('PGS000001')
@@ -289,7 +301,7 @@ class ScoringFiles:
     ScoringFile('PGS000003')
     """
 
-    def __init__(self, *args, target_build=None):
+    def __init__(self, *args, target_build=None, **kwargs):
         # flatten args to provide a more flexible interface
         flargs = list(
             itertools.chain.from_iterable(
@@ -303,7 +315,10 @@ class ScoringFiles:
                 case _ if pathlib.Path(arg).is_file():
                     raise NotImplementedError
                 case str() if arg.startswith("PGP") or "_" in arg:
-                    pgp_scorefiles = CatalogQuery(accession=arg).score_query()
+                    self.include_children = kwargs.get("include_children", None)
+                    pgp_scorefiles = CatalogQuery(
+                        accession=arg, include_children=self.include_children
+                    ).score_query()
                     scorefiles.extend(
                         [
                             ScoringFile(x.pgs_id, target_build=target_build)
