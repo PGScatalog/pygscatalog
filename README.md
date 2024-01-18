@@ -23,6 +23,23 @@ If you write  code to work with PGS, we publish some libraries that might be hel
 | `pgscatalog-calclib`   | Ancestry estimation and normalisation                    |
 
 
+## Installation
+
+### pip
+
+If you want to use the packages in this repository, use pip:
+
+### Local install for developers
+
+If you want to make changes to a package or application, it's simplest to clone the repository and install packages in editable mode.
+
+```
+$ git clone https://github.com/PGScatalog/pygscatalog.git
+$ cd pygscatalog/pgscatalog.downloadapp # replace with the package you want to edit
+$ poetry add --editable ../pgscatalog.corelib # downloadapp requires corelib
+$ poetry install  
+```
+
 ## Documentation
 
 Full documentation is provided.. 

@@ -12,3 +12,5 @@ FTP_EXCLUSIVE = False
 
 # how many lines to read from large scoring files per batch
 BATCH_SIZE = 20000
+
+LIFTOVER = False

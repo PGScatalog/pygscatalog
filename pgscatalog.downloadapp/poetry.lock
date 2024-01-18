@@ -132,22 +132,9 @@ files = [
 ]
 
 [[package]]
-name = "pgscatalog-calclib"
-version = "0.1.0"
-description = ""
-optional = false
-python-versions = "^3.11"
-files = []
-develop = true
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.calclib"
-
-[[package]]
 name = "pgscatalog-corelib"
 version = "0.1.0"
-description = ""
+description = "Library for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
 python-versions = "^3.11"
 files = []
@@ -224,4 +211,4 @@ doc = ["reno", "sphinx", "tornado (>=4.5)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "eca65e5b03171ed7e15f10b82fc7f21f31ddc0595553ba4daec16ab116dbb28b"
+content-hash = "0b7a46fbcfe9a45419dadd1612128a6f31cf07147fd3ad1d6ed54e1eac61178c"

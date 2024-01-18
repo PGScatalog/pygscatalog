@@ -65,6 +65,14 @@ class EffectAllele:
             self._is_snp = not frozenset(self.allele) - self._valid_snp_bases
         return self._is_snp
 
+    def __eq__(self, other):
+        if isinstance(other, EffectAllele):
+            return self.allele == other.allele
+        return False
+
+    def __hash__(self):
+        return hash(self.allele)
+
 
 class EffectType(Enum):
     """Enums that represent inheritance models. The vast majority of variants have

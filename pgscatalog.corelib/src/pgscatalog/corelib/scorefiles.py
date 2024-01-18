@@ -9,6 +9,7 @@ import pathlib
 
 from pgscatalog.corelib import config, pgsexceptions
 from pgscatalog.corelib._download import https_download
+from pgscatalog.corelib._normalise import normalise
 from pgscatalog.corelib.catalogapi import CatalogQuery, GenomeBuild, ScoreQueryResult
 from pgscatalog.corelib._read import (
     generate_header_lines,
@@ -180,6 +181,9 @@ class ScoringFile:
         "_identifier",
         "_header",
         "_directory",
+        "_is_wide",
+        "_start_line",
+        "_fields",
     ]
 
     def __init__(self, identifier, target_build=None, query_result=None, **kwargs):
@@ -195,6 +199,22 @@ class ScoringFile:
             self._init_from_accession(self._identifier, target_build=target_build)
         else:
             self._init_from_path(self._identifier, target_build=target_build)
+
+        # set up local file attributes
+        try:
+            start_line, fields = get_columns(self.local_path)
+        except TypeError:
+            self._is_wide, self._start_line, self._fields, self._directory = (
+                None,
+                None,
+                None,
+                None,
+            )
+        else:
+            self._is_wide = detect_wide(fields)
+            self._start_line = start_line
+            self._fields = fields
+            self._directory = self.local_path.parent
 
     def _init_from_accession(self, accession, target_build):
         match self._identifier:
@@ -247,16 +267,11 @@ class ScoringFile:
 
     def _generate_variants(self):
         """Yields rows from a scoring file as ScoreVariant objects"""
-        if self.local_path is None:
-            raise ValueError("Local file is missing. Did you .download() the file?")
-
-        start_line, fields = get_columns(self.local_path)
-        is_wide = detect_wide(fields)
 
         row_nr = 0
 
         with auto_open(self.local_path, mode="rt") as f:
-            for _ in range(start_line + 1):
+            for _ in range(self._start_line + 1):
                 # skip header
                 next(f)
 
@@ -268,9 +283,9 @@ class ScoringFile:
                 csv_reader = csv.reader(batch, delimiter="\t")
                 yield from read_rows_lazy(
                     csv_reader=csv_reader,
-                    fields=fields,
+                    fields=self._fields,
                     name=self.pgs_id,
-                    wide=is_wide,
+                    wide=self._is_wide,
                     row_nr=row_nr,
                 )
                 # this is important because row_nr resets for each batch
@@ -333,11 +348,28 @@ class ScoringFile:
             directory=self._directory,
         )
 
+        # update local file attributes
+        self.local_path = out_path
+        start_line, fields = get_columns(self.local_path)
+        self._is_wide = detect_wide(fields)
+        self._start_line = start_line
+        self._fields = fields
+
     def normalise(self):
         """Extracts key fields from a scoring file in a normalised format.
 
-        Takes care of quality control."""
-        raise NotImplementedError
+        Takes care of quality control.
+
+        >>> testpath = config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz"
+        >>> variants = ScoringFile(testpath).normalise()
+        >>> for x in variants: # doctest: +ELLIPSIS
+        ...     x
+        ...     break
+        ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',...
+        """
+        yield from normalise(
+            self.variants, harmonised=self.harmonised, wide=self._is_wide
+        )
 
 
 class ScoringFiles:
