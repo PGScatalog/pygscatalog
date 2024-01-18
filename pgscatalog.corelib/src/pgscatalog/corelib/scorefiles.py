@@ -1,81 +1,24 @@
 """ This module contains classes that compose a ScoringFile: a file in the
 PGS Catalog that contains a list of genetic variants and their effect weights.
 Scoring files are used to calculate PGS for new target genomes. """
-import gzip
-import hashlib
+import csv
 import itertools
-import os
+import logging
 import pathlib
-import tempfile
-import urllib
 
-import httpx
-import tenacity
-from tenacity import retry
 
 from pgscatalog.corelib import config, pgsexceptions
+from pgscatalog.corelib._download import https_download
 from pgscatalog.corelib.catalogapi import CatalogQuery, GenomeBuild, ScoreQueryResult
-
-
-def _score_download_failed(retry_state):
-    """Every attempt to download went wrong, let's be specific about what went wrong"""
-    try:
-        retry_state.outcome.result()
-    except pgsexceptions.ScoreChecksumError as e:
-        # the checksum kept could never be matched
-        raise e
-    except Exception as download_exc:
-        # stuff all other exceptions into a ScoreDownloadError
-        raise pgsexceptions.ScoreDownloadError(
-            "Downloading score failed"
-        ) from download_exc
-
-
-@retry(
-    stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
-    retry=tenacity.retry_if_exception_type(
-        (pgsexceptions.ScoreDownloadError, pgsexceptions.ScoreChecksumError)
-    ),
-    retry_error_callback=_score_download_failed,
-    wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
+from pgscatalog.corelib._read import (
+    generate_header_lines,
+    auto_open,
+    read_rows_lazy,
+    get_columns,
+    detect_wide,
 )
-def _ftp_fallback(retry_state):
-    """When ScoringFile.download() fails, it invokes this callback function
 
-    Try downloading from PGS Catalog using FTP protocol instead of HTTPS.
-    """
-    scorefile = retry_state.args[0]
-    directory = retry_state.args[1]
-
-    ftp_url = scorefile.path.replace("https://", "ftp://")
-    checksum_url = (scorefile.path + ".md5").replace("https://", "ftp://")
-
-    fn = pathlib.Path(scorefile.path).name
-    out_path = pathlib.Path(directory) / fn
-    md5 = hashlib.md5()
-
-    try:
-        with (
-            tempfile.NamedTemporaryFile(dir=directory, delete=False) as score_f,
-            tempfile.NamedTemporaryFile(dir=directory, delete=True) as checksum_f,
-        ):
-            urllib.request.urlretrieve(ftp_url, score_f.name)
-            urllib.request.urlretrieve(checksum_url, checksum_f.name)
-
-            md5.update(score_f.read())
-
-            if (checksum := md5.hexdigest()) != (
-                remote := checksum_f.read().decode().split()[0]
-            ):
-                raise pgsexceptions.ScoreChecksumError(
-                    f"Local checksum {checksum} doesn't match remote {remote}"
-                )
-            else:
-                os.rename(score_f.name, out_path)
-    except urllib.error.URLError as download_exc:
-        raise pgsexceptions.ScoreDownloadError(
-            f"Can't download {scorefile} over FTP"
-        ) from download_exc
+logger = logging.getLogger(__name__)
 
 
 class ScoringFileHeader:
@@ -162,8 +105,8 @@ class ScoringFileHeader:
             # try overwriting with harmonised data
             self.genome_build = GenomeBuild.from_string(HmPOS_build)
 
-        if self.pgs_name is None or self.genome_build is None:
-            raise ValueError("pgs_name and genome_build cannot be None")
+        if self.pgs_name is None:
+            raise ValueError("pgs_name cannot be None")
 
         # the rest of these fields are optional
         self.pgs_id = pgs_id
@@ -208,7 +151,36 @@ class ScoringFile:
     """Represents a single scoring file.
 
     Can also be constructed with a ScoreQueryResult to avoid hitting the API during instantiation
+
+    >>> sf = ScoringFile(config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz")
+    >>> for variant in sf.variants: # doctest: +ELLIPSIS
+    ...     variant
+    ...     break
+    ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',accession='PGS000001',...
+
+    It's important to use the .download() method when you're not working with local files,
+    or many attributes and methods will fail:
+    >>> sf = ScoringFile("PGS000001")
+    >>> for variant in sf.variants:
+    ...     variant
+    ...     break
+    Traceback (most recent call last):
+    ...
+    ValueError: Local file is missing. Did you .download()?
     """
+
+    __slots__ = [
+        "pgs_id",
+        "genome_build",
+        "harmonised",
+        "path",
+        "local_path",
+        "catalog_response",
+        "include_children",
+        "_identifier",
+        "_header",
+        "_directory",
+    ]
 
     def __init__(self, identifier, target_build=None, query_result=None, **kwargs):
         if query_result is None:
@@ -217,26 +189,12 @@ class ScoringFile:
             self._identifier = query_result
 
         try:
-            self.header = ScoringFileHeader.from_path(self._identifier)
+            self._header = ScoringFileHeader.from_path(self._identifier)
         except (FileNotFoundError, TypeError):
             self.include_children = kwargs.get("include_children", None)
             self._init_from_accession(self._identifier, target_build=target_build)
         else:
-            # init from file path
-            if target_build:
-                raise NotImplementedError("Can't liftover")
-            raise NotImplementedError("Local files not supported")
-
-    def __repr__(self):
-        return f"{type(self).__name__}({repr(self._identifier)})"
-
-    def __hash__(self):
-        return hash(self.pgs_id)
-
-    def __eq__(self, other):
-        if isinstance(other, ScoringFile):
-            return self.pgs_id == other.pgs_id
-        return False
+            self._init_from_path(self._identifier, target_build=target_build)
 
     def _init_from_accession(self, accession, target_build):
         match self._identifier:
@@ -263,18 +221,79 @@ class ScoringFile:
             )
 
         self.pgs_id = score.pgs_id
-        self.header = None
         self.catalog_response = score
         self.path = score.get_download_url(target_build)
+        self.local_path = None
 
-    @retry(
-        stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
-        retry=tenacity.retry_if_exception_type(
-            (pgsexceptions.ScoreDownloadError, pgsexceptions.ScoreChecksumError)
-        ),
-        retry_error_callback=_ftp_fallback,
-        wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
-    )
+    def _init_from_path(self, path, target_build=None):
+        if target_build is not None:
+            raise NotImplementedError("Can't liftover coordinates yet")
+
+        self.path = path
+        self.local_path = path
+        self.catalog_response = None
+
+        if (pgs_id := self._header.pgs_id) is not None:
+            self.pgs_id = pgs_id
+        else:
+            raise pgsexceptions.ScoreFormatError("Missing pgs_id from header")
+
+        if header_build := self._header.HmPOS_build is not None:
+            self.genome_build = header_build
+            self.harmonised = True
+        else:
+            self.genome_build = self._header.genome_build
+            self.harmonised = False
+
+    def _generate_variants(self):
+        """Yields rows from a scoring file as ScoreVariant objects"""
+        if self.local_path is None:
+            raise ValueError("Local file is missing. Did you .download() the file?")
+
+        start_line, fields = get_columns(self.local_path)
+        is_wide = detect_wide(fields)
+
+        row_nr = 0
+
+        with auto_open(self.local_path, mode="rt") as f:
+            for _ in range(start_line + 1):
+                # skip header
+                next(f)
+
+            while True:
+                batch = list(itertools.islice(f, config.BATCH_SIZE))
+                if not batch:
+                    break
+
+                csv_reader = csv.reader(batch, delimiter="\t")
+                yield from read_rows_lazy(
+                    csv_reader=csv_reader,
+                    fields=fields,
+                    name=self.pgs_id,
+                    wide=is_wide,
+                    row_nr=row_nr,
+                )
+                # this is important because row_nr resets for each batch
+                row_nr += len(batch)
+
+    @property
+    def variants(self):
+        if self.local_path is not None:
+            return self._generate_variants()
+        else:
+            raise ValueError("Local file is missing. Did you .download()?")
+
+    def __repr__(self):
+        return f"{type(self).__name__}({repr(self._identifier)})"
+
+    def __hash__(self):
+        return hash(self.pgs_id)
+
+    def __eq__(self, other):
+        if isinstance(other, ScoringFile):
+            return self.pgs_id == other.pgs_id
+        return False
+
     def download(self, directory, overwrite=False):
         """
         Download a ScoringFile to a specified directory with checksum validation
@@ -304,45 +323,21 @@ class ScoringFile:
         ...
         pgscatalog.corelib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGSinvalidaccession'
         """
-        if config.FTP_EXCLUSIVE:
-            # replace wait function to hit callback quickly
-            self.download.retry.wait = tenacity.wait_none()
-            raise pgsexceptions.ScoreDownloadError(
-                "HTTPS downloads disabled by config.FTP_EXCLUSIVE"
-            )
+        self._directory = pathlib.Path(directory)
+        fn = pathlib.Path(self.path).name
+        out_path = self._directory / fn
+        https_download(
+            url=self.path,
+            out_path=out_path,
+            overwrite=overwrite,
+            directory=self._directory,
+        )
 
-        try:
-            fn = pathlib.Path(self.path).name
-            out_path = pathlib.Path(directory) / fn
+    def normalise(self):
+        """Extracts key fields from a scoring file in a normalised format.
 
-            if out_path.exists() and not overwrite:
-                raise FileExistsError(f"{out_path} already exists")
-
-            checksum_path = self.path + ".md5"
-            checksum = httpx.get(checksum_path, headers=config.API_HEADER).text
-            md5 = hashlib.md5()
-
-            with tempfile.NamedTemporaryFile(dir=directory, delete=False) as f:
-                with httpx.stream("GET", self.path, headers=config.API_HEADER) as r:
-                    for data in r.iter_bytes():
-                        f.write(data)
-                        md5.update(data)
-
-                if (calc := md5.hexdigest()) != (remote := checksum.split()[0]):
-                    # will attempt to download again (see decorator)
-                    raise pgsexceptions.ScoreChecksumError(
-                        f"Calculated checksum {calc} doesn't match {remote}"
-                    )
-                else:
-                    os.rename(f.name, out_path)
-        except httpx.UnsupportedProtocol as protocol_exc:
-            raise ValueError(
-                f"Can't download a local file: {self.path!r}"
-            ) from protocol_exc
-        except httpx.RequestError as download_exc:
-            raise pgsexceptions.ScoreDownloadError(
-                "HTTPS download failed"
-            ) from download_exc
+        Takes care of quality control."""
+        raise NotImplementedError
 
 
 class ScoringFiles:
@@ -390,6 +385,9 @@ class ScoringFiles:
     ScoringFile('PGS000003')
 
     >>> ScoringFiles("PGPpotato")
+    Traceback (most recent call last):
+    ...
+    pgscatalog.corelib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGPpotato'
     """
 
     def __init__(self, *args, target_build=None, **kwargs):
@@ -470,27 +468,3 @@ def read_header(path: pathlib.Path):
             header[key[1:]] = value  # drop # character from key
 
     return header
-
-
-def generate_header_lines(f):
-    """Header lines in a PGS Catalog scoring file are structured like:
-        #pgs_id=PGS000348
-        #pgs_name=PRS_PrCa
-    Files can be big, so we want to only read header lines and stop immediately
-    """
-    for line in f:
-        if line.startswith("#"):
-            if "=" in line:
-                yield line.strip()
-        else:
-            # stop reading lines
-            break
-
-
-def auto_open(filepath, mode="rt"):
-    """Automatically open a gzipped text file or an uncompressed text file"""
-    with open(filepath, "rb") as test_f:
-        if test_f.read(2) == b"\x1f\x8b":
-            return gzip.open(filepath, mode)
-        else:
-            return open(filepath, mode)

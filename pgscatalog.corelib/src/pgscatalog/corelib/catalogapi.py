@@ -220,12 +220,18 @@ class CatalogQuery:
             case CatalogCategory.PUBLICATION:
                 url = self.get_query_url()
                 r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
-                pgs_ids = [
-                    score
-                    for scores in list(r["associated_pgs_ids"].values())
-                    for score in scores
-                ]
-                return CatalogQuery(accession=pgs_ids).score_query()
+                try:
+                    pgs_ids = [
+                        score
+                        for scores in list(r["associated_pgs_ids"].values())
+                        for score in scores
+                    ]
+                except KeyError:
+                    raise pgsexceptions.InvalidAccessionError(
+                        f"No Catalog result for accession {self.accession!r}"
+                    )
+                else:
+                    return CatalogQuery(accession=pgs_ids).score_query()
             case CatalogCategory.TRAIT:
                 url = self.get_query_url()
                 r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
