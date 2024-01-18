@@ -154,6 +154,10 @@ class ScoringFile:
     Can also be constructed with a ScoreQueryResult to avoid hitting the API during instantiation
 
     >>> sf = ScoringFile(config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz")
+    >>> sf.genome_build
+    GenomeBuild.GRCh38
+    >>> sf.pgs_id
+    'PGS000001'
     >>> for variant in sf.variants: # doctest: +ELLIPSIS
     ...     variant
     ...     break
@@ -198,18 +202,17 @@ class ScoringFile:
             self.include_children = kwargs.get("include_children", None)
             self._init_from_accession(self._identifier, target_build=target_build)
         else:
-            self._init_from_path(self._identifier, target_build=target_build)
+            self.local_path = pathlib.Path(self._identifier)
+            self._init_from_path(target_build=target_build)
 
         # set up local file attributes
         try:
             start_line, fields = get_columns(self.local_path)
         except TypeError:
-            self._is_wide, self._start_line, self._fields, self._directory = (
-                None,
-                None,
-                None,
-                None,
-            )
+            self._is_wide = None
+            self._start_line = None
+            self._fields = None
+            self._directory = None
         else:
             self._is_wide = detect_wide(fields)
             self._start_line = start_line
@@ -245,12 +248,11 @@ class ScoringFile:
         self.path = score.get_download_url(target_build)
         self.local_path = None
 
-    def _init_from_path(self, path, target_build=None):
+    def _init_from_path(self, target_build=None):
         if target_build is not None:
             raise NotImplementedError("Can't liftover coordinates yet")
 
-        self.path = path
-        self.local_path = path
+        self.path = self.local_path
         self.catalog_response = None
 
         if (pgs_id := self._header.pgs_id) is not None:
@@ -258,8 +260,8 @@ class ScoringFile:
         else:
             raise pgsexceptions.ScoreFormatError("Missing pgs_id from header")
 
-        if header_build := self._header.HmPOS_build is not None:
-            self.genome_build = header_build
+        if (build := self._header.HmPOS_build) is not None:
+            self.genome_build = build
             self.harmonised = True
         else:
             self.genome_build = self._header.genome_build
@@ -355,7 +357,7 @@ class ScoringFile:
         self._start_line = start_line
         self._fields = fields
 
-    def normalise(self):
+    def normalise(self, drop_missing=False):
         """Extracts key fields from a scoring file in a normalised format.
 
         Takes care of quality control.
@@ -368,8 +370,52 @@ class ScoringFile:
         ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',...
         """
         yield from normalise(
-            self.variants, harmonised=self.harmonised, wide=self._is_wide
+            variants=self.variants,
+            harmonised=self.harmonised,
+            wide=self._is_wide,
+            drop_missing=drop_missing,
         )
+
+    def get_log(self, drop_missing=False, variant_log=None):
+        """Get a"""
+        log = {}
+
+        for attr in self._header.__slots__:
+            if (extracted_attr := getattr(self._header, attr, None)) is not None:
+                log[attr] = str(extracted_attr)
+            else:
+                log[attr] = None
+
+        if log["variants_number"] is None:
+            # custom scoring files might not have this information
+            log["variants_number"] = variant_log["n_variants"]
+
+        if (
+            variant_log is not None
+            and int(log["variants_number"]) != variant_log["n_variants"]
+            and not drop_missing
+        ):
+            logger.warning(
+                f"Mismatch between header ({log['variants_number']}) and output row count ({variant_log['n_variants']}) for {self.pgs_id}"
+            )
+            logger.warning(
+                "This can happen with older scoring files in the PGS Catalog (e.g. PGS000028)"
+            )
+
+        # multiple terms may be separated with a pipe
+        if log["trait_mapped"]:
+            log["trait_mapped"] = log["trait_mapped"].split("|")
+
+        if log["trait_efo"]:
+            log["trait_efo"] = log["trait_efo"].split("|")
+
+        log["columns"] = self._fields
+        log["use_harmonised"] = self.harmonised
+
+        if variant_log is not None:
+            log["sources"] = [k for k, v in variant_log.items() if k != "n_variants"]
+
+        return {self.pgs_id: log}
 
 
 class ScoringFiles:
