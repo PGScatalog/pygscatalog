@@ -1,0 +1,13 @@
+on:
+  push:
+    paths:
+      - 'pgscatalog.combineapp/**.py'
+  pull_request:
+    paths:
+      - 'pgscatalog.combineapp/**.py'
+
+jobs:
+  combineapp-pytest:
+    uses: ./.github/workflows/pytest.yaml
+    with:
+      package-directory: "pgscatalog.combineapp"

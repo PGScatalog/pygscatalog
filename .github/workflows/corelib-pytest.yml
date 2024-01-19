@@ -7,7 +7,7 @@ on:
       - 'pgscatalog.corelib/**.py'
 
 jobs:
-  downloadapp-corelib:
+  pytest-corelib:
     uses: ./.github/workflows/pytest.yaml
     with:
       package-directory: "pgscatalog.corelib"

@@ -21,7 +21,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-pgscatalog-download = 'pgscatalog.downloadapp.cli:run'
+pgscatalog-combine = 'pgscatalog.combineapp.cli:run'
 
 [tool.pytest.ini_options]
 pythonpath = [

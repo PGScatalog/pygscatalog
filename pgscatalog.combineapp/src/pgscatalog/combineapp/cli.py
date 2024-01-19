@@ -8,7 +8,7 @@ import textwrap
 
 from pgscatalog.corelib import GenomeBuild, ScoringFile
 
-from _combine import normalise, get_variant_log, TextFileWriter
+from pgscatalog.combineapp._combine import normalise, get_variant_log, TextFileWriter
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ def run():
             writer.write(normalised_score)
             variant_log.append(get_variant_log(normalised_score))
 
+    # TODO: set threads
     # TODO: fix drop_missing argument
     score_log = []
     for sf, log in zip(scoring_files, variant_log, strict=True):
