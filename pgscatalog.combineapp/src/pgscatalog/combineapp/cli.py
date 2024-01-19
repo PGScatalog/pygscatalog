@@ -55,7 +55,7 @@ def run():
         logger.info(f"All builds match target build {target_build}")
 
     variant_log = []
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = []
         for scorefile in scoring_files:
             logger.info(f"Submitting {scorefile!r}")
@@ -72,7 +72,6 @@ def run():
             writer.write(normalised_score)
             variant_log.append(get_variant_log(normalised_score))
 
-    # TODO: set threads
     # TODO: fix drop_missing argument
     score_log = []
     for sf, log in zip(scoring_files, variant_log, strict=True):
@@ -87,7 +86,8 @@ def run():
 
 
 _description_text = textwrap.dedent(
-    """\ Combine multiple scoring files in PGS Catalog format (see 
+    """
+    Combine multiple scoring files in PGS Catalog format (see 
     https://www.pgscatalog.org/downloads/ for details) to a 'long' table of columns 
     needed for variant matching and subsequent calculation.
 
@@ -100,7 +100,8 @@ _description_text = textwrap.dedent(
 )
 
 _epilog_text = textwrap.dedent(
-    """\The long table is used to simplify intersecting variants in target genotyping datasets 
+    """
+    The long table is used to simplify intersecting variants in target genotyping datasets 
     and the scoring files with the match_variants program.
     """
 )
@@ -117,7 +118,7 @@ def parse_args(args=None):
         "--scorefiles",
         dest="scorefiles",
         nargs="+",
-        help="<Required> Scorefile path (wildcard * is OK)",
+        help="<Required> Scorefile paths",
         required=True,
     )
     parser.add_argument(
