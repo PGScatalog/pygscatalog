@@ -344,6 +344,7 @@ def lift(
 def load_chain(*, current_build, target_build, chain_dir):
     """Only supports loading GRCh37 and GRCh38 chain files
 
+    >>> from ._config import Config
     >>> chain_dir = Config.ROOT_DIR / "tests" / "chain"
     >>> load_chain(current_build=GenomeBuild.GRCh37, target_build=GenomeBuild.GRCh38, chain_dir=chain_dir) # doctest: +ELLIPSIS
     <pyliftover.liftover.LiftOver object at...
