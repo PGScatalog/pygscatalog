@@ -55,7 +55,8 @@ def chain_dir(request):
 @pytest.fixture(scope="package")
 def lift_scorefiles(request):
     """These scoring files had chr_position column added for liftover test,
-    genome_build modified in the header, and harmonisation columns deleted"""
+    genome_build modified in the header, and harmonisation columns deleted.
+    The tuple is (target_build, score_path)"""
     return (
         (
             "GRCh38",

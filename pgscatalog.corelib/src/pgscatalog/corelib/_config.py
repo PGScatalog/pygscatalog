@@ -6,7 +6,7 @@ import pathlib
 
 class Config:
     API_HEADER = {
-        "user-agent": f"{__package__}/{importlib.metadata.version(__package__)}"
+        "user-agent": f"{__package__}/{importlib.metadata.version('pgscatalog.corelib')}"
     }
     # couldn't figure out a nicer way to get the root dir with a namespace package
     ROOT_DIR = pathlib.Path(__file__).resolve().parent.parent.parent.parent
