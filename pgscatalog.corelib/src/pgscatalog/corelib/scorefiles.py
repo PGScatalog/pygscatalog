@@ -357,7 +357,9 @@ class ScoringFile:
         self._start_line = start_line
         self._fields = fields
 
-    def normalise(self, drop_missing=False, liftover=False, **kwargs):
+    def normalise(
+        self, liftover=False, drop_missing=False, chain_dir=None, target_build=None
+    ):
         """Extracts key fields from a scoring file in a normalised format.
 
         Takes care of quality control.
@@ -415,7 +417,11 @@ class ScoringFile:
         A LiftoverError is only raised when many converted coordinates are missing.
         """
         yield from normalise(
-            scoring_file=self, drop_missing=drop_missing, liftover=liftover, **kwargs
+            scoring_file=self,
+            drop_missing=drop_missing,
+            liftover=liftover,
+            chain_dir=chain_dir,
+            target_build=target_build,
         )
 
     def get_log(self, drop_missing=False, variant_log=None):

@@ -8,7 +8,7 @@ import textwrap
 
 from pgscatalog.corelib import GenomeBuild, ScoringFile
 
-from pgscatalog.combineapp._combine import normalise, get_variant_log, TextFileWriter
+from ._combine import normalise, get_variant_log, TextFileWriter
 
 logger = logging.getLogger(__name__)
 
@@ -41,20 +41,26 @@ def run():
     target_build = GenomeBuild.from_string(args.target_build)
 
     for x in scoring_files:
-        if x.genome_build != target_build:
-            raise NotImplementedError(
-                f"{x.pgs_id} build {x.genome_build} doesn't match {target_build}. "
-                f"Liftover not implemented yet"
+        if x.genome_build != target_build and not args.liftover:
+            raise ValueError(
+                f"Can't combine scoring file with genome build {x.genome_build!r} when {target_build=} without --liftover"
             )
 
-    bad_builds = [x.pgs_id for x in scoring_files if x.genome_build != target_build]
-
-    for bad_file in bad_builds:
-        raise ValueError(f"{bad_file} doesn't match {target_build}, can't combine")
-    else:
-        logger.info(f"All builds match target build {target_build}")
-
     variant_log = []
+
+    if args.liftover:
+        chain_dir = pathlib.Path(args.chain_dir)
+        if not chain_dir.exists():
+            raise FileNotFoundError
+
+        liftover_kwargs = {
+            "liftover": True,
+            "chain_dir": chain_dir,
+            "target_build": target_build,
+        }
+    else:
+        liftover_kwargs = {"liftover": False}
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = []
         for scorefile in scoring_files:
@@ -63,6 +69,8 @@ def run():
                 executor.submit(
                     normalise,
                     scorefile,
+                    drop_missing=args.drop_missing,
+                    **liftover_kwargs,
                 )
             )
 
@@ -72,7 +80,6 @@ def run():
             writer.write(normalised_score)
             variant_log.append(get_variant_log(normalised_score))
 
-    # TODO: fix drop_missing argument
     score_log = []
     for sf, log in zip(scoring_files, variant_log, strict=True):
         score_log.append(sf.get_log(variant_log=log))

@@ -5,10 +5,9 @@ import pathlib
 
 
 class Config:
-    _package_version = f"{importlib.metadata.version('pgscatalog.corelib')}"
-    _package_string = f"pgscatalog.corelib/{_package_version}"
-
-    API_HEADER = {"user-agent": _package_string}
+    API_HEADER = {
+        "user-agent": f"{__package__}/{importlib.metadata.version(__package__)}"
+    }
     # couldn't figure out a nicer way to get the root dir with a namespace package
     ROOT_DIR = pathlib.Path(__file__).resolve().parent.parent.parent.parent
     # when querying PGS Catalog API / downloading

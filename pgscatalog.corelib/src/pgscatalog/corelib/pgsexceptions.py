@@ -21,6 +21,7 @@ The hierarchy:
   - CombineError
     - BuildError
     - ScoreFormatError
+    - LiftoverError
   - CatalogError
     - ScoreDownloadError
     - ScoreChecksumError
