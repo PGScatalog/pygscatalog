@@ -4,13 +4,20 @@ on a list of ScoreVariants and yields updated ScoreVariants. This makes it easy 
 plug in extra steps where needed, and lazily works on millions of objects."""
 
 import logging
+import pathlib
 
-from pgscatalog.corelib.scorevariant import EffectType, ScoreVariant, EffectAllele
+import pyliftover
+
+from .build import GenomeBuild
+from .scorevariant import EffectType, ScoreVariant, EffectAllele
+from .pgsexceptions import LiftoverError
 
 logger = logging.getLogger(__name__)
 
 
-def normalise(variants, harmonised, wide, drop_missing=False, liftover=False):
+def normalise(
+    scoring_file, drop_missing=False, liftover=False, chain_dir=None, target_build=None
+):
     """Order of steps is important:
 
     1. liftover non-harmonised data (quite rare), failed lifts get None'd
@@ -18,9 +25,17 @@ def normalise(variants, harmonised, wide, drop_missing=False, liftover=False):
     3. log and optionally drop bad variants
     """
     if liftover:
-        raise NotImplementedError
+        variants = lift(
+            scoring_file=scoring_file,
+            harmonised=scoring_file.harmonised,
+            current_build=scoring_file.genome_build,
+            target_build=target_build,
+            chain_dir=chain_dir,
+        )
+    else:
+        variants = scoring_file.variants
 
-    variants = remap_harmonised(variants, harmonised)
+    variants = remap_harmonised(variants, scoring_file.harmonised)
     variants = check_bad_variant(variants, drop_missing)
 
     if drop_missing:
@@ -32,7 +47,7 @@ def normalise(variants, harmonised, wide, drop_missing=False, liftover=False):
     variants = check_effect_allele(variants, drop_missing)
     variants = detect_complex(variants)
 
-    if wide:
+    if scoring_file._is_wide:
         # wide data must be sorted because check_duplicates requires sorted input
         variants = (x for x in sorted(variants, key=lambda x: x["accession"]))
 
@@ -280,3 +295,78 @@ def detect_complex(variants):
         logger.warning(
             "Complex files are difficult to calculate properly and may require manual intervention"
         )
+
+
+def lift(
+    *, scoring_file, harmonised, current_build, target_build, chain_dir, min_lift=0.95
+):
+    variants = scoring_file.variants
+
+    skip_lo = True
+    if target_build != current_build:
+        if not harmonised:
+            skip_lo = False
+
+    if skip_lo:
+        logger.info("Skipping liftover")
+        for variant in variants:
+            yield variant
+    else:
+        logger.info("Starting liftover")
+        lo = load_chain(
+            current_build=current_build, target_build=target_build, chain_dir=chain_dir
+        )
+
+        n_lifted = 0
+        n = 0
+
+        for variant in variants:
+            chrom = "chr" + variant.chr_name  # ew
+            pos = int(variant.chr_position) - 1  # VCF -> 1 based, UCSC -> 0 based
+            lifted = lo.convert_coordinate(chrom, pos)
+            if lifted:
+                variant.chr_name = lifted[0][0][3:].split("_")[0]
+                variant.chr_position = lifted[0][1] + 1  # reverse 0 indexing
+                yield variant
+                n_lifted += 1
+            else:
+                variant.chr_name = None
+                variant.chr_position = None
+                yield variant
+            n += 1
+
+        if (n_lifted / n) < min_lift:
+            raise LiftoverError(f"{scoring_file!r}")
+        else:
+            logger.info("Liftover successful")
+
+
+def load_chain(*, current_build, target_build, chain_dir):
+    """Only supports loading GRCh37 and GRCh38 chain files
+
+    >>> chain_dir = Config.ROOT_DIR / "tests" / "chain"
+    >>> load_chain(current_build=GenomeBuild.GRCh37, target_build=GenomeBuild.GRCh38, chain_dir=chain_dir) # doctest: +ELLIPSIS
+    <pyliftover.liftover.LiftOver object at...
+
+    >>> load_chain(current_build=GenomeBuild.GRCh38, target_build=GenomeBuild.GRCh37, chain_dir=chain_dir) # doctest: +ELLIPSIS
+    <pyliftover.liftover.LiftOver object at...
+
+    >>> load_chain(current_build=GenomeBuild.NCBI36, target_build=GenomeBuild.GRCh38, chain_dir=chain_dir)
+    Traceback (most recent call last):
+    ...
+    ValueError: Unsupported liftover current_build=GenomeBuild.NCBI36, target_build=GenomeBuild.GRCh38
+    """
+    chain_path = pathlib.Path(chain_dir)
+
+    match (current_build, target_build):
+        case GenomeBuild.GRCh37, GenomeBuild.GRCh38:
+            chain_path = chain_path / "hg19ToHg38.over.chain.gz"
+        case GenomeBuild.GRCh38, GenomeBuild.GRCh37:
+            chain_path = chain_path / "hg38ToHg19.over.chain.gz"
+        case _:
+            raise ValueError(f"Unsupported liftover {current_build=}, {target_build=}")
+
+    if not chain_path.exists():
+        raise FileNotFoundError
+
+    return pyliftover.LiftOver(str(chain_path))

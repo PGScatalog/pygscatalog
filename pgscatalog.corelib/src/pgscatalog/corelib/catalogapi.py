@@ -4,7 +4,9 @@ import enum
 import httpx
 import tenacity
 
-from pgscatalog.corelib import config, pgsexceptions
+from .pgsexceptions import QueryError, InvalidAccessionError
+from .build import GenomeBuild
+from ._config import Config
 
 
 class CatalogCategory(enum.Enum):
@@ -24,7 +26,7 @@ def _query_error(retry_state):
     try:
         retry_state.outcome.result()
     except Exception as e:
-        raise pgsexceptions.QueryError("Can't query PGS Catalog API") from e
+        raise QueryError("Can't query PGS Catalog API") from e
 
 
 class CatalogQuery:
@@ -109,9 +111,7 @@ class CatalogQuery:
                 # simple check for structured text like EFO_ACCESSION, HP_ACCESSION, etc
                 category = CatalogCategory.TRAIT
             case _:
-                raise pgsexceptions.InvalidAccessionError(
-                    f"Invalid accession: {accession!r}"
-                )
+                raise InvalidAccessionError(f"Invalid accession: {accession!r}")
 
         return category
 
@@ -171,7 +171,7 @@ class CatalogQuery:
         return (accessions[pos : pos + size] for pos in range(0, len(accessions), size))
 
     @tenacity.retry(
-        stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
+        stop=tenacity.stop_after_attempt(Config.MAX_RETRIES),
         retry=tenacity.retry_if_exception_type(httpx.RequestError),
         retry_error_callback=_query_error,
         wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
@@ -196,7 +196,7 @@ class CatalogQuery:
                 results = []
 
                 for url in self.get_query_url():
-                    r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
+                    r = httpx.get(url, timeout=5, headers=Config.API_HEADER).json()
 
                     if "request limit exceeded" in r.get("message", ""):
                         raise httpx.RequestError("request limit exceeded")
@@ -212,14 +212,14 @@ class CatalogQuery:
                         try:
                             return ScoreQueryResult.from_query(results[0])
                         except IndexError:
-                            raise pgsexceptions.InvalidAccessionError(
+                            raise InvalidAccessionError(
                                 f"No Catalog result for accession {self.accession!r}"
                             )
                     case _:
                         raise ValueError
             case CatalogCategory.PUBLICATION:
                 url = self.get_query_url()
-                r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
+                r = httpx.get(url, timeout=5, headers=Config.API_HEADER).json()
                 try:
                     pgs_ids = [
                         score
@@ -227,14 +227,14 @@ class CatalogQuery:
                         for score in scores
                     ]
                 except KeyError:
-                    raise pgsexceptions.InvalidAccessionError(
+                    raise InvalidAccessionError(
                         f"No Catalog result for accession {self.accession!r}"
                     )
                 else:
                     return CatalogQuery(accession=pgs_ids).score_query()
             case CatalogCategory.TRAIT:
                 url = self.get_query_url()
-                r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
+                r = httpx.get(url, timeout=5, headers=Config.API_HEADER).json()
                 pgs_ids = r["associated_pgs_ids"]
                 if self.include_children:
                     pgs_ids.extend(r["child_associated_pgs_ids"])
@@ -312,47 +312,3 @@ class ScoreQueryResult:
                 return self.ftp_url
             case _:
                 raise ValueError(f"Invalid genome build {build!r}")
-
-
-class GenomeBuild(enum.Enum):
-    """Enumeration of genome build: the reference genome release that a scoring file
-    is aligned to.
-
-    >>> GenomeBuild.GRCh38
-    GenomeBuild.GRCh38
-    >>> GenomeBuild.from_string("GRCh38")
-    GenomeBuild.GRCh38
-    >>> str(GenomeBuild.from_string("GRCh37"))
-    'GRCh37'
-    >>> GenomeBuild.from_string("NR") is None
-    True
-    >>> GenomeBuild.from_string("pangenome")
-    Traceback (most recent call last):
-    ...
-    ValueError: Can't match build='pangenome'
-    """
-
-    GRCh37 = "GRCh37"
-    GRCh38 = "GRCh38"
-    # just included to handle older files, incompatible unless harmonised:
-    NCBI36 = "NCBI36"  # ew
-
-    def __str__(self):
-        return str(self.value)
-
-    def __repr__(self):
-        return f"{type(self).__name__}.{self.name}"
-
-    @classmethod
-    def from_string(cls, build):
-        match build:
-            case "GRCh37" | "hg19":
-                return cls(GenomeBuild.GRCh37)
-            case "GRCh38" | "hg38":
-                return cls(GenomeBuild.GRCh38)
-            case "NR" | "" | None:
-                return None
-            case "NCBI36" | "hg18":
-                return cls(GenomeBuild.NCBI36)
-            case _:
-                raise ValueError(f"Can't match {build=}")

@@ -6,12 +6,13 @@ import itertools
 import logging
 import pathlib
 
-
-from pgscatalog.corelib import config, pgsexceptions
-from pgscatalog.corelib._download import https_download
-from pgscatalog.corelib._normalise import normalise
-from pgscatalog.corelib.catalogapi import CatalogQuery, GenomeBuild, ScoreQueryResult
-from pgscatalog.corelib._read import (
+from .build import GenomeBuild
+from .catalogapi import ScoreQueryResult, CatalogQuery
+from ._normalise import normalise
+from ._download import https_download
+from ._config import Config
+from .pgsexceptions import ScoreFormatError
+from ._read import (
     generate_header_lines,
     auto_open,
     read_rows_lazy,
@@ -27,8 +28,7 @@ class ScoringFileHeader:
     header expects a PGS Catalog header format.
 
     It's always best to build headers with from_path():
-    >>> import pgscatalog.corelib.config
-    >>> testpath = config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz"
+    >>> testpath = Config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz"
     >>> ScoringFileHeader.from_path(testpath) # doctest: +ELLIPSIS
     ScoringFileHeader(pgs_id='PGS000001', pgp_id='PGP000001', pgs_name='PRS77_BC', ...
 
@@ -153,7 +153,7 @@ class ScoringFile:
 
     Can also be constructed with a ScoreQueryResult to avoid hitting the API during instantiation
 
-    >>> sf = ScoringFile(config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz")
+    >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz")
     >>> sf.genome_build
     GenomeBuild.GRCh38
     >>> sf.pgs_id
@@ -258,7 +258,7 @@ class ScoringFile:
         if (pgs_id := self._header.pgs_id) is not None:
             self.pgs_id = pgs_id
         else:
-            raise pgsexceptions.ScoreFormatError("Missing pgs_id from header")
+            raise ScoreFormatError("Missing pgs_id from header")
 
         if (build := self._header.HmPOS_build) is not None:
             self.genome_build = build
@@ -278,7 +278,7 @@ class ScoringFile:
                 next(f)
 
             while True:
-                batch = list(itertools.islice(f, config.BATCH_SIZE))
+                batch = list(itertools.islice(f, Config.BATCH_SIZE))
                 if not batch:
                     break
 
@@ -332,13 +332,13 @@ class ScoringFile:
         ...     ScoringFile("potato", GenomeBuild.GRCh38).download(tmp_dir)
         Traceback (most recent call last):
         ...
-        pgscatalog.corelib.pgsexceptions.InvalidAccessionError: Invalid accession: 'potato'
+        corelib.pgsexceptions.InvalidAccessionError: Invalid accession: 'potato'
 
         >>> with tempfile.TemporaryDirectory() as tmp_dir:
         ...     ScoringFile("PGSinvalidaccession", GenomeBuild.GRCh38).download(tmp_dir)
         Traceback (most recent call last):
         ...
-        pgscatalog.corelib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGSinvalidaccession'
+        corelib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGSinvalidaccession'
         """
         self._directory = pathlib.Path(directory)
         fn = pathlib.Path(self.path).name
@@ -357,23 +357,65 @@ class ScoringFile:
         self._start_line = start_line
         self._fields = fields
 
-    def normalise(self, drop_missing=False):
+    def normalise(self, drop_missing=False, liftover=False, **kwargs):
         """Extracts key fields from a scoring file in a normalised format.
 
         Takes care of quality control.
 
-        >>> testpath = config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz"
+        >>> testpath = Config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz"
         >>> variants = ScoringFile(testpath).normalise()
         >>> for x in variants: # doctest: +ELLIPSIS
         ...     x
         ...     break
         ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',...
+
+        Supports lifting over scoring files from GRCh37 to GRCh38:
+
+        >>> testpath = Config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh37.txt"
+        >>> chaindir = Config.ROOT_DIR / "tests" / "chain"
+        >>> sf = ScoringFile(testpath)
+        >>> sf.harmonised = False  # lying, or liftover will be skipped
+        >>> variants = sf.normalise(liftover=True, chain_dir=chaindir, target_build=GenomeBuild.GRCh38)
+        >>> for x in variants:
+        ...     (x.rsID, x.chr_name, x.chr_position)
+        ...     break
+        ('rs78540526', '11', 69516650)
+
+        Example of lifting down (GRCh38 to GRCh37):
+
+        >>> testpath = Config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt"
+        >>> chaindir = Config.ROOT_DIR / "tests" / "chain"
+        >>> sf = ScoringFile(testpath)
+        >>> sf.harmonised = False  # lying, or liftover will be skipped
+        >>> variants = sf.normalise(liftover=True, chain_dir=chaindir, target_build=GenomeBuild.GRCh37)
+        >>> for x in variants:
+        ...     (x.rsID, x.chr_name, x.chr_position)
+        ...     break
+        ('rs78540526', '11', 69331418)
+
+        Liftover support is only really useful for custom scoring files that aren't
+        in the PGS Catalog. It's always best to use harmonised data when it's
+        available from the PGS Catalog. This data goes through a lot of validation
+        and error checking.
+
+        For example, if you set the wrong genome build, you can get incorrect
+        coordinates returned and _no errors or exceptions are raised_:
+
+        >>> testpath = Config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt"
+        >>> chaindir = Config.ROOT_DIR / "tests" / "chain"
+        >>> sf = ScoringFile(testpath)
+        >>> sf.harmonised = False  # lying, or liftover will be skipped
+        >>> sf.genome_build = GenomeBuild.GRCh37  # wrong build ! it's GRCh38
+        >>> variants = sf.normalise(liftover=True, chain_dir=chaindir, target_build=GenomeBuild.GRCh38)
+        >>> for x in variants:
+        ...     (x.rsID, x.chr_name, x.chr_position)
+        ...     break
+        ('rs78540526', '11', 69701882)
+
+        A LiftoverError is only raised when many converted coordinates are missing.
         """
         yield from normalise(
-            variants=self.variants,
-            harmonised=self.harmonised,
-            wide=self._is_wide,
-            drop_missing=drop_missing,
+            scoring_file=self, drop_missing=drop_missing, liftover=liftover, **kwargs
         )
 
     def get_log(self, drop_missing=False, variant_log=None):
@@ -465,7 +507,7 @@ class ScoringFiles:
     >>> ScoringFiles("PGPpotato")
     Traceback (most recent call last):
     ...
-    pgscatalog.corelib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGPpotato'
+    corelib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGPpotato'
     """
 
     def __init__(self, *args, target_build=None, **kwargs):

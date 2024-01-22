@@ -147,6 +147,16 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "pyliftover"
+version = "0.4"
+description = "Pure-python implementation of UCSC ``liftOver`` genome coordinate conversion."
+optional = false
+python-versions = "*"
+files = [
+    {file = "pyliftover-0.4.tar.gz", hash = "sha256:72bcfb7de907569b0eb75e86c817840365297d63ba43a961da394187e399da41"},
+]
+
+[[package]]
 name = "pytest"
 version = "7.4.4"
 description = "pytest: simple powerful testing with Python"
@@ -194,4 +204,4 @@ doc = ["reno", "sphinx", "tornado (>=4.5)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "634b93565f849216022aaaf24ef45f2ae75a27cf154abae044a3675944e643b3"
+content-hash = "e6c7f5d78197388d009a98d6d4ceecec4d7d4534e8e0c85897894593dbe9bd47"

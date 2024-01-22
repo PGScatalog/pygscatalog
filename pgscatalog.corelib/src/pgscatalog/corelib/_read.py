@@ -3,7 +3,7 @@ These functions aren't really meant to be imported outside corelib """
 import gzip
 import logging
 
-from pgscatalog.corelib.scorevariant import ScoreVariant
+from .scorevariant import ScoreVariant
 
 logger = logging.getLogger(__name__)
 

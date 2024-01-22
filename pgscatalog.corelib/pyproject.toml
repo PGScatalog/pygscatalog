@@ -13,6 +13,7 @@ packages = [
 python = "^3.11"
 httpx = "^0.26.0"
 tenacity = "^8.2.3"
+pyliftover = "^0.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"

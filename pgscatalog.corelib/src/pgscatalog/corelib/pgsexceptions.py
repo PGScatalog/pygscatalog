@@ -87,6 +87,10 @@ class ScoreFormatError(CombineError):
     """Raised when there's a problem with a scoring file."""
 
 
+class LiftoverError(CombineError):
+    """Raised when liftover has failed to convert genomic coordinates well"""
+
+
 class CatalogError(BasePGSException):
     """The base class for errors when querying or downloading from the PGS Catalog"""
 

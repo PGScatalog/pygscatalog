@@ -12,8 +12,8 @@ import urllib
 import tenacity
 import httpx
 
-from pgscatalog.corelib import pgsexceptions, config
-
+from .pgsexceptions import ScoreDownloadError, ScoreChecksumError
+from ._config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -23,25 +23,30 @@ def score_download_failed(retry_state):
     This function should be used as a callback function from a tenacity.retry decorator"""
     try:
         retry_state.outcome.result()
-    except pgsexceptions.ScoreChecksumError as e:
-        raise pgsexceptions.ScoreChecksumError("All checksum retries failed") from e
+    except ScoreChecksumError as e:
+        raise ScoreChecksumError("All checksum retries failed") from e
     except Exception as download_exc:
-        raise pgsexceptions.ScoreDownloadError(
-            "All download retries failed"
-        ) from download_exc
+        raise ScoreDownloadError("All download retries failed") from download_exc
 
 
 @tenacity.retry(
-    stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
-    retry=tenacity.retry_if_exception_type(
-        (pgsexceptions.ScoreDownloadError, pgsexceptions.ScoreChecksumError)
-    ),
+    stop=tenacity.stop_after_attempt(Config.MAX_RETRIES),
+    retry=tenacity.retry_if_exception_type((ScoreDownloadError, ScoreChecksumError)),
     retry_error_callback=score_download_failed,
     wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
 )
 def ftp_fallback(retry_state):
     """Try downloading from PGS Catalog using FTP like it's 1991 instead of HTTPS.
     This function should be used as a callback function from a tenacity.retry decorator.
+
+    Downloading over FTP is less reliable but a helpful fallback option.
+    It should never be called directly, only as a callback function from tenacity.retry:
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     out_path = "PGS000001.txt.gz"
+    ...     kwargs = {"url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000001/ScoringFiles/PGS000001.txt.gz", "directory": d, "out_path": out_path}
+    ...     retry_state = tenacity.RetryCallState(retry_object=None, fn=None, args=None, kwargs=kwargs)
+    ...     ftp_fallback(retry_state)
+    ...     assert (pathlib.Path(d) / pathlib.Path(out_path)).exists()
     """
     url = retry_state.kwargs.get("url")
     directory = retry_state.kwargs.get("directory")
@@ -50,7 +55,7 @@ def ftp_fallback(retry_state):
     checksum_url = ftp_url + ".md5"
 
     fn = pathlib.Path(retry_state.kwargs.get("out_path")).name
-    out_path = directory / fn
+    out_path = pathlib.Path(directory) / pathlib.Path(fn)
     md5 = hashlib.md5()
 
     try:
@@ -66,58 +71,52 @@ def ftp_fallback(retry_state):
             if (checksum := md5.hexdigest()) != (
                 remote := checksum_f.read().decode().split()[0]
             ):
-                raise pgsexceptions.ScoreChecksumError(
+                raise ScoreChecksumError(
                     f"Local checksum {checksum} doesn't match remote {remote}"
                 )
     except urllib.error.URLError as download_exc:
-        raise pgsexceptions.ScoreDownloadError(
-            f"Can't download {ftp_url} over FTP"
-        ) from download_exc
+        raise ScoreDownloadError(f"Can't download {ftp_url} over FTP") from download_exc
     else:
         # no exceptions thrown, move the temporary file to the final output path
         os.rename(score_f.name, out_path)
 
 
 @tenacity.retry(
-    stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
-    retry=tenacity.retry_if_exception_type(
-        (pgsexceptions.ScoreDownloadError, pgsexceptions.ScoreChecksumError)
-    ),
+    stop=tenacity.stop_after_attempt(Config.MAX_RETRIES),
+    retry=tenacity.retry_if_exception_type((ScoreDownloadError, ScoreChecksumError)),
     retry_error_callback=ftp_fallback,
     wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
 )
 def https_download(*, url, out_path, directory, overwrite):
     try:
-        if config.FTP_EXCLUSIVE:
-            logger.warning("HTTPS downloads disabled by config.FTP_EXCLUSIVE")
+        if Config.FTP_EXCLUSIVE:
+            logger.warning("HTTPS downloads disabled by Config.FTP_EXCLUSIVE")
             https_download.retry.wait = tenacity.wait_none()
             https_download.retry.stop = tenacity.stop.stop_after_attempt(1)
-            raise pgsexceptions.ScoreDownloadError("HTTPS disabled")
+            raise ScoreDownloadError("HTTPS disabled")
 
         if out_path.exists() and not overwrite:
             raise FileExistsError(f"{out_path} already exists")
 
         checksum_path = url + ".md5"
-        checksum = httpx.get(checksum_path, headers=config.API_HEADER).text
+        checksum = httpx.get(checksum_path, headers=Config.API_HEADER).text
         md5 = hashlib.md5()
 
         with tempfile.NamedTemporaryFile(dir=directory, delete=False) as f:
-            with httpx.stream("GET", url, headers=config.API_HEADER) as r:
+            with httpx.stream("GET", url, headers=Config.API_HEADER) as r:
                 for data in r.iter_bytes():
                     f.write(data)
                     md5.update(data)
 
             if (calc := md5.hexdigest()) != (remote := checksum.split()[0]):
                 # will attempt to download again (see decorator)
-                raise pgsexceptions.ScoreChecksumError(
+                raise ScoreChecksumError(
                     f"Calculated checksum {calc} doesn't match {remote}"
                 )
     except httpx.UnsupportedProtocol as protocol_exc:
         raise ValueError(f"Can't download a local file: {url!r}") from protocol_exc
     except httpx.RequestError as download_exc:
-        raise pgsexceptions.ScoreDownloadError(
-            "HTTPS download failed"
-        ) from download_exc
+        raise ScoreDownloadError("HTTPS download failed") from download_exc
     else:
         # no exceptions thrown, move the temporary file to the final output path
         os.rename(f.name, out_path)
