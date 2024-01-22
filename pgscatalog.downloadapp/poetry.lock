@@ -142,6 +142,7 @@ develop = true
 
 [package.dependencies]
 httpx = "^0.26.0"
+pyliftover = "^0.4"
 tenacity = "^8.2.3"
 
 [package.source]
@@ -162,6 +163,16 @@ files = [
 [package.extras]
 dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
+
+[[package]]
+name = "pyliftover"
+version = "0.4"
+description = "Pure-python implementation of UCSC ``liftOver`` genome coordinate conversion."
+optional = false
+python-versions = "*"
+files = [
+    {file = "pyliftover-0.4.tar.gz", hash = "sha256:72bcfb7de907569b0eb75e86c817840365297d63ba43a961da394187e399da41"},
+]
 
 [[package]]
 name = "pytest"
