@@ -1,6 +1,7 @@
 from ._config import Config
 from .scorefiles import ScoringFiles, ScoringFile
 from .scorevariant import ScoreVariant
+from .build import GenomeBuild
 from .pgsexceptions import (
     BasePGSException,
     MatchError,
@@ -44,4 +45,5 @@ __all__ = [
     "ScoringFile",
     "ScoreVariant",
     "Config",
+    "GenomeBuild",
 ]
