@@ -43,9 +43,7 @@ class ScoringFileHeader:
     GenomeBuild.GRCh37
     """
 
-    # slots are used here because we want a controlled vocabulary
-    # random extra attributes would be bad without thinking about them
-    __slots__ = (
+    fields = (
         "pgs_id",
         "pgp_id",
         "pgs_name",
@@ -132,7 +130,7 @@ class ScoringFileHeader:
             self.license = self._default_license_text
 
     def __repr__(self):
-        values = {x: getattr(self, x) for x in self.__slots__}
+        values = {x: getattr(self, x) for x in self.fields}
         value_strings = ", ".join([f"{key}='{value}'" for key, value in values.items()])
         return f"{type(self).__name__}({value_strings})"
 
@@ -143,7 +141,7 @@ class ScoringFileHeader:
         if len(raw_header) == 0:
             raise ValueError(f"No header detected in scoring file {path=}")
 
-        header_dict = {k: raw_header.get(k) for k in cls.__slots__}
+        header_dict = {k: raw_header.get(k) for k in cls.fields}
 
         return cls(**header_dict)
 
@@ -154,6 +152,9 @@ class ScoringFile:
     Can also be constructed with a ScoreQueryResult to avoid hitting the API during instantiation
 
     >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz")
+    >>> sf # doctest: +ELLIPSIS
+    ScoringFile('.../PGS000001_hmPOS_GRCh38.txt.gz', target_build=None)
+
     >>> sf.genome_build
     GenomeBuild.GRCh38
     >>> sf.pgs_id
@@ -165,7 +166,9 @@ class ScoringFile:
 
     It's important to use the .download() method when you're not working with local files,
     or many attributes and methods will fail:
-    >>> sf = ScoringFile("PGS000001")
+    >>> sf = ScoringFile("PGS000001", target_build=GenomeBuild.GRCh38)
+    >>> sf
+    ScoringFile('PGS000001', target_build=GenomeBuild.GRCh38)
     >>> for variant in sf.variants:
     ...     variant
     ...     break
@@ -174,23 +177,9 @@ class ScoringFile:
     ValueError: Local file is missing. Did you .download()?
     """
 
-    __slots__ = [
-        "pgs_id",
-        "genome_build",
-        "harmonised",
-        "path",
-        "local_path",
-        "catalog_response",
-        "include_children",
-        "_identifier",
-        "_header",
-        "_directory",
-        "_is_wide",
-        "_start_line",
-        "_fields",
-    ]
-
     def __init__(self, identifier, target_build=None, query_result=None, **kwargs):
+        self._target_build = target_build
+
         if query_result is None:
             self._identifier = identifier
         else:
@@ -209,12 +198,13 @@ class ScoringFile:
         try:
             start_line, fields = get_columns(self.local_path)
         except TypeError:
-            self._is_wide = None
+            # remote file hasn't been downloaded yet
+            self.is_wide = None
             self._start_line = None
             self._fields = None
             self._directory = None
         else:
-            self._is_wide = detect_wide(fields)
+            self.is_wide = detect_wide(fields)
             self._start_line = start_line
             self._fields = fields
             self._directory = self.local_path.parent
@@ -250,7 +240,10 @@ class ScoringFile:
 
     def _init_from_path(self, target_build=None):
         if target_build is not None:
-            raise NotImplementedError("Can't liftover coordinates yet")
+            raise ValueError(
+                "target_build must be None for local files. "
+                "Use .normalise(target_build=...) if you want to liftover genomic coordinates"
+            )
 
         self.path = self.local_path
         self.catalog_response = None
@@ -287,7 +280,7 @@ class ScoringFile:
                     csv_reader=csv_reader,
                     fields=self._fields,
                     name=self.pgs_id,
-                    wide=self._is_wide,
+                    wide=self.is_wide,
                     row_nr=row_nr,
                 )
                 # this is important because row_nr resets for each batch
@@ -301,7 +294,10 @@ class ScoringFile:
             raise ValueError("Local file is missing. Did you .download()?")
 
     def __repr__(self):
-        return f"{type(self).__name__}({repr(self._identifier)})"
+        if self.local_path is not None:
+            return f"{type(self).__name__}({repr(str(self.local_path))}, target_build={repr(self._target_build)})"
+        else:
+            return f"{type(self).__name__}({repr(self.pgs_id)}, target_build={repr(self._target_build)})"
 
     def __hash__(self):
         return hash(self.pgs_id)
@@ -353,7 +349,7 @@ class ScoringFile:
         # update local file attributes
         self.local_path = out_path
         start_line, fields = get_columns(self.local_path)
-        self._is_wide = detect_wide(fields)
+        self.is_wide = detect_wide(fields)
         self._start_line = start_line
         self._fields = fields
 
@@ -425,10 +421,9 @@ class ScoringFile:
         )
 
     def get_log(self, drop_missing=False, variant_log=None):
-        """Get a"""
         log = {}
 
-        for attr in self._header.__slots__:
+        for attr in self._header.fields:
             if (extracted_attr := getattr(self._header, attr, None)) is not None:
                 log[attr] = str(extracted_attr)
             else:
@@ -467,27 +462,23 @@ class ScoringFile:
 
 
 class ScoringFiles:
-    """This class provides methods to work with multiple ScoringFile objects.
+    """This container class provides methods to work with multiple ScoringFile objects.
 
     You can use publications or trait accessions to instantiate:
-    >>> pub = ScoringFiles("PGP000001")
-    >>> len(pub)
-    3
+    >>> ScoringFiles("PGP000001", target_build=GenomeBuild.GRCh37)
+    ScoringFiles('PGS000001', 'PGS000002', 'PGS000003', target_build=GenomeBuild.GRCh37)
 
     Or multiple PGS IDs:
-    >>> score = ScoringFiles("PGS000001", "PGS000002")
-    >>> len(score)
-    2
+    >>> ScoringFiles("PGS000001", "PGS000002")
+    ScoringFiles('PGS000001', 'PGS000002', target_build=None)
 
     List input is OK too:
-    >>> score = ScoringFiles(["PGS000001", "PGS000002"])
-    >>> len(score)
-    2
+    >>> ScoringFiles(["PGS000001", "PGS000002"])
+    ScoringFiles('PGS000001', 'PGS000002', target_build=None)
 
     Or any mixture of publications, traits, and scores:
-    >>> score = ScoringFiles("PGP000001", "PGS000001", "PGS000002")
-    >>> len(score)
-    3
+    >>> ScoringFiles("PGP000001", "PGS000001", "PGS000002")
+    ScoringFiles('PGS000001', 'PGS000002', 'PGS000003', target_build=None)
 
     Scoring files with duplicate PGS IDs (accessions) are automatically dropped.
     In the example above PGP000001 contains PGS000001, PGS000002, and PGS000003.
@@ -501,22 +492,64 @@ class ScoringFiles:
 
     For example, Alzheimer's disease (MONDO_0004975) includes Late-onset Alzheier's disease (EFO_1001870) as a child trait.
 
+    Concatenation works OK:
+    >>> ScoringFiles('PGS000001') + ScoringFiles('PGS000002', 'PGS000003')
+    ScoringFiles('PGS000001', 'PGS000002', 'PGS000003', target_build=None)
+
+    Only ScoringFiles with the same genome build can be concatenated:
+    >>> ScoringFiles('PGS000001') + ScoringFiles('PGS000002', 'PGS000003', target_build=GenomeBuild.GRCh38)
+    Traceback (most recent call last):
+    ...
+    TypeError: unsupported operand type(s) for +: 'ScoringFiles' and 'ScoringFiles'
+
+    Multiplication doesn't make sense, so isn't supported
+    >>> ScoringFiles('PGS000001') * 3
+    Traceback (most recent call last):
+    ...
+    TypeError: unsupported operand type(s) for *: 'ScoringFiles' and 'ScoringFiles'
+
     You can slice and iterate over ScoringFiles:
+    >>> score = ScoringFiles("PGP000001", target_build=GenomeBuild.GRCh38)
     >>> score[0]
-    ScoringFile('PGS000001')
+    ScoringFile('PGS000001', target_build=GenomeBuild.GRCh38)
     >>> for x in score:
     ...     x
-    ScoringFile('PGS000001')
-    ScoringFile('PGS000002')
-    ScoringFile('PGS000003')
+    ScoringFile('PGS000001', target_build=GenomeBuild.GRCh38)
+    ScoringFile('PGS000002', target_build=GenomeBuild.GRCh38)
+    ScoringFile('PGS000003', target_build=GenomeBuild.GRCh38)
+    >>> score[0] in score
+    True
 
     >>> ScoringFiles("PGPpotato")
     Traceback (most recent call last):
     ...
     corelib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGPpotato'
+
+    Local files can also be used to instantiate ScoringFiles:
+    >>> import tempfile
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     x = ScoringFile("PGS000001", target_build=GenomeBuild.GRCh38)
+    ...     x.download(directory=d)
+    ...     ScoringFiles(x.local_path) # doctest: +ELLIPSIS
+    ScoringFiles('.../PGS000001_hmPOS_GRCh38.txt.gz', target_build=None)
+
+    But the target_build parameter doesn't work with local files:
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     x = ScoringFile("PGS000002", target_build=GenomeBuild.GRCh38)
+    ...     x.download(directory=d)
+    ...     ScoringFiles(x.local_path, target_build=GenomeBuild.GRCh37)
+    Traceback (most recent call last):
+    ...
+    ValueError: Can't load local scoring file when target_build is setTry .normalise() method to do liftover, or load harmonised scoring files from PGS Catalog
+
+    If you have a local scoring file that needs to change genome build, and using PGS
+    Catalog harmonised data isn't an option, you should:
+    1. make a ScoringFile from a path
+    2. use the normalise() method with liftover enabled
     """
 
     def __init__(self, *args, target_build=None, **kwargs):
+        self.target_build = target_build
         # flatten args to provide a more flexible interface
         flargs = list(
             itertools.chain.from_iterable(
@@ -527,8 +560,19 @@ class ScoringFiles:
         pgs_batch = []
         for arg in flargs:
             match arg:
-                case _ if pathlib.Path(arg).is_file():
-                    raise NotImplementedError
+                case ScoringFile() if arg.target_build == target_build:
+                    scorefiles.append(arg)
+                case ScoringFile() if arg.target_build != target_build:
+                    raise ValueError(
+                        f"{arg.target_build=} doesn't match {target_build=}"
+                    )
+                case _ if pathlib.Path(arg).is_file() and target_build is None:
+                    scorefiles.append(ScoringFile(arg))
+                case _ if pathlib.Path(arg).is_file() and target_build is not None:
+                    raise ValueError(
+                        "Can't load local scoring file when target_build is set"
+                        "Try .normalise() method to do liftover, or load harmonised scoring files from PGS Catalog"
+                    )
                 case str() if arg.startswith("PGP") or "_" in arg:
                     self.include_children = kwargs.get("include_children", None)
                     traitpub_query = CatalogQuery(
@@ -559,8 +603,15 @@ class ScoringFiles:
         self._elements = list(dict.fromkeys(scorefiles))
 
     def __repr__(self):
-        args = ", ".join([repr(x.pgs_id) for x in self.elements])
-        return f"{type(self).__name__}({args})"
+        ids = []
+        for x in self.elements:
+            if x.local_path is not None:
+                ids.append(str(x.local_path))
+            else:
+                ids.append(x.pgs_id)
+
+        args = ", ".join([repr(x) for x in ids])
+        return f"{type(self).__name__}({args}, target_build={repr(self.target_build)})"
 
     def __iter__(self):
         return iter(self.elements)
@@ -571,15 +622,29 @@ class ScoringFiles:
     def __getitem__(self, item):
         return self.elements[item]
 
+    def __contains__(self, item):
+        for element in self.elements:
+            if element == item:
+                return True
+        return False
+
+    def __add__(self, other):
+        if isinstance(other, type(self)):
+            if self.target_build == other.target_build:
+                new_elements = self._elements + other.elements
+                return ScoringFiles(new_elements, target_build=self.target_build)
+            else:
+                return NotImplemented
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        """Intentionally not implemented. Cannot contain duplicate elements."""
+        return NotImplemented
+
     @property
     def elements(self):
         return self._elements
-
-    def combine(self):
-        """Combining multiple scoring files yields ScoreVariants in a consistent genome build and data format.
-
-        This process takes care of data munging and some quality control steps."""
-        raise NotImplementedError
 
 
 def read_header(path: pathlib.Path):

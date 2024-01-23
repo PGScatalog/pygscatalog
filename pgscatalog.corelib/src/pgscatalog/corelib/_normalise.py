@@ -47,7 +47,7 @@ def normalise(
     variants = check_effect_allele(variants, drop_missing)
     variants = detect_complex(variants)
 
-    if scoring_file._is_wide:
+    if scoring_file.is_wide:
         # wide data must be sorted because check_duplicates requires sorted input
         variants = (x for x in sorted(variants, key=lambda x: x["accession"]))
 
