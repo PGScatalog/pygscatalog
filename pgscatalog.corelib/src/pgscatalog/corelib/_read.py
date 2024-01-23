@@ -2,6 +2,7 @@
 These functions aren't really meant to be imported outside corelib """
 import gzip
 import logging
+import pathlib
 
 from .scorevariant import ScoreVariant
 
@@ -83,3 +84,17 @@ def detect_wide(cols: list[str]) -> bool:
         return True
     else:
         return False
+
+
+def read_header(path: pathlib.Path):
+    """Parses the header of a PGS Catalog format scoring file into a dictionary"""
+    header = {}
+
+    with auto_open(path, "rt") as f:
+        header_text = generate_header_lines(f)
+
+        for item in header_text:
+            key, value = item.split("=")
+            header[key[1:]] = value  # drop # character from key
+
+    return header

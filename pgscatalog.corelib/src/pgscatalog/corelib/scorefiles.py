@@ -13,11 +13,11 @@ from ._download import https_download
 from ._config import Config
 from .pgsexceptions import ScoreFormatError
 from ._read import (
-    generate_header_lines,
     auto_open,
     read_rows_lazy,
     get_columns,
     detect_wide,
+    read_header,
 )
 
 logger = logging.getLogger(__name__)
@@ -650,17 +650,3 @@ class ScoringFiles:
     @property
     def elements(self):
         return self._elements
-
-
-def read_header(path: pathlib.Path):
-    """Parses the header of a PGS Catalog format scorefile into a dictionary"""
-    header = {}
-
-    with auto_open(path, "rt") as f:
-        header_text = generate_header_lines(f)
-
-        for item in header_text:
-            key, value = item.split("=")
-            header[key[1:]] = value  # drop # character from key
-
-    return header
