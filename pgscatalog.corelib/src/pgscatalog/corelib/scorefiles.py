@@ -293,11 +293,15 @@ class ScoringFile:
         else:
             raise ValueError("Local file is missing. Did you .download()?")
 
+    @property
+    def target_build(self):
+        return self._target_build
+
     def __repr__(self):
         if self.local_path is not None:
-            return f"{type(self).__name__}({repr(str(self.local_path))}, target_build={repr(self._target_build)})"
+            return f"{type(self).__name__}({repr(str(self.local_path))}, target_build={repr(self.target_build)})"
         else:
-            return f"{type(self).__name__}({repr(self.pgs_id)}, target_build={repr(self._target_build)})"
+            return f"{type(self).__name__}({repr(self.pgs_id)}, target_build={repr(self.target_build)})"
 
     def __hash__(self):
         return hash(self.pgs_id)
@@ -502,11 +506,12 @@ class ScoringFiles:
     ...
     TypeError: unsupported operand type(s) for +: 'ScoringFiles' and 'ScoringFiles'
 
-    Multiplication doesn't make sense, so isn't supported
+    Multiplication doesn't make sense, because ScoringFile elements must be unique,
+    so isn't supported
     >>> ScoringFiles('PGS000001') * 3
     Traceback (most recent call last):
     ...
-    TypeError: unsupported operand type(s) for *: 'ScoringFiles' and 'ScoringFiles'
+    TypeError: unsupported operand type(s) for *: 'ScoringFiles' and 'int'
 
     You can slice and iterate over ScoringFiles:
     >>> score = ScoringFiles("PGP000001", target_build=GenomeBuild.GRCh38)
