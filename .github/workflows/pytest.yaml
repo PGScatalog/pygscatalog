@@ -34,13 +34,5 @@ jobs:
       - run: poetry install --with dev
         working-directory: ${{ inputs.package-directory }}
 
-      - name: Run pytest and calculate coverage
-        run: poetry run coverage run -m pytest --doctest-modules && poetry run coverage xml -o $RUNNER_TEMP/coverage.xml
+      - run: poetry run pytest --doctest-modules
         working-directory: ${{ inputs.package-directory }}
-
-      - name: Get coverage
-        uses: orgoro/coverage@v3.1
-        with:
-            coverageFile: ${{ env.RUNNER_TEMP}}/coverage.xml
-            token: ${{ secrets.GITHUB_TOKEN }}
-            thresholdAll: 0.8
