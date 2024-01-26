@@ -73,7 +73,7 @@ def run():
                     **liftover_kwargs,
                 )
             )
-
+        # TODO: do this asynchronously
         for future in concurrent.futures.as_completed(futures):
             writer = TextFileWriter(compress=compress_output, filename=out_path)
             normalised_score = future.result()

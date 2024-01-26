@@ -1,35 +1,47 @@
-""" This module defines a custom PGS exception hierarchy. There's a lot of exceptions for specific failure states,
-which can be a bad approach and too complex. However, we did this anyway for a few reasons:
+""" This module defines a custom PGS exception hierarchy.
 
-1. There's only a few types of common errors (around a dozen, with 3-4 very common)
-2. Want to exit the program with custom exit codes to simplify communicating program
-state with external processes (e.g. PGS Catalog Calculator, web platforms) without doing
-complicated things like logging to an external location
-3. This approach should make maintaining exit codes simple
-
-So the plan is to override sys.excepthook, intercept errors defined here, and map them
-to custom exit codes defined below
+This module overrides sys.excepthook. Uncaught exceptions are intercepted,
+and ``sys.exit()`` is called with a custom code. This can be helpful to debug
+problems in other applications, because there are relatively few failure states.
 
 The hierarchy:
 
 - BasePGSException
+
   - MatchError
+
     - DuplicateMatchError
+
     - MatchRateError
+
     - ZeroMatchesError
+
     - MatchValueError
+
   - CombineError
+
     - BuildError
+
     - ScoreFormatError
+
     - LiftoverError
+
   - CatalogError
+
     - ScoreDownloadError
+
     - ScoreChecksumError
+
     - QueryError
+
     - InvalidAccessionError
+
   - SamplesheetError
+
     - GenomesNotFound
+
     - SamplesheetFormatError
+
 """
 import sys
 from types import MappingProxyType
@@ -158,6 +170,7 @@ class ExceptionExitCodeMap:
 
 
 def handle_uncaught_exception(exctype, value, trace):
+    """Intercept BasePGSExceptions and trigger sys.exit with a custom code"""
     code_map = ExceptionExitCodeMap()
     oldHook(exctype, value, trace)
     if isinstance(value, BasePGSException):

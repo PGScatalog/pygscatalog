@@ -5,12 +5,14 @@ import httpx
 import tenacity
 
 from .pgsexceptions import QueryError, InvalidAccessionError
-from .build import GenomeBuild
+from .genomebuild import GenomeBuild
 from ._config import Config
 
 
 class CatalogCategory(enum.Enum):
-    """The main categories in the PGS Catalog. Enumeration values don't mean anything.
+    """The three main categories in the PGS Catalog
+
+    Enumeration values don't mean anything and are automatically generated:
 
     >>> CatalogCategory.SCORE
     <CatalogCategory.SCORE: 1>
@@ -30,23 +32,28 @@ def _query_error(retry_state):
 
 
 class CatalogQuery:
-    """Efficiently batch query the PGS Catalog API using trait (EFO), score (PGS ID),
-    or publication identifier (PGP ID).
+    """Efficiently query the PGS Catalog API using accessions
+
+    Supports trait (EFO), score (PGS ID), or publication identifier (PGP ID)
 
     >>> CatalogQuery(accession="PGS000001")
     CatalogQuery(accession='PGS000001', category=CatalogCategory.SCORE, include_children=None)
 
     Supports multiple PGS ID input in a list:
+
     >>> CatalogQuery(accession=["PGS000001", "PGS000002"])
     CatalogQuery(accession=['PGS000001', 'PGS000002'], category=CatalogCategory.SCORE, include_children=None)
 
     Duplicates are automatically dropped:
+
     >>> CatalogQuery(accession=["PGS000001", "PGS000001"])
     CatalogQuery(accession=['PGS000001'], category=CatalogCategory.SCORE, include_children=None)
 
     Publications and trait accessions are supported too:
+
     >>> CatalogQuery(accession="PGP000001")
     CatalogQuery(accession='PGP000001', category=CatalogCategory.PUBLICATION, include_children=None)
+
     >>> CatalogQuery(accession="EFO_0001645")
     CatalogQuery(accession='EFO_0001645', category=CatalogCategory.TRAIT, include_children=False)
     """
@@ -77,12 +84,8 @@ class CatalogQuery:
             f"{self.category}, include_children={self.include_children})"
         )
 
-    def infer_category(self) -> CatalogCategory:
+    def infer_category(self):
         """Inspect an accession and guess the Catalog category
-
-        Assume lists of accessions only contain PGS IDs:
-        >>> CatalogQuery(accession=["PGS000001", "PGS000002"]).infer_category()
-        <CatalogCategory.SCORE: 1>
 
         >>> CatalogQuery(accession="PGS000001").infer_category()
         <CatalogCategory.SCORE: 1>
@@ -95,6 +98,11 @@ class CatalogQuery:
 
         >>> CatalogQuery(accession="PGP000001").infer_category()
         <CatalogCategory.PUBLICATION: 3>
+
+        Be careful, assume lists of accessions only contain PGS IDs:
+
+        >>> CatalogQuery(accession=["PGS000001", "PGS000002"]).infer_category()
+        <CatalogCategory.SCORE: 1>
         """
         match accession := self.accession:
             case list() if all([x.startswith("PGS") for x in accession]):
@@ -122,20 +130,24 @@ class CatalogQuery:
 
         A list is returned because when querying multiple score accessions batches
         are created:
+
         >>> CatalogQuery(accession=["PGS000001","PGS000002"]).get_query_url()
         ['https://www.pgscatalog.org/rest/score/search?pgs_ids=PGS000001,PGS000002']
 
         (each element in this list contains up to 50 score IDs)
 
         Multiple score accessions are automatically deduplicated:
+
         >>> CatalogQuery(accession = ["PGS000001"] * 100).get_query_url()
         ['https://www.pgscatalog.org/rest/score/search?pgs_ids=PGS000001']
 
         Publications don't batch because they natively support many scores:
+
         >>> CatalogQuery(accession="PGP000001").get_query_url()
         'https://www.pgscatalog.org/rest/publication/PGP000001'
 
         Traits don't batch for the same reason as publications:
+
         >>> CatalogQuery(accession="EFO_0001645").get_query_url()
         'https://www.pgscatalog.org/rest/trait/EFO_0001645?include_children=0'
 
@@ -177,17 +189,20 @@ class CatalogQuery:
         wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
     )
     def score_query(self):
-        """Query the PGS Catalog API and return ScoreQueryResult
+        """Query the PGS Catalog API and return :class:`ScoreQueryResult`
 
         Information about a single score is returned as a dict:
+
         >>> CatalogQuery(accession="PGS000001").score_query() # doctest: +ELLIPSIS
         ScoreQueryResult(pgs_id='PGS000001', ftp_url=...
 
         If information about multiple scores is found, it's returned as a list:
+
         >>> CatalogQuery(accession=["PGS000001", "PGS000002"]).score_query() # doctest: +ELLIPSIS
         [ScoreQueryResult(pgs_id='PGS000001', ftp_url=...
 
         Publications and traits always return a list of score information:
+
         >>> CatalogQuery(accession="PGP000001").score_query() # doctest: +ELLIPSIS
         [ScoreQueryResult(pgs_id='PGS000001', ftp_url=...
         """
@@ -261,7 +276,10 @@ class ScoreQueryResult:
     @classmethod
     def from_query(cls, result_response):
         """
-        Create a ScoreQueryResult from PGS Catalog API response
+        Parses PGS Catalog API JSON response
+
+        :param result_response: PGS Catalog API JSON response
+        :returns: :class:`ScoreQueryResult`
 
         >>> fake_response = {"id": "fake", "ftp_harmonized_scoring_files":
         ... {"GRCh37": {"positions": "fake.txt.gz"}, "GRCh38": {"positions": "fake.txt.gz"}},

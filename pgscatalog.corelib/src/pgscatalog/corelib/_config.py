@@ -1,10 +1,16 @@
-""" This module contains global corelib configuration stored as class attributes."""
+""" This module managers global package configuration"""
 
 import importlib.metadata
 import pathlib
 
 
 class Config:
+    """This class stores global package configuration as class attributes
+
+    Most of the time you won't need to change anything.
+    """
+
+    # headers sent to the PGS Catalog API
     API_HEADER = {
         "user-agent": f"{__package__}/{importlib.metadata.version('pgscatalog.corelib')}"
     }

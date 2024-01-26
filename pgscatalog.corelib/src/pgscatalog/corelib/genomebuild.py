@@ -7,16 +7,6 @@ class GenomeBuild(enum.Enum):
 
     >>> GenomeBuild.GRCh38
     GenomeBuild.GRCh38
-    >>> GenomeBuild.from_string("GRCh38")
-    GenomeBuild.GRCh38
-    >>> str(GenomeBuild.from_string("GRCh37"))
-    'GRCh37'
-    >>> GenomeBuild.from_string("NR") is None
-    True
-    >>> GenomeBuild.from_string("pangenome")
-    Traceback (most recent call last):
-    ...
-    ValueError: Can't match build='pangenome'
     """
 
     GRCh37 = "GRCh37"
@@ -32,6 +22,22 @@ class GenomeBuild(enum.Enum):
 
     @classmethod
     def from_string(cls, build):
+        """
+        :param build: genome build string
+        :return: :class:`GenomeBuild`
+        :raises ValueError: From an unsupported build string
+
+        >>> GenomeBuild.from_string("GRCh38")
+        GenomeBuild.GRCh38
+        >>> str(GenomeBuild.from_string("GRCh37"))
+        'GRCh37'
+        >>> GenomeBuild.from_string("NR") is None
+        True
+        >>> GenomeBuild.from_string("pangenome")
+        Traceback (most recent call last):
+        ...
+        ValueError: Can't match build='pangenome'
+        """
         match build:
             case "GRCh37" | "hg19":
                 return cls(GenomeBuild.GRCh37)

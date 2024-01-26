@@ -1,7 +1,8 @@
 from ._config import Config
+from .catalogapi import ScoreQueryResult, CatalogQuery, CatalogCategory
 from .scorefiles import ScoringFiles, ScoringFile
 from .scorevariant import ScoreVariant
-from .build import GenomeBuild
+from .genomebuild import GenomeBuild
 from .pgsexceptions import (
     BasePGSException,
     MatchError,
@@ -46,4 +47,7 @@ __all__ = [
     "ScoreVariant",
     "Config",
     "GenomeBuild",
+    "CatalogQuery",
+    "ScoreQueryResult",
+    "CatalogCategory",
 ]

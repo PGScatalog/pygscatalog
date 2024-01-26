@@ -1,6 +1,5 @@
 """ This module contains functions that simplify downloading data from the PGS Catalog.
-HTTPS -> FTP fallback with a lot of retries. These functions aren't really meant to be
-imported outside corelib.
+HTTPS download is preferred, with FTP fallback available.
 """
 import hashlib
 import logging
@@ -19,8 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 def score_download_failed(retry_state):
-    """Every attempt to download went wrong, let's give up.
-    This function should be used as a callback function from a tenacity.retry decorator"""
+    """This function raises a ``ScoreChecksumError`` or ``ScoreDownloadError``
+    because every attempt has failed. This function should be used as a callback
+    function from a tenacity.retry decorator"""
     try:
         retry_state.outcome.result()
     except ScoreChecksumError as e:
@@ -41,12 +41,14 @@ def ftp_fallback(retry_state):
 
     Downloading over FTP is less reliable but a helpful fallback option.
     It should never be called directly, only as a callback function from tenacity.retry:
+
     >>> with tempfile.TemporaryDirectory() as d:
     ...     out_path = "PGS000001.txt.gz"
     ...     kwargs = {"url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000001/ScoringFiles/PGS000001.txt.gz", "directory": d, "out_path": out_path}
     ...     retry_state = tenacity.RetryCallState(retry_object=None, fn=None, args=None, kwargs=kwargs)
     ...     ftp_fallback(retry_state)
     ...     assert (pathlib.Path(d) / pathlib.Path(out_path)).exists()
+
     """
     url = retry_state.kwargs.get("url")
     directory = retry_state.kwargs.get("directory")
@@ -88,6 +90,8 @@ def ftp_fallback(retry_state):
     wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
 )
 def https_download(*, url, out_path, directory, overwrite):
+    """Download a file from the PGS Catalog over HTTPS, with automatic retries and
+    waiting. md5 checksums are automatically validated."""
     try:
         if Config.FTP_EXCLUSIVE:
             logger.warning("HTTPS downloads disabled by Config.FTP_EXCLUSIVE")

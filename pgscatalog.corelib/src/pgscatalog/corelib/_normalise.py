@@ -8,7 +8,7 @@ import pathlib
 
 import pyliftover
 
-from .build import GenomeBuild
+from .genomebuild import GenomeBuild
 from .scorevariant import EffectType, ScoreVariant, EffectAllele
 from .pgsexceptions import LiftoverError
 

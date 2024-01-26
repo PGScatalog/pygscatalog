@@ -10,6 +10,7 @@ class EffectAllele:
     The allele that's dosage is counted (e.g. {0, 1, 2}) and multiplied by the variant's
     weight (effect_weight) when calculating score. The effect allele is also known as
     the 'risk allele'.
+
     >>> simple_ea = EffectAllele("A")
     >>> simple_ea
     EffectAllele("A")
@@ -54,6 +55,7 @@ class EffectAllele:
         files. More complex effect alleles, like HLAs or APOE genes, often require
         extra work to represent in genomes. Users should be warned about complex
         effect alleles.
+
         >>> ea = EffectAllele("+")
         >>> ea.is_snp
         False
@@ -78,13 +80,11 @@ class EffectType(Enum):
     """Enums that represent inheritance models. The vast majority of variants have
     an additive effect type.
 
-    EffectType changes downstream PGS calculation:
+    This changes downstream PGS calculation:
 
-    ScoreVariants with an additive effect type will always be added to the PGS sum.
-    ScoreVariants with a dominant effect type are only added to the PGS sum if there
-    is at least one copy of the effect allele.
-    ScoreVariants with a recessive effect type are only added to the PGS sum if there
-    are two copies of the effect allele.
+    * ScoreVariants with an additive effect type will always be added to the PGS sum.
+    * ScoreVariants with a dominant effect type are only added to the PGS sum if there is at least one copy of the effect allele.
+    * ScoreVariants with a recessive effect type are only added to the PGS sum if there are two copies of the effect allele.
 
     >>> EffectType.ADDITIVE
     EffectType.ADDITIVE
@@ -105,7 +105,11 @@ class EffectType(Enum):
 
 
 class ScoreVariant:
-    """ """
+    """Represents a single row in a PGS Catalog scoring file.
+
+    It's rare to instantiate this class directly. Instead, create a
+    class:`ScoringFile`  from a path and you can lazily iterate over variants.
+    """
 
     mandatory_fields: tuple[str] = (
         "effect_allele",
@@ -148,15 +152,6 @@ class ScoreVariant:
     # slots uses magic to improve speed and memory when making millions of objects
     __slots__ = mandatory_fields + optional_fields + ("is_complex",)
 
-    # __init__ is intentionally verbose and avoids using loops or trickery to work:
-    #   - attributes won't change often
-    #   - class accepts keyword parameters only to init (not positional)
-    #   - type hints are helpful in parameters
-    #   - setting sensible defaults for optional fields is clear
-    #   - being verbose helps prevent IDE warnings
-    # extra kwargs are silently ignored
-    # (yes, effect_weight is treated as a str, want to avoid rounding errors at this
-    # stage)
     def __init__(
         self,
         *,
