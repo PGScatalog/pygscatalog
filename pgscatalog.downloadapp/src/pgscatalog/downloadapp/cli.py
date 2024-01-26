@@ -5,6 +5,8 @@ import pathlib
 import textwrap
 from concurrent.futures import ThreadPoolExecutor
 
+from tqdm import tqdm
+
 from pgscatalog.corelib import ScoringFiles, GenomeBuild, Config
 
 logger = logging.getLogger(__name__)
@@ -51,7 +53,9 @@ def run():
                 )
             )
 
-        for future in concurrent.futures.as_completed(futures):
+        for future in tqdm(
+            concurrent.futures.as_completed(futures), total=len(futures)
+        ):
             # nothing returned, but important to grab result to raise exceptions
             future.result()
             logger.info("Download complete")
