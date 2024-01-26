@@ -46,8 +46,10 @@ def read_rows_lazy(
 
 def generate_header_lines(f):
     """Header lines in a PGS Catalog scoring file are structured like:
-        #pgs_id=PGS000348
-        #pgs_name=PRS_PrCa
+
+    #pgs_id=PGS000348
+    #pgs_name=PRS_PrCa
+
     Files can be big, so we want to only read header lines and stop immediately
     """
     for line in f:

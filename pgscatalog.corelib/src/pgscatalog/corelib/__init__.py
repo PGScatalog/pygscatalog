@@ -3,6 +3,7 @@ from .catalogapi import ScoreQueryResult, CatalogQuery, CatalogCategory
 from .scorefiles import ScoringFiles, ScoringFile
 from .scorevariant import ScoreVariant
 from .genomebuild import GenomeBuild
+from .targetvariants import TargetVariants, TargetVariant
 from .pgsexceptions import (
     BasePGSException,
     MatchError,
@@ -50,4 +51,6 @@ __all__ = [
     "CatalogQuery",
     "ScoreQueryResult",
     "CatalogCategory",
+    "TargetVariant",
+    "TargetVariants",
 ]

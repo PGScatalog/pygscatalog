@@ -168,14 +168,13 @@ def assign_effect_type(variants):
     """Convert PGS Catalog effect type columns to EffectType enums
 
     The most common type of effect type is additive:
+
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "FALSE", "is_dominant": "FALSE"})
     >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
     [ScoreVariant(...,effect_type=EffectType.ADDITIVE,...)]
-
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "TRUE", "is_dominant": "FALSE"})
     >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
     [ScoreVariant(...,effect_type=EffectType.RECESSIVE,...)]
-
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "FALSE", "is_dominant": "TRUE"})
     >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
     [ScoreVariant(...,effect_type=EffectType.DOMINANT,...)]
@@ -200,6 +199,7 @@ def remap_harmonised(variants, harmonised):
 
     In this case chr_name, chr_position, and other allele are missing.
     Perhaps authors submitted rsID and effect allele originally:
+
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "hm_chr": 1, "hm_pos": 100, "hm_inferOtherAllele": "A"})
     >>> list(remap_harmonised([variant], harmonised=True)) # doctest: +ELLIPSIS
     [ScoreVariant(...,chr_name=1,chr_position=100,...other_allele='A'...)]
@@ -223,11 +223,13 @@ def remap_harmonised(variants, harmonised):
 def check_bad_variant(variants, drop_missing=False):
     """
     Missing effect allele:
+
     >>> variant = ScoreVariant(**{"effect_allele": None, "effect_weight": 5, "accession": "test", "row_nr": 0})
     >>> list(check_bad_variant([variant], drop_missing=True)) # doctest: +ELLIPSIS
     []
 
     Missing chromosome name and position:
+
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
     >>> list(check_bad_variant([variant], drop_missing=True)) # doctest: +ELLIPSIS
     []
@@ -254,11 +256,10 @@ def check_bad_variant(variants, drop_missing=False):
 def check_effect_allele(variants, drop_missing=False):
     """
     Odd effect allele:
+
     >>> variant = ScoreVariant(**{"effect_allele": "Z", "effect_weight": 5, "accession": "test", "row_nr": 0})
     >>> list(check_effect_allele([variant], drop_missing=True)) # doctest: +ELLIPSIS
     []
-
-
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
     >>> list(check_effect_allele([variant], drop_missing=True)) # doctest: +ELLIPSIS
     [ScoreVariant(effect_allele='A'...)]
