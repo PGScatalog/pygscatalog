@@ -22,3 +22,5 @@ class Config:
     FTP_EXCLUSIVE = False
     # the number of rows to read from a scoring file at a time
     BATCH_SIZE = 20000
+    # the number of rows to read from a variant information file at a time
+    TARGET_BATCH_SIZE = 500000

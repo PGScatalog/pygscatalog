@@ -20,6 +20,9 @@ xopen = {version = "^1.8.0", extras = ["zstd"]}
 pytest = "^7.4.4"
 sphinx-autoapi = "^3.0.0"
 
+[tool.poetry.extras]
+pyarrow = ["pyarrow"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
