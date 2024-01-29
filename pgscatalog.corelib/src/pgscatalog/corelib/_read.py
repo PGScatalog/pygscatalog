@@ -1,21 +1,13 @@
 """This module contains functions for reading data from PGS Catalog files.
 These functions aren't really meant to be imported outside corelib """
-import gzip
 import logging
 import pathlib
+
+from xopen import xopen
 
 from .scorevariant import ScoreVariant
 
 logger = logging.getLogger(__name__)
-
-
-def auto_open(filepath, mode="rt"):
-    """Automatically open a gzipped text file or an uncompressed text file"""
-    with open(filepath, "rb") as test_f:
-        if test_f.read(2) == b"\x1f\x8b":
-            return gzip.open(filepath, mode)
-        else:
-            return open(filepath, mode)
 
 
 def read_rows_lazy(
@@ -63,7 +55,7 @@ def generate_header_lines(f):
 
 def get_columns(path):
     """Grab column labels from a PGS Catalog scoring file. line_no is useful to skip the header"""
-    with auto_open(path, mode="rt") as f:
+    with xopen(path, mode="rt") as f:
         for i, line in enumerate(f):
             if line.startswith("#"):
                 continue
@@ -92,7 +84,7 @@ def read_header(path: pathlib.Path):
     """Parses the header of a PGS Catalog format scoring file into a dictionary"""
     header = {}
 
-    with auto_open(path, "rt") as f:
+    with xopen(path, "rt") as f:
         header_text = generate_header_lines(f)
 
         for item in header_text:

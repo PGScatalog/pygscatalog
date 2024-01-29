@@ -14,7 +14,7 @@ python = "^3.11"
 httpx = "^0.26.0"
 tenacity = "^8.2.3"
 pyliftover = "^0.4"
-zstandard = "^0.22.0"
+xopen = {version = "^1.8.0", extras = ["zstd"]}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"

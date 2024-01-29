@@ -3,38 +3,39 @@ being reused to calculate scores for new genotypes, the new genotypes are target
 genomes."""
 import enum
 import csv
-import io
 
-from pgscatalog.corelib._read import auto_open
-import zstandard as zstd
+from xopen import xopen
 
 
 class TargetVariant:
     """A single target variant, including genomic coordinates and allele information
 
-    >>> a = TargetVariant(chrom="1", pos=12, ref="A", alt="C")
+    >>> a = TargetVariant(chrom="1", pos=12, ref="A", alt="C", id='1:12:A:C')
     >>> a
-    TargetVariant(chrom='1', pos=12, ref='A', alt='C')
+    TargetVariant(chrom='1', pos=12, ref='A', alt='C', id='1:12:A:C')
     >>> b = a
     >>> b == a
     True
     """
 
-    def __init__(self, *, chrom, pos, ref, alt, **kwargs):
+    def __init__(self, *, chrom, pos, ref, alt, id):
         self.chrom = chrom
         self.pos = int(pos)
         self.ref = ref
         self.alt = alt
+        self.id = id
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(chrom={repr(self.chrom)}, pos="
             f"{repr(self.pos)}, "
-            f"ref={repr(self.ref)}, alt={repr(self.alt)})"
+            f"ref={repr(self.ref)}, "
+            f"alt={repr(self.alt)}, "
+            f"id={repr(self.id)})"
         )
 
     def __hash__(self):
-        return hash((self.chrom, self.pos, self.ref, self.alt))
+        return hash((self.chrom, self.pos, self.ref, self.alt, self.id))
 
     def __eq__(self, other):
         if isinstance(other, TargetVariant):
@@ -64,7 +65,7 @@ class TargetVariants:
     >>> for variant in pvar.variants:
     ...   variant
     ...   break
-    TargetVariant(chrom='14', pos=65003549, ref='T', alt='C')
+    TargetVariant(chrom='14', pos=65003549, ref='T', alt='C', id='14:65003549:T:C')
 
     gzip and zstandard compression is transparently handled for pvar:
 
@@ -72,7 +73,7 @@ class TargetVariants:
     >>> for variant in pvar.variants:
     ...   variant
     ...   break
-    TargetVariant(chrom='14', pos=65003549, ref='T', alt='C')
+    TargetVariant(chrom='14', pos=65003549, ref='T', alt='C', id='14:65003549:T:C')
 
     The same is true for bim files:
 
@@ -82,24 +83,24 @@ class TargetVariants:
     >>> for variant in bim.variants:
     ...    variant
     ...    break
-    TargetVariant(chrom='1', pos=10180, ref='C', alt='T')
+    TargetVariant(chrom='1', pos=10180, ref='C', alt='T', id='1:10180:T:C')
     >>> bim = TargetVariants(Config.ROOT_DIR / "tests" / "hapnest.bim.zst")
     >>> for variant in bim.variants:
     ...    variant
     ...    break
-    TargetVariant(chrom='1', pos=10180, ref='C', alt='T')
+    TargetVariant(chrom='1', pos=10180, ref='C', alt='T', id='1:10180:T:C')
     >>> bim = TargetVariants(Config.ROOT_DIR / "tests" / "hapnest.bim")
     >>> for variant in bim.variants:
     ...    variant
     ...    break
-    TargetVariant(chrom='1', pos=10180, ref='C', alt='T')
+    TargetVariant(chrom='1', pos=10180, ref='C', alt='T', id='1:10180:T:C')
 
     Note, A1/A2 isn't guaranteed to be ref/alt because of PLINK1 file format
     limitations. PGS Catalog libraries handle this internally, but you should be
     aware REF/ALT can be swapped by plink during VCF to bim conversion.
     """
 
-    def __init__(self, path):
+    def __init__(self, path, chrom=None):
         match n := path.name:
             case _ if "pvar" in n:
                 self.ftype = TargetType.PVAR
@@ -108,6 +109,7 @@ class TargetVariants:
             case _:
                 raise ValueError(f"Unknown target type {n!r}")
 
+        self._chrom = chrom
         self._path = str(path)
 
     def __repr__(self):
@@ -116,6 +118,10 @@ class TargetVariants:
     @property
     def path(self):
         return self._path
+
+    @property
+    def chrom(self):
+        return self._chrom
 
     @property
     def variants(self):
@@ -129,47 +135,31 @@ class TargetVariants:
 
 
 def read_pvar(path):
-    try:
-        with auto_open(path, "rt") as f:
-            reader = csv.DictReader(f, delimiter="\t")
-            yield from yield_pvar_rows(reader)
-    except UnicodeDecodeError:
-        with open(path, "rb") as f:
-            dctx = zstd.ZstdDecompressor()
-            stream_reader = dctx.stream_reader(f)
-            text_stream = io.TextIOWrapper(stream_reader, encoding="utf-8")
-            reader = csv.DictReader(text_stream, delimiter="\t")
-            yield from yield_pvar_rows(reader)
+    with xopen(path, "rt") as f:
+        # pvars do have a header column and support arbitrary columns
+        reader = csv.DictReader(f, delimiter="\t")
+        fields = {
+            "#CHROM": "chrom",
+            "POS": "pos",
+            "REF": "ref",
+            "ALT": "alt",
+            "ID": "id",
+        }
+        for row in reader:
+            yield TargetVariant(**{v: row[k] for k, v in fields.items()})
 
 
 def read_bim(path):
-    try:
-        with auto_open(path, "rt") as f:
-            reader = csv.reader(f, delimiter="\t")
-            yield from yield_bim_rows(reader)
-    except UnicodeDecodeError:
-        with open(path, "rb") as f:
-            dctx = zstd.ZstdDecompressor()
-            stream_reader = dctx.stream_reader(f)
-            text_stream = io.TextIOWrapper(stream_reader, encoding="utf-8")
-            reader = csv.reader(text_stream, delimiter="\t")
-            yield from yield_bim_rows(reader)
-
-
-def yield_pvar_rows(iterable):
-    fields = {"#CHROM": "chrom", "POS": "pos", "REF": "ref", "ALT": "alt"}
-    for row in iterable:
-        # update dict keys to match expected kwargs in TargetVariant
-        for k, v in fields.items():
-            row[v] = row.pop(k)
-        yield TargetVariant(**row)
-
-
-def yield_bim_rows(iterable):
-    # yes, A1/A2 in bim isn't ref/alt
-    fields = ["chrom", "ID", "pos_cm", "pos", "ref", "alt"]
-    for row in iterable:
-        yield TargetVariant(**dict(zip(fields, row, strict=True)))
+    with xopen(path, "rt") as f:
+        # bims don't have header column
+        reader = csv.reader(f, delimiter="\t")
+        # yes, A1/A2 in bim isn't ref/alt
+        fields = ["chrom", "id", "pos_cm", "pos", "ref", "alt"]
+        for row in reader:
+            row = dict(zip(fields, row, strict=True))
+            yield TargetVariant(
+                **{k: row[k] for k in ("chrom", "pos", "ref", "alt", "id")}
+            )
 
 
 class TargetType(enum.Enum):

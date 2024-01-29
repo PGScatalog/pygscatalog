@@ -353,6 +353,58 @@ files = [
 ]
 
 [[package]]
+name = "isal"
+version = "1.5.3"
+description = "Faster zlib and gzip compatible compression and decompression by providing python bindings for the ISA-L library."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "isal-1.5.3-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:9b4fcf4f63ec2b74999ae9cb836fc28d8dc36bec4e6a8e92b8eb45441f434ae9"},
+    {file = "isal-1.5.3-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7c6f0b56af7e732797a3e350f98d3aa6fc8e6b50f5e30ab63acf057b672a2dac"},
+    {file = "isal-1.5.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7ffefe595d4ff1617db0bd87268eb5cdac31aa8d6922c2e1b1b840d135a852fd"},
+    {file = "isal-1.5.3-cp310-cp310-musllinux_1_1_aarch64.whl", hash = "sha256:8081b0f88be840765e90e2d7d10c82712ef42fdd31f7e84f467a31ae8e419dc7"},
+    {file = "isal-1.5.3-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:ada38dfc13485f1180922d0058265dc5edc414213ab7954a9ff275e3b097d345"},
+    {file = "isal-1.5.3-cp310-cp310-win_amd64.whl", hash = "sha256:3ca4a0e8cda489f47a5d57006918ea8c2c3880a34e3f71c8dfa62f8019309fb8"},
+    {file = "isal-1.5.3-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:fee58d29018b888b6e4195e77e1a3561971ec6995b87cf371f5d82944a45e51f"},
+    {file = "isal-1.5.3-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:660a85c4faf2995def7534c3dccf26eb6102bfc8df61ebfd48afb66953775f60"},
+    {file = "isal-1.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8cd4719dc33bb2fe0180acdd67970afdc2cf48c4a76938e9ad3fafdfbab91850"},
+    {file = "isal-1.5.3-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:42d559d997a1d6740a92cddfa5ab0fc7e03f3284416272bb978a7df83ccd60e1"},
+    {file = "isal-1.5.3-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:612aef605c46f21ac79566cc80d91bdd1dab10e62965aabcfa95cd2724da1f51"},
+    {file = "isal-1.5.3-cp311-cp311-win_amd64.whl", hash = "sha256:0e8f9a9b09e2a6dc93574b986d59724bdfb098badb01bb9071a3fc01b5a4f8b8"},
+    {file = "isal-1.5.3-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:f7aa82e8338695779c4fee833e88b97dd17956fe3a0eb12a7cd6dee86c803144"},
+    {file = "isal-1.5.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:966ced045623761018517ceb79b0a221795966bb7d5f7aa8f84e8f716a07267b"},
+    {file = "isal-1.5.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:509e2499bef999bf5e9c7e40333e0ec71f5fd6eeff2e94f007b44cc464785064"},
+    {file = "isal-1.5.3-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:72c486bedc1973df22ae735ad8ddae0c3b2822b5e1118162cbceb4a9c6728798"},
+    {file = "isal-1.5.3-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:687f232eaef7a0f0a8eecb25e7e83c12420a7c3c43c3073f599df3d11d3f2f76"},
+    {file = "isal-1.5.3-cp312-cp312-win_amd64.whl", hash = "sha256:ea7e8f12c3a6b9f65b7819baefe7f1833dde80c4119203dea6da947b78d8ea74"},
+    {file = "isal-1.5.3-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:bd289331a50f05eb14c1c85734378c986f5719c1dd314e823996d838a4569bf1"},
+    {file = "isal-1.5.3-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:24d5203192fa26b5d99250c18dfc7f25a282acec8111e7a852935599070f41df"},
+    {file = "isal-1.5.3-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:81abcc7bfffd56aed22c473f196435524b7a3c6b8b0c7f10380c7b2d0165d624"},
+    {file = "isal-1.5.3-cp38-cp38-musllinux_1_1_aarch64.whl", hash = "sha256:e7e50115bde6032430d7a36c4c2c32b6bb7d2fbf9483235680fdcaec48f0a281"},
+    {file = "isal-1.5.3-cp38-cp38-musllinux_1_1_x86_64.whl", hash = "sha256:567a4ace808ee3da0701c26e0fa98e7bb3f657738fcfac9f92a069191ea4ebc4"},
+    {file = "isal-1.5.3-cp38-cp38-win_amd64.whl", hash = "sha256:c9b3380199044bc3bd56e64e1505b812d9d41298636c563b7dc6e5c191b52319"},
+    {file = "isal-1.5.3-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:0dff842d11b53ab1c9419a37563edf74982af4f8d309def113bc3aab84b2ceac"},
+    {file = "isal-1.5.3-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5e2bd02d62ae091137cff9d511ea107d3819b6f214fd47413f843cca68acc914"},
+    {file = "isal-1.5.3-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f52645cb066315831839031577fb367c9f7eee5d3fb8fbfc1c8f581bbe0463b9"},
+    {file = "isal-1.5.3-cp39-cp39-musllinux_1_1_aarch64.whl", hash = "sha256:371adaa06a292854f1953c58b2bd9f91f3cf4ac3fdad020fcbc07167dafca0dc"},
+    {file = "isal-1.5.3-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:7734d5fa82cb6edc525caf8048717e797265a0f31f4bdd313769884c1f6a3ea1"},
+    {file = "isal-1.5.3-cp39-cp39-win_amd64.whl", hash = "sha256:b3e5873c19af39ea67aabeb9d39881a80345b55938d4e875193538a6c9406d9e"},
+    {file = "isal-1.5.3-pp310-pypy310_pp73-macosx_10_9_x86_64.whl", hash = "sha256:cfe4d4b8b4282c23777a49104648819a85cb4df369e7aee6dafde9a511f0c9c5"},
+    {file = "isal-1.5.3-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a89bc100411bfd870c9c41b816b981cf2d3343586cf3de89c69e1066d8ee9e93"},
+    {file = "isal-1.5.3-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0abdbf51be6c4f8307469b366c3bd8c74c74d07c140ee184576d6629607eda03"},
+    {file = "isal-1.5.3-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:8aa86dc97fa5c4477e7145fa62a25e42dc0514775ff454f15c96c602472ca40b"},
+    {file = "isal-1.5.3-pp38-pypy38_pp73-macosx_10_9_x86_64.whl", hash = "sha256:46d767613ff8052bc4418ab04a8ac5e55f6959be29eeaff14ef6c51b19b5d94c"},
+    {file = "isal-1.5.3-pp38-pypy38_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1796ee5ab885e7787b088fdef3a8ebb0acb48b8271c8bde02b22e0c3a7bb7507"},
+    {file = "isal-1.5.3-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e0dcafcbd8b6f11eb315e20cdac7cf75b2c9efcb7f57ac149cf5f72166e21ad7"},
+    {file = "isal-1.5.3-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:e8e88ad7c88e5f13284e3d7e8b19e3af50acb1e2f0209c8584eb8b8735889ccd"},
+    {file = "isal-1.5.3-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:d90fde3378678f1559d6b76555a35bd7caca634e7dfd02a59a85da247cdeefce"},
+    {file = "isal-1.5.3-pp39-pypy39_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9c9fb681a19c35e30130209ce321ba3ff852c417267a8ad33f75128d155a4204"},
+    {file = "isal-1.5.3-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:af9d9120e7a3d54f300c61e5ce79d0877b704325dad59a21d8a76f5471841dc4"},
+    {file = "isal-1.5.3-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:a2e5f2b202cd7205118ec7a5a441502ede2e432f5a3504c956b953561cbb7a4b"},
+    {file = "isal-1.5.3.tar.gz", hash = "sha256:01d9b76db3535374d720a06f5d66031f74e609698f0382fdd6ab3a0351210b72"},
+]
+
+[[package]]
 name = "jinja2"
 version = "3.1.3"
 description = "A very fast and expressive template engine."
@@ -451,13 +503,13 @@ files = [
 
 [[package]]
 name = "pluggy"
-version = "1.3.0"
+version = "1.4.0"
 description = "plugin and hook calling mechanisms for python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pluggy-1.3.0-py3-none-any.whl", hash = "sha256:d89c696a773f8bd377d18e5ecda92b7a3793cbe66c87060a6fb58c7b6e1061f7"},
-    {file = "pluggy-1.3.0.tar.gz", hash = "sha256:cf61ae8f126ac6f7c451172cf30e3e43d3ca77615509771b3a984a0730651e12"},
+    {file = "pluggy-1.4.0-py3-none-any.whl", hash = "sha256:7db9f7b503d67d1c5b95f59773ebb58a8c1c288129a88665838012cfb07b8981"},
+    {file = "pluggy-1.4.0.tar.gz", hash = "sha256:8c85c2876142a764e5b7548e7d9a0e0ddb46f5185161049a79b7e974454223be"},
 ]
 
 [package.extras]
@@ -795,6 +847,25 @@ socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
+name = "xopen"
+version = "1.8.0"
+description = "Open compressed files transparently"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "xopen-1.8.0-py3-none-any.whl", hash = "sha256:e151a23bcaa0913e9683654c197d1da2444d4e59f27aa17e93bbf42eb4a72d7d"},
+    {file = "xopen-1.8.0.tar.gz", hash = "sha256:00c0fc8945311b1c37e0f845a596d37f26a3d9820aaeb52cffd4f25fdae50840"},
+]
+
+[package.dependencies]
+isal = {version = ">=1.4.1", markers = "platform_machine == \"x86_64\" or platform_machine == \"AMD64\" or platform_machine == \"aarch64\""}
+zstandard = {version = "<1", optional = true, markers = "extra == \"zstd\""}
+
+[package.extras]
+dev = ["pytest"]
+zstd = ["zstandard (<1)"]
+
+[[package]]
 name = "zstandard"
 version = "0.22.0"
 description = "Zstandard bindings for Python"
@@ -858,4 +929,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "a65f448d409abc50276b6b631032ba07604d0870a0091f31b52847e57d3073e1"
+content-hash = "3d165175953641ab805ed73f01776ed120e01d181dfd9d40b596a54c6a4545ab"

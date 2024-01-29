@@ -6,6 +6,8 @@ import itertools
 import logging
 import pathlib
 
+from xopen import xopen
+
 from .genomebuild import GenomeBuild
 from .catalogapi import ScoreQueryResult, CatalogQuery
 from ._normalise import normalise
@@ -13,7 +15,6 @@ from ._download import https_download
 from ._config import Config
 from .pgsexceptions import ScoreFormatError
 from ._read import (
-    auto_open,
     read_rows_lazy,
     get_columns,
     detect_wide,
@@ -305,7 +306,7 @@ class ScoringFile:
 
         row_nr = 0
 
-        with auto_open(self.local_path, mode="rt") as f:
+        with xopen(self.local_path, mode="rt") as f:
             for _ in range(self._start_line + 1):
                 # skip header
                 next(f)
