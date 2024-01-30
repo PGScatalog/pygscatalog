@@ -745,14 +745,18 @@ class NormalisedScoringFile:
     NormalisedScoringFile(ScoringFile('.../PGS000001_hmPOS_GRCh38.txt.gz', ...))
 
 
-    >>> for i in test.variants:  # doctest.+ELLIPSIS
+    >>> for i in test.variants:  # doctest: +ELLIPSIS
     ...     i
     ...     break
     ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',...
 
-    >>> for x in test.to_pa_recordbatch():
+    >>> for x in test.to_pa_recordbatch():  # doctest: +ELLIPSIS
     ...     x
     ...     break
+    pyarrow.RecordBatch
+    chr_name: string
+    ...
+    row_nr: [0,1,2,3,4,5,6,7,8,9,...,67,68,69,70,71,72,73,74,75,76]
     """
 
     def __init__(self, path):
