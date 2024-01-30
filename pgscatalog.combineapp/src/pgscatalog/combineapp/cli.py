@@ -6,6 +6,7 @@ import pathlib
 import sys
 import textwrap
 
+from tqdm import tqdm
 from pgscatalog.corelib import GenomeBuild, ScoringFile
 
 from ._combine import normalise, get_variant_log, TextFileWriter
@@ -73,8 +74,10 @@ def run():
                     **liftover_kwargs,
                 )
             )
-        # TODO: do this asynchronously
-        for future in concurrent.futures.as_completed(futures):
+        # TODO: do this I/O asynchronously
+        for future in tqdm(
+            concurrent.futures.as_completed(futures), total=len(futures)
+        ):
             writer = TextFileWriter(compress=compress_output, filename=out_path)
             normalised_score = future.result()
             writer.write(normalised_score)
