@@ -1,5 +1,7 @@
 import os
 
+import polars as pl
+
 from pgscatalog.corelib import NormalisedScoringFile
 
 from ._arrow import loose
@@ -11,20 +13,22 @@ class ScoringFileFrame:
     Instantiated with a NormalisedScoringFile written to a file (i.e. the output of
     combine scorefiles application):
 
-    >>> import polars as pl
     >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "combined.txt.gz"
     >>> x = ScoringFileFrame(path)
     >>> x  # doctest: +ELLIPSIS
     ScoringFileFrame(NormalisedScoringFile('.../combined.txt.gz'))
+
+    The context manager returns a polars dataframe with global string cache enabled:
+
     >>> with x as arrow:
-    ...     assert os.path.exists(arrow.arrowpath.name)
-    ...     pl.read_ipc(arrow.arrowpath.name).shape
+    ...     assert os.path.exists(x.arrowpath.name)
+    ...     arrow.collect().shape
     (154, 9)
-    >>> assert not os.path.exists(arrow.arrowpath.name)
+    >>> assert not os.path.exists(x.arrowpath.name)
     """
 
     def __init__(self, path, cleanup=True, tmpdir=None):
-        self._scoringfile = NormalisedScoringFile(path)
+        self.scoringfile = NormalisedScoringFile(path)
         self._cleanup = cleanup
         self._tmpdir = tmpdir
         self._loosed = False
@@ -33,17 +37,19 @@ class ScoringFileFrame:
     def __enter__(self):
         # convert to arrow files
         self.arrowpath = loose(
-            record_batches=self._scoringfile.to_pa_recordbatch(),
-            schema=self._scoringfile.pa_schema(),
+            record_batches=self.scoringfile.to_pa_recordbatch(),
+            schema=self.scoringfile.pa_schema(),
             tmpdir=self._tmpdir,
         )
         self._loosed = True
-        return self
+        pl.enable_string_cache()
+        return pl.scan_ipc(self.arrowpath.name)
 
     def __exit__(self, *args, **kwargs):
         if self._cleanup:
             os.unlink(self.arrowpath.name)
         self._loosed = False
+        pl.disable_string_cache()
 
     def __repr__(self):
-        return f"{type(self).__name__}({repr(self._scoringfile)})"
+        return f"{type(self).__name__}({repr(self.scoringfile)})"
