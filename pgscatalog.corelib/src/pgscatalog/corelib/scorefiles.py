@@ -8,6 +8,14 @@ import pathlib
 
 from xopen import xopen
 
+try:
+    import pyarrow as pa
+except ImportError:
+    PYARROW_AVAILABLE = False
+else:
+    PYARROW_AVAILABLE = True
+
+from .scorevariant import ScoreVariant
 from .genomebuild import GenomeBuild
 from .catalogapi import ScoreQueryResult, CatalogQuery
 from ._normalise import normalise
@@ -707,3 +715,131 @@ class ScoringFiles:
     def elements(self):
         """Returns a list of :class:`ScoringFile` objects contained inside :class:`ScoringFiles`"""
         return self._elements
+
+
+def _read_normalised_rows(path):
+    with xopen(path) as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            yield ScoreVariant(**row)
+
+
+class NormalisedScoringFile:
+    """This class represents a ScoringFile that's been normalised to have a consistent format
+
+    Its main purpose is to provide a convenient way to iterate over variants
+
+    >>> normpath = Config.ROOT_DIR / "tests" / "combined.txt.gz"
+    >>> test = NormalisedScoringFile(normpath)
+    >>> test  # doctest: +ELLIPSIS
+    NormalisedScoringFile('.../tests/combined.txt.gz')
+
+    >>> for i in test.variants:  # doctest: +ELLIPSIS
+    ...     i
+    ...     break
+    ScoreVariant(effect_allele='T',effect_weight='0.2104229869048294',...
+
+    >>> testpath = Config.ROOT_DIR / "tests" / "PGS000001_hmPOS_GRCh38.txt.gz"
+    >>> test = NormalisedScoringFile(ScoringFile(testpath))
+    >>> test  # doctest: +ELLIPSIS
+    NormalisedScoringFile(ScoringFile('.../PGS000001_hmPOS_GRCh38.txt.gz', ...))
+
+
+    >>> for i in test.variants:  # doctest.+ELLIPSIS
+    ...     i
+    ...     break
+    ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',...
+
+    >>> for x in test.to_pa_recordbatch():
+    ...     x
+    ...     break
+    """
+
+    def __init__(self, path):
+        try:
+            xopen(path)
+        except TypeError:
+            self.path = False
+        else:
+            self.path = True
+        finally:
+            # either a ScoringFile or a path to a combined file
+            self._scoringfile = path
+
+    def __iter__(self):
+        yield from self.variants
+
+    @property
+    def variants(self):
+        if self.path:
+            # get a fresh generator from the file
+            self._variants = _read_normalised_rows(self._scoringfile)
+        else:
+            # get a fresh generator from the normalise() method
+            self._variants = self._scoringfile.normalise()
+
+        return self._variants
+
+    def __repr__(self):
+        if self.path:
+            x = f"{repr(str(self._scoringfile))}"
+        else:
+            x = f"{repr(self._scoringfile)}"
+
+        return f"{type(self).__name__}({x})"
+
+    def pa_schema(self):
+        """Return a pyarrow schema used when writing object to files"""
+        if not PYARROW_AVAILABLE:
+            raise ImportError("pyarrow is not available")
+
+        return pa.schema(
+            [
+                pa.field("chr_name", pa.string()),
+                pa.field("chr_position", pa.uint64()),
+                pa.field("effect_allele", pa.string()),
+                pa.field("other_allele", pa.string()),
+                pa.field("effect_weight", pa.string()),
+                pa.field("effect_type", pa.string()),
+                pa.field("is_duplicated", pa.bool_()),
+                pa.field("accession", pa.string()),
+                pa.field("row_nr", pa.uint64()),
+            ]
+        )
+
+    def to_pa_recordbatch(self):
+        """Yields an iterator of pyarrow RecordBatches"""
+        if not PYARROW_AVAILABLE:
+            raise ImportError("pyarrow is not available")
+
+        # accessing the property returns a fresh generator
+        # don't want an infinite loop
+        variants = self.variants
+
+        while True:
+            batch = list(itertools.islice(variants, Config.TARGET_BATCH_SIZE))
+            if not batch:
+                break
+
+            _chrom, _pos, _ea, _oa, _ew, _et, _dup, _acc, _rownr = zip(
+                *(
+                    (
+                        x.chr_name,
+                        x.chr_position,
+                        str(x.effect_allele),
+                        x.other_allele,
+                        x.effect_weight,
+                        str(x.effect_type),
+                        x.is_duplicated,
+                        x.accession,
+                        x.row_nr,
+                    )
+                    for x in batch
+                ),
+                strict=True,
+            )
+
+            yield pa.RecordBatch.from_arrays(
+                [_chrom, _pos, _ea, _oa, _ew, _et, _dup, _acc, _rownr],
+                schema=self.pa_schema(),
+            )

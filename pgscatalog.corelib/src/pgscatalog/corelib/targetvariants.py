@@ -6,7 +6,6 @@ import csv
 import itertools
 import pathlib
 
-import pyarrow
 from xopen import xopen
 
 from ._config import Config
@@ -151,7 +150,7 @@ class TargetVariants:
     def pa_schema(self):
         """Return a pyarrow schema used when writing object to files"""
         if not PYARROW_AVAILABLE:
-            raise ImportError
+            raise ImportError("pyarrow is not available")
 
         return pa.schema(
             [
@@ -166,7 +165,7 @@ class TargetVariants:
     def to_pa_recordbatch(self):
         """Yields an iterator of pyarrow RecordBatches"""
         if not PYARROW_AVAILABLE:
-            raise ImportError
+            raise ImportError("pyarrow is not available")
 
         # accessing the property returns a fresh generator
         # don't want an infinite loop
@@ -186,7 +185,7 @@ class TargetVariants:
             ids = pa.array(_id, type=pa.string())
             refs = pa.array(_ref, type=pa.string())
             alts = pa.array(_alt, type=pa.string())
-            yield pyarrow.RecordBatch.from_arrays(
+            yield pa.RecordBatch.from_arrays(
                 [chroms, positions, ids, refs, alts], schema=self.pa_schema()
             )
 
