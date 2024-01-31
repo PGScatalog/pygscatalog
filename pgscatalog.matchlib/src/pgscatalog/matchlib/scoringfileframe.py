@@ -1,10 +1,17 @@
+import logging
 import os
+import shutil
 
 import polars as pl
 
 from pgscatalog.corelib import NormalisedScoringFile
 
 from ._arrow import loose
+from ._match.preprocess import complement_valid_alleles
+from ._match.match import get_all_matches
+from .matchresult import MatchResult
+
+logger = logging.getLogger(__name__)
 
 
 class ScoringFileFrame:
@@ -13,7 +20,9 @@ class ScoringFileFrame:
     Instantiated with a NormalisedScoringFile written to a file (i.e. the output of
     combine scorefiles application):
 
-    >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "combined.txt.gz"
+    >>> from ._config import Config
+    >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" /
+    "combined.txt.gz"
     >>> x = ScoringFileFrame(path)
     >>> x  # doctest: +ELLIPSIS
     ScoringFileFrame(NormalisedScoringFile('.../combined.txt.gz'))
@@ -23,12 +32,18 @@ class ScoringFileFrame:
     >>> with x as arrow:
     ...     assert os.path.exists(x.arrowpath.name)
     ...     arrow.collect().shape
-    (154, 9)
-    >>> assert not os.path.exists(x.arrowpath.name)
+    (154, 11)
+    >>> assert not os.path.exists(x.arrowpath.name)  # all cleaned up
+
+    >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "hapnest.bim"
+    >>> target = VariantFrame(path)
+    >>> with target as target_df:
+    ...     x.match(target_df)
     """
 
-    def __init__(self, path, cleanup=True, tmpdir=None):
+    def __init__(self, path, chrom=None, cleanup=True, tmpdir=None):
         self.scoringfile = NormalisedScoringFile(path)
+        self.chrom = chrom
         self._cleanup = cleanup
         self._tmpdir = tmpdir
         self._loosed = False
@@ -36,20 +51,57 @@ class ScoringFileFrame:
 
     def __enter__(self):
         # convert to arrow files
-        self.arrowpath = loose(
-            record_batches=self.scoringfile.to_pa_recordbatch(),
-            schema=self.scoringfile.pa_schema(),
-            tmpdir=self._tmpdir,
+        if not self._loosed:
+            logger.debug(f"Converting {self!r} to feather format")
+            self.arrowpath = loose(
+                record_batches=self.scoringfile.to_pa_recordbatch(),
+                schema=self.scoringfile.pa_schema(),
+                tmpdir=self._tmpdir,
+            )
+            self._loosed = True
+            logger.debug(f"{self!r} feather conversion complete")
+
+        # note: pl.enable_string_cache() must be called by variantframe context manager
+        # so don't alter the string cache
+        score_df = (
+            pl.scan_ipc(self.arrowpath.name)
+            .pipe(complement_valid_alleles, flip_cols=["effect_allele", "other_allele"])
+            .with_columns(
+                [
+                    pl.col("chr_name").cast(pl.Categorical),
+                    pl.col("accession").cast(pl.Categorical),
+                    pl.col("effect_allele").cast(pl.Categorical),
+                    pl.col("other_allele").cast(pl.Categorical),
+                    pl.col("effect_allele_FLIP").cast(pl.Categorical),
+                    pl.col("other_allele_FLIP").cast(pl.Categorical),
+                ]
+            )
         )
-        self._loosed = True
-        pl.enable_string_cache()
-        return pl.scan_ipc(self.arrowpath.name)
+
+        if self.chrom is not None:
+            # add filter to query plan
+            logger.debug(f"Filtering scoring file to chromosome {self.chrom}")
+            score_df = score_df.filter(pl.col("chr_name") == self.chrom)
+
+        return score_df
 
     def __exit__(self, *args, **kwargs):
         if self._cleanup:
             os.unlink(self.arrowpath.name)
         self._loosed = False
-        pl.disable_string_cache()
 
     def __repr__(self):
         return f"{type(self).__name__}({repr(self.scoringfile)})"
+
+    def match(self, target_df):
+        with self as score_df:
+            return MatchResult(get_all_matches(scorefile=score_df, target=target_df))
+
+    def save_ipc(self, destination):
+        if not self._loosed:
+            raise ValueError(
+                "Can't save IPC because it doesn't exist."
+                "Try calling inside a with: statement"
+            )
+
+        shutil.copyfile(self.arrowpath, destination)

@@ -20,7 +20,7 @@ def complement_valid_alleles(df: pl.LazyFrame, flip_cols: list[str]) -> pl.LazyF
     for col in flip_cols:
         logger.debug(f"Complementing column {col}")
         new_col = col + "_FLIP"
-        df = df.with_column(
+        df = df.with_columns(
             pl.when(pl.col(col).str.contains("^[ACGT]+$"))
             .then(
                 pl.col(col)
