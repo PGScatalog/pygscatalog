@@ -14,6 +14,11 @@ from .matchresult import MatchResult
 logger = logging.getLogger(__name__)
 
 
+def match_variants(score_df, target_df, target):
+    matches = get_all_matches(scorefile=score_df, target=target_df)
+    return MatchResult(dataset=target.dataset, matchresult=matches)
+
+
 class ScoringFileFrame:
     """Like NormalisedScoringFile, but backed by the polars dataframe library
 
@@ -21,8 +26,7 @@ class ScoringFileFrame:
     combine scorefiles application):
 
     >>> from ._config import Config
-    >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" /
-    "combined.txt.gz"
+    >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "combined.txt.gz"
     >>> x = ScoringFileFrame(path)
     >>> x  # doctest: +ELLIPSIS
     ScoringFileFrame(NormalisedScoringFile('.../combined.txt.gz'))
@@ -35,14 +39,16 @@ class ScoringFileFrame:
     (154, 11)
     >>> assert not os.path.exists(x.arrowpath.name)  # all cleaned up
 
+    >>> from .variantframe import VariantFrame
     >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "hapnest.bim"
-    >>> target = VariantFrame(path)
-    >>> with target as target_df:
-    ...     x.match(target_df)
+    >>> target = VariantFrame(path, dataset="hapnest")
+    >>> with target as target_df, x as score_df:
+    ...     match_variants(score_df=score_df, target_df=target_df, target=target)
     """
 
     def __init__(self, path, chrom=None, cleanup=True, tmpdir=None):
         self.scoringfile = NormalisedScoringFile(path)
+        # used for filtering the scoring file if the target contains a single chromosome
         self.chrom = chrom
         self._cleanup = cleanup
         self._tmpdir = tmpdir
@@ -50,7 +56,8 @@ class ScoringFileFrame:
         self.arrowpath = None
 
     def __enter__(self):
-        # convert to arrow files
+        """Use a context manager to create arrow IPC files and return a lazyframe"""
+        # prevent nested context managers creating multiple arrow files
         if not self._loosed:
             logger.debug(f"Converting {self!r} to feather format")
             self.arrowpath = loose(
@@ -61,22 +68,26 @@ class ScoringFileFrame:
             self._loosed = True
             logger.debug(f"{self!r} feather conversion complete")
 
-        # note: pl.enable_string_cache() must be called by variantframe context manager
-        # so don't alter the string cache
-        score_df = (
-            pl.scan_ipc(self.arrowpath.name)
-            .pipe(complement_valid_alleles, flip_cols=["effect_allele", "other_allele"])
-            .with_columns(
-                [
-                    pl.col("chr_name").cast(pl.Categorical),
-                    pl.col("accession").cast(pl.Categorical),
-                    pl.col("effect_allele").cast(pl.Categorical),
-                    pl.col("other_allele").cast(pl.Categorical),
-                    pl.col("effect_allele_FLIP").cast(pl.Categorical),
-                    pl.col("other_allele_FLIP").cast(pl.Categorical),
-                ]
+        if self.arrowpath is not None:
+            score_df = (
+                pl.scan_ipc(self.arrowpath.name)
+                .pipe(
+                    complement_valid_alleles,
+                    flip_cols=["effect_allele", "other_allele"],
+                )
+                .with_columns(
+                    [
+                        pl.col("chr_name").cast(pl.Categorical),
+                        pl.col("accession").cast(pl.Categorical),
+                        pl.col("effect_allele").cast(pl.Categorical),
+                        pl.col("other_allele").cast(pl.Categorical),
+                        pl.col("effect_allele_FLIP").cast(pl.Categorical),
+                        pl.col("other_allele_FLIP").cast(pl.Categorical),
+                    ]
+                )
             )
-        )
+        else:
+            raise ValueError("No arrow IPC file")
 
         if self.chrom is not None:
             # add filter to query plan
@@ -86,16 +97,13 @@ class ScoringFileFrame:
         return score_df
 
     def __exit__(self, *args, **kwargs):
+        """Optionally clean up the arrow IPC files"""
         if self._cleanup:
             os.unlink(self.arrowpath.name)
-        self._loosed = False
+            self._loosed = False
 
     def __repr__(self):
         return f"{type(self).__name__}({repr(self.scoringfile)})"
-
-    def match(self, target_df):
-        with self as score_df:
-            return MatchResult(get_all_matches(scorefile=score_df, target=target_df))
 
     def save_ipc(self, destination):
         if not self._loosed:

@@ -15,18 +15,18 @@ logger = logging.getLogger(__name__)
 class VariantFrame:
     """Similar to TargetVariants, but backed by the polars dataframe library
 
-    Fast, supports more complicated things, but requires more resources (CPU/RAM)
+    Fast, supports more complicated things, but requires more resources.
 
     The context manager returns a polars LazyFrame:
 
     >>> from ._config import Config
     >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "hapnest.bim"
-    >>> x = VariantFrame(path)
+    >>> x = VariantFrame(path, dataset="hapnest")
     >>> with x as df:
     ...     df.collect().shape
     (101, 6)
     >>> x  # doctest: +ELLIPSIS
-    VariantFrame(path='.../hapnest.bim', chrom=None, cleanup=True, tmpdir=None)
+    VariantFrame(path='.../hapnest.bim', dataset='hapnest', chrom=None, cleanup=True, tmpdir=None)
 
     The VariantFrame contains a TargetVariant object:
 
@@ -34,8 +34,10 @@ class VariantFrame:
     TargetVariants(path='.../hapnest.bim')
     """
 
-    def __init__(self, path, chrom=None, cleanup=True, tmpdir=None):
+    def __init__(self, path, dataset, chrom=None, cleanup=True, tmpdir=None):
         self.variants = TargetVariants(path)
+        # variant frames need an ID column (dataset)
+        self.dataset = dataset
         self.chrom = chrom
         self._cleanup = cleanup
         self._tmpdir = tmpdir
@@ -73,13 +75,14 @@ class VariantFrame:
     def __exit__(self, *args, **kwargs):
         if self._cleanup:
             os.unlink(self.arrowpath.name)
-        self._loosed = False
+            self._loosed = False
         pl.disable_string_cache()
 
     def __repr__(self):
         return (
-            f"{type(self).__name__}(path={repr(self.variants.path)}, chrom={repr(self.chrom)},"
-            f" cleanup={repr(self._cleanup)}, tmpdir={repr(self._tmpdir)})"
+            f"{type(self).__name__}(path={repr(self.variants.path)}, dataset={repr(self.dataset)}, "
+            f"chrom={repr(self.chrom)}, cleanup={repr(self._cleanup)}, "
+            f"tmpdir={repr(self._tmpdir)})"
         )
 
     def save_ipc(self, destination):
