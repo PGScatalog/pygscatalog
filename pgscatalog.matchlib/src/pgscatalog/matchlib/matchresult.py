@@ -3,7 +3,7 @@ import logging
 
 import polars as pl
 
-from .plinkframe import PlinkFrames
+from ._plinkframe import PlinkFrames
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +87,7 @@ class MatchResult:
 class MatchResults(collections.abc.Sequence):
     """
     Container for MatchResult. Useful for making logs and writing scoring files.
+
     >>> import tempfile, os
     >>> from ._config import Config
     >>> from .variantframe import VariantFrame
