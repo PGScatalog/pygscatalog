@@ -53,7 +53,7 @@ def annotate_multiallelic(df: pl.LazyFrame) -> pl.LazyFrame:
         df.select("is_multiallelic").unique().collect().get_column("is_multiallelic")
     ).any():
         logger.debug("Exploding dataframe to handle multiallelic variants")
-        return df.with_columns(pl.col("ALT").str.split(by=",")).explode("ALT")
+        return df.with_columns(pl.col("ALT").str.split_and_pivot(by=",")).explode("ALT")
     else:
         logger.debug("No multiallelic variants detected")
         return df

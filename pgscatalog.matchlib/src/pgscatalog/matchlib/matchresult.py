@@ -1,11 +1,9 @@
 import collections.abc
 import logging
-import pathlib
 
 import polars as pl
 
 from .plinkframe import PlinkFrames
-from ._match.plink import pivot_score
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +87,7 @@ class MatchResult:
 class MatchResults(collections.abc.Sequence):
     """
     Container for MatchResult. Useful for making logs and writing scoring files.
-    >>> import tempfile
+    >>> import tempfile, os
     >>> from ._config import Config
     >>> from .variantframe import VariantFrame
     >>> from .scoringfileframe import ScoringFileFrame, match_variants
@@ -152,21 +150,7 @@ class MatchResults(collections.abc.Sequence):
         # TODO: create summary log before writing - need to explode
 
         for frame in plink:
-            if split:
-                dfs = frame.split()
-                for chrom, df in dfs.items():
-                    fout = (
-                        pathlib.Path(directory)
-                        / f"{self.dataset}_{chrom}_{str(frame.effect_type)}_{frame.n}.scorefile.gz"
-                    )
-                    df.pipe(pivot_score).write_csv(fout, separator="\t")
-            else:
-                chrom = "ALL"
-                fout = (
-                    pathlib.Path(directory)
-                    / f"{self.dataset}_{chrom}_{str(frame.effect_type)}_{frame.n}.scorefile.gz"
-                )
-                frame.df.collect().pipe(pivot_score).write_csv(fout, separator="\t")
+            frame.write(directory=directory, split=split, dataset=self.dataset)
 
     def variant_log(self):
         raise NotImplementedError
