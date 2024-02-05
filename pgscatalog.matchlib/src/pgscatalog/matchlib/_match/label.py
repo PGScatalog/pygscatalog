@@ -306,8 +306,8 @@ def _label_flips(df: pl.LazyFrame, skip_flip: bool) -> pl.LazyFrame:
 
 
 def _label_filter(df: pl.LazyFrame, filter_IDs: list) -> pl.LazyFrame:
-    nIDs = len(filter_IDs)
-    if nIDs > 0:
+    if filter_IDs is not None:
+        nIDs = len(filter_IDs)
         logger.debug(
             "Excluding variants that are not in ID list (read {} IDs)".format(nIDs)
         )

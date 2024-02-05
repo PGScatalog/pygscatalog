@@ -177,16 +177,15 @@ class MatchResults(collections.abc.Sequence):
         kwargs.setdefault("skip_flip", False)
         # allow matching to multiallelic variants
         kwargs.setdefault("remove_multiallelic", True)
-        # constrain variants to this list of IDs
-        kwargs.setdefault("filter_IDs", [])
+        # constrain variants to this list of IDs (ignored if empty list)
+        kwargs.setdefault("filter_IDs", None)
 
-        self.df = self.df.pipe(label_matches, kwargs)
         self._labelled = True
-        return self.df
+        return self.df.pipe(label_matches, kwargs)
 
     def write_scorefiles(self, directory, split=False, **kwargs):
         if not self._labelled:
-            _ = self.label(**kwargs)
+            self.df = self.label(**kwargs)
 
         # TODO: make plink frames from labelled and filtered data...
         plink = PlinkFrames.from_matchresult(self.df)

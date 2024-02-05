@@ -7,11 +7,13 @@ from pgscatalog.corelib import EffectType
 logger = logging.getLogger(__name__)
 
 
-def plinkify(matches):
-    """Prepare dataframes to align with plink2 expectations for a --scorefile
+def plinkify(df):
+    """Prepare dataframe to align with plink2 expectations for a --scorefile
 
     Split effect types: weight calculation differs by effect type
     Variants with the same ID and different effect alleles must be split into different files
+
+    Input df must contain match candidates filtered to best matched variant
     """
     min_cols = [
         "accession",
@@ -21,12 +23,12 @@ def plinkify(matches):
         "matched_effect_allele",
         "effect_weight",
     ]
-    matches = (pl.concat(x.df for x in matches)).select(min_cols).lazy()
+    df = df.select(min_cols).lazy()
 
     # 1. split by effect type
     effect_frames = zip(
         [EffectType.ADDITIVE, EffectType.DOMINANT, EffectType.RECESSIVE],
-        _split_effect_type(matches),
+        _split_effect_type(df),
         strict=True,
     )
 
@@ -74,11 +76,11 @@ def _check_column_types(matches: pl.LazyFrame):
         x: matches.schema.get(x)
         for x in list((matches.schema.keys() & correct_schema.keys()))
     }
-    assert (
-        col_types == correct_schema
-    ), "MISMATCHED SCHEMA\nCurrent columns: {}\nCorrect schema:{}".format(
-        col_types, correct_schema
-    )
+    if not (col_types == correct_schema):
+        logger.critical(
+            f"MISMATCHED SCHEMA\nCurrent columns: {col_types}\nCorrect schema:{correct_schema}"
+        )
+        raise ValueError
 
 
 def _split_effect_type(
