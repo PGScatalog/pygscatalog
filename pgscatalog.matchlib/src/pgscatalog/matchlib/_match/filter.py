@@ -1,3 +1,4 @@
+""" This module contains functions to filter match candidates and report th"""
 import logging
 
 import polars as pl
@@ -60,7 +61,7 @@ def _calculate_match_rate(df: pl.LazyFrame) -> pl.LazyFrame:
     return (
         df.groupby("accession")
         .agg([pl.all().len(), (pl.col("match_type").is_null()).sum().alias("no_match")])
-        .with_column((pl.col("no_match") / pl.col("count")).alias("fail_rate"))
+        .with_columns((pl.col("no_match") / pl.col("count")).alias("fail_rate"))
     )
 
 

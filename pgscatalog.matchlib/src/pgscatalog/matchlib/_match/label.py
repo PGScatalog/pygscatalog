@@ -1,3 +1,11 @@
+""" This module labels match candidates with various flag columns, with the aim of
+producing a final set of best match candidates (one maximum for each variant).
+
+These operations are all quite data-framey and involve calculating a horizontal
+maximum across boolean columns to determine if a variant should be given a true value
+in an exclude column.
+"""
+
 import logging
 
 import polars as pl
@@ -5,23 +13,6 @@ import polars as pl
 from .preprocess import complement_valid_alleles
 
 logger = logging.getLogger(__name__)
-
-
-def make_params_dict(args) -> dict[str, bool]:
-    """Make a dictionary with parameters that control labelling match candidates"""
-    filter_IDs = []
-    if args.filter:
-        logger.debug("Reading filter file (variant IDs)")
-        with open(args.filter, "r") as f:
-            filter_IDs = pl.Series([line.strip() for line in f], dtype=pl.Utf8)
-
-    return {
-        "keep_first_match": args.keep_first_match,
-        "remove_ambiguous": args.remove_ambiguous,
-        "skip_flip": args.skip_flip,
-        "remove_multiallelic": args.remove_multiallelic,
-        "filter_IDs": filter_IDs,
-    }
 
 
 def label_matches(df: pl.LazyFrame, params: dict[str, bool]) -> pl.LazyFrame:
@@ -32,16 +23,18 @@ def label_matches(df: pl.LazyFrame, params: dict[str, bool]) -> pl.LazyFrame:
     - duplicate: True if more than one best match exists for the same accession and ID
     - ambiguous: True if ambiguous
     """
-    assert set(params.keys()) == {
+    if set(params.keys()) != {
         "keep_first_match",
         "remove_ambiguous",
         "remove_multiallelic",
         "skip_flip",
         "filter_IDs",
-    }
+    }:
+        raise KeyError("Invalid labelling parameters")
+
     labelled = (
         df.with_columns(
-            pl.lit(False).alias("exclude")
+            exclude=pl.lit(False)
         )  # set up dummy exclude column for _label_*
         .pipe(_label_best_match)
         .pipe(_label_duplicate_best_match)
@@ -50,35 +43,36 @@ def label_matches(df: pl.LazyFrame, params: dict[str, bool]) -> pl.LazyFrame:
         .pipe(_label_multiallelic, params["remove_multiallelic"])
         .pipe(_label_flips, params["skip_flip"])
         .pipe(_label_filter, params["filter_IDs"])
-        .with_column(pl.lit(True).alias("match_candidate"))
+        .with_columns(match_candidate=pl.lit(True))
     )
 
-    return _encode_match_priority(labelled)
+    return labelled.pipe(_encode_match_priority)
 
 
 def _encode_match_priority(df: pl.LazyFrame) -> pl.LazyFrame:
     """Encode a new column called match status containing matched, unmatched, excluded, and not_best"""
     return (
         df.with_columns(
-            [
-                # set false best match to not_best
-                pl.col("best_match")
-                .apply(lambda x: {None: 0, True: 1, False: 3}[x])
-                .alias("match_priority"),
-                pl.col("exclude")
-                .apply(lambda x: {None: 0, True: 2, False: 0}[x])
-                .alias("excluded_match_priority"),
-            ]
+            # set false best match to not_best
+            match_priority=pl.col("best_match").apply(
+                lambda x: {None: 0, True: 1, False: 3}[x]
+            )
         )
-        .with_columns(pl.max("match_priority", "excluded_match_priority"))
         .with_columns(
-            pl.col("max")
+            excluded_match_priority=pl.col("exclude").apply(
+                lambda x: {None: 0, True: 2, False: 0}[x]
+            )
+        )
+        .with_columns(
+            max=pl.max_horizontal("match_priority", "excluded_match_priority")
+        )
+        .with_columns(
+            match_status=pl.col("max")
             .apply(
                 lambda x: {0: "unmatched", 1: "matched", 2: "excluded", 3: "not_best"}[
                     x
                 ]
             )
-            .alias("match_status")
             .cast(pl.Categorical)
         )
         .drop(["max", "excluded_match_priority", "match_priority"])
@@ -102,17 +96,21 @@ def _label_best_match(df: pl.LazyFrame) -> pl.LazyFrame:
 
     # use a groupby aggregation to guarantee the number of rows stays the same
     # rows were being lost using an anti join + reduce approach
-    prioritised: pl.LazyFrame = df.with_columns(
-        pl.col("match_type").apply(lambda x: match_priority[x]).alias("match_priority"),
-        pl.col("match_priority")
-        .min()
-        .over(["accession", "row_nr"])
-        .apply(lambda x: match_priority_rev[x])
-        .alias("best_match_type"),
-        pl.when(pl.col("best_match_type") == pl.col("match_type"))
-        .then(pl.lit(True))
-        .otherwise(pl.lit(False))
-        .alias("best_match"),
+    prioritised: pl.LazyFrame = (
+        df.with_columns(
+            match_priority=pl.col("match_type").apply(lambda x: match_priority[x])
+        )
+        .with_columns(
+            best_match_type=pl.col("match_priority")
+            .min()
+            .over(["accession", "row_nr"])
+            .apply(lambda x: match_priority_rev[x])
+        )
+        .with_columns(
+            best_match=pl.when(pl.col("best_match_type") == pl.col("match_type"))
+            .then(pl.lit(True))
+            .otherwise(pl.lit(False))
+        )
     )
 
     return prioritised.drop(["match_priority", "best_match_type"])
@@ -138,21 +136,19 @@ def _label_duplicate_best_match(df: pl.LazyFrame) -> pl.LazyFrame:
     )
     labelled: pl.LazyFrame = (
         df.with_columns(
-            pl.col("best_match")
-            .count()
-            .over(["accession", "row_nr", "best_match"])
-            .alias("count"),
-            pl.when((pl.col("count") > 1) & (pl.col("best_match")))
+            count=pl.col("best_match").len().over(["accession", "row_nr", "best_match"])
+        )
+        .with_columns(
+            duplicate_best_match=pl.when((pl.col("count") > 1) & (pl.col("best_match")))
             .then(pl.lit(True))
             .otherwise(pl.lit(False))
-            .alias("duplicate_best_match"),
         )
         .drop("count")
         .with_row_count(
             name="temp_row_nr"
         )  # add temporary row count to get first variant
         .with_columns(
-            pl.when(
+            best_match=pl.when(
                 pl.col("best_match")
                 & pl.col("duplicate_best_match")
                 & (pl.col("temp_row_nr") > pl.min("temp_row_nr")).over(
@@ -161,7 +157,6 @@ def _label_duplicate_best_match(df: pl.LazyFrame) -> pl.LazyFrame:
             )
             .then(False)  # reset best match flag for duplicates
             .otherwise(pl.col("best_match"))  # just keep value from existing column
-            .alias("best_match")
         )
     )
 
@@ -191,21 +186,20 @@ def _label_duplicate_id(df: pl.LazyFrame, keep_first_match: bool) -> pl.LazyFram
     # best_match is added to not count: same row_nr, different match_type (_label_best_match)
     # duplicate_best_match is added to not count: same row_nr, same match_type (_label_duplicate_best_match)
     duplicates = df.with_columns(
-        pl.count("ID")
+        count=pl.col("ID")
+        .len()
         .over(["accession", "ID", "best_match", "duplicate_best_match"])
-        .alias("count")
     ).with_columns(
-        pl.when((pl.col("count") > 1) & (pl.col("best_match")))
+        duplicate_ID=pl.when((pl.col("count") > 1) & (pl.col("best_match")))
         .then(pl.lit(True))
         .otherwise(pl.lit(False))
-        .alias("duplicate_ID")
     )
 
     if keep_first_match:
         logger.debug("Keeping first duplicate, labelling others with exclude flag ")
         # set first duplicate (with the smallest row_nr) to exclude = false
         labelled = duplicates.with_columns(
-            pl.when(
+            exclude_duplicate=pl.when(
                 (pl.col("duplicate_ID"))
                 & (
                     pl.col("row_nr")
@@ -214,17 +208,14 @@ def _label_duplicate_id(df: pl.LazyFrame, keep_first_match: bool) -> pl.LazyFram
             )
             .then(True)
             .otherwise(False)
-            .alias("exclude_duplicate")
         )
     else:
         logger.debug("Labelling all duplicates with exclude flag")
-        labelled = duplicates.with_columns(
-            pl.col("duplicate_ID").alias("exclude_duplicate")
-        )
+        labelled = duplicates.with_columns(exclude_duplicate=pl.col("duplicate_ID"))
 
     # get the horizontal maximum to combine the exclusion columns for each variant
     return (
-        labelled.with_columns(pl.max("exclude", "exclude_duplicate"))
+        labelled.with_columns(max=pl.max_horizontal("exclude", "exclude_duplicate"))
         .drop(["exclude", "exclude_duplicate"])
         .rename({"max": "exclude"})
     )
@@ -248,7 +239,7 @@ def _label_biallelic_ambiguous(df: pl.LazyFrame, remove_ambiguous) -> pl.LazyFra
                 pl.lit(True).alias("ambiguous"),
             ]
         ).pipe(complement_valid_alleles, ["REF"])
-    ).with_column(
+    ).with_columns(
         pl.when(pl.col("REF_FLIP") == pl.col("ALT"))
         .then(pl.col("ambiguous"))
         .otherwise(False)
@@ -257,20 +248,20 @@ def _label_biallelic_ambiguous(df: pl.LazyFrame, remove_ambiguous) -> pl.LazyFra
     if remove_ambiguous:
         logger.debug("Labelling ambiguous variants with exclude flag")
         return (
-            ambig.with_column(
+            ambig.with_columns(
                 pl.when(pl.col("ambiguous"))
                 .then(True)
                 .otherwise(False)
                 .alias("exclude_ambiguous")
             )
-            .with_column(pl.max("exclude", "exclude_ambiguous"))
+            .with_columns(max=pl.max_horizontal("exclude", "exclude_ambiguous"))
             .drop(["exclude", "exclude_ambiguous"])
             .rename({"max": "exclude"})
         )
     else:
         return (
             ambig.with_column(pl.lit(False).alias("exclude_ambiguous"))
-            .with_column(pl.max("exclude", "exclude_ambiguous"))
+            .with_columns(max=pl.max_horizontal("exclude", "exclude_ambiguous"))
             .drop(["exclude", "exclude_ambiguous"])
             .rename({"max": "exclude"})
         )
@@ -328,4 +319,4 @@ def _label_filter(df: pl.LazyFrame, filter_IDs: list) -> pl.LazyFrame:
             .alias("exclude")
         )
     else:
-        return df.with_columns((pl.lit("NA")).alias("match_IDs"))
+        return df

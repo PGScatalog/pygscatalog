@@ -8,6 +8,7 @@ import pathlib
 import polars as pl
 
 from ._plinkframe import PlinkFrames
+from ._match.label import label_matches
 
 logger = logging.getLogger(__name__)
 
@@ -119,16 +120,18 @@ class MatchResults(collections.abc.Sequence):
 
     >>> foutdir = tempfile.mkdtemp()
     >>> MatchResults(x).write_scorefiles(directory=foutdir, split=True)  # doctest: +ELLIPSIS
-    >>> x = sorted(os.listdir(foutdir))
-    >>> x # doctest: +ELLIPSIS
+    >>> scorefiles = sorted(os.listdir(foutdir))
+    >>> scorefiles # doctest: +ELLIPSIS
     ['goodmatch_10_additive_0.scorefile.gz', 'goodmatch_11_additive_0.scorefile.gz', ...]
-    >>> sum("dominant" in f for f in x)
+    >>> sum("dominant" in f for f in scorefiles)
     1
-    >>> sum("recessive" in f for f in x)
+    >>> sum("recessive" in f for f in scorefiles)
     1
-    >>> sum("additive" in f for f in x)
+    >>> sum("additive" in f for f in scorefiles)
     20
-    >>> assert len(x) == 22
+    >>> assert len(scorefiles) == 22
+    >>> with scorefile as score_df:
+    ...     MatchResults(x).summary_log(score_df=score_df)
     """
 
     def __init__(self, *elements):
@@ -140,6 +143,11 @@ class MatchResults(collections.abc.Sequence):
             )
 
         self.dataset = self._elements[0].dataset
+        # a df composed of all match result elements
+        self.df = pl.scan_ipc(x.ipc_path for x in self._elements).select(
+            pl.col("*"), pl.col("match_type").cast(pl.Categorical)
+        )
+        self._labelled = False
 
     def __len__(self):
         return len(self._elements)
@@ -150,12 +158,48 @@ class MatchResults(collections.abc.Sequence):
     def __repr__(self):
         return f"{type(self).__name__}({self._elements!r})"
 
-    def write_scorefiles(self, directory, split=False):
-        plink = PlinkFrames.from_matchresult(self._elements)
+    def label(self, **kwargs):
+        """Label match candidates according to matching parameters
+
+        kwargs control labelling parameters:
+
+        **keep_first_match
+        **remove_ambiguous
+        **skip_flip
+        **remove_multiallelic
+        **filter_IDs
+        """
+        # if multiple match candidates are tied, keep the first (default: drop all)
+        kwargs.setdefault("keep_first_match", False)
+        # keep variants with ambiguous alleles, (e.g. A/T and G/C SNPs)
+        kwargs.setdefault("remove_ambiguous", True)
+        # consider matched variants that may be reported on the opposite strand
+        kwargs.setdefault("skip_flip", False)
+        # allow matching to multiallelic variants
+        kwargs.setdefault("remove_multiallelic", True)
+        # constrain variants to this list of IDs
+        kwargs.setdefault("filter_IDs", [])
+
+        self.df = self.df.pipe(label_matches, kwargs)
+        self._labelled = True
+        return self.df
+
+    def write_scorefiles(self, directory, split=False, **kwargs):
+        if not self._labelled:
+            _ = self.label(**kwargs)
+
+        # TODO: make plink frames from labelled and filtered data...
+        plink = PlinkFrames.from_matchresult(self.df)
         # TODO: create summary log before writing - need to explode
 
         for frame in plink:
             frame.write(directory=directory, split=split, dataset=self.dataset)
+
+    def summary_log(self, score_df, min_overlap=0.75):
+        """ """
+        # match_candidates = pl.concat(x.df for x in self._elements)
+        # x, y = filter_scores(scorefile=score_df, dataset=self.dataset, matches=match_candidates, min_overlap=min_overlap)
+        pass
 
     def variant_log(self):
         raise NotImplementedError
