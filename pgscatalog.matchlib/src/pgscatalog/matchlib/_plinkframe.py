@@ -2,6 +2,7 @@
 to be compatible with plink2 --score
 """
 import collections.abc
+import gzip
 import pathlib
 
 from ._match.plink import plinkify, pivot_score
@@ -43,14 +44,17 @@ class PlinkFrame:
                     pathlib.Path(directory)
                     / f"{dataset}_{chrom}_{str(self.effect_type)}_{self.n}.scorefile.gz"
                 )
-                df.write_csv(fout, separator="\t")
+                with gzip.open(fout, "wb") as f:
+                    df.write_csv(f, separator="\t")
         else:
             chrom = "ALL"
             fout = (
                 pathlib.Path(directory)
                 / f"{dataset}_{chrom}_{str(self.effect_type)}_{self.n}.scorefile.gz"
             )
-            self.pivot_wide().write_csv(fout, separator="\t")
+            df = self.pivot_wide()
+            with gzip.open(fout, "wb") as f:
+                df.write_csv(f, separator="\t")
 
 
 class PlinkFrames(collections.abc.Sequence):
