@@ -36,20 +36,19 @@ class PlinkScoreFiles(collections.abc.Sequence):
         >>> from ._config import Config
         >>> from .variantframe import VariantFrame
         >>> from .scoringfileframe import ScoringFileFrame, match_variants
+        >>> from .matchresult import MatchResult, MatchResults
         >>> fout = tempfile.NamedTemporaryFile(delete=False)
         >>> target_path = Config.ROOT_DIR / "tests" / "good_match.pvar"
         >>> score_path =  Config.ROOT_DIR / "tests" / "good_match_scorefile.txt"
         >>> target = VariantFrame(target_path, dataset="goodmatch")
         >>> scorefile = ScoringFileFrame(score_path)
         >>> with target as target_df, scorefile as score_df:
-        ...     results = match_variants(score_df=score_df, target_df=target_df,
-        target=target)
+        ...     results = match_variants(score_df=score_df, target_df=target_df, target=target)
         ...     _ = results.collect(outfile=fout.name)
         >>> x = MatchResult.from_ipc(fout.name, dataset="goodmatch")
         >>> foutdir = tempfile.mkdtemp()
         >>> with scorefile as score_df:
-        ...     MatchResults(x).write_scorefiles(directory=foutdir, split=True,
-        score_df=score_df)  # doctest: +ELLIPSIS
+        ...     MatchResults(x).write_scorefiles(directory=foutdir, split=True, score_df=score_df)  # doctest: +ELLIPSIS
         >>> plink_files = (pathlib.Path(foutdir) / x for x in os.listdir(foutdir))
         >>> psf = PlinkScoreFiles(*plink_files)
         >>> psf  # doctest: +ELLIPSIS
@@ -59,9 +58,7 @@ class PlinkScoreFiles(collections.abc.Sequence):
         >>> len(combined_paths)
         3
         >>> combined_paths # doctest: +ELLIPSIS
-        ['.../goodmatch_ALL_additive_0.scorefile.gz',
-        '.../goodmatch_ALL_dominant_0.scorefile.gz',
-        '.../goodmatch_ALL_recessive_0.scorefile.gz']
+        ['.../goodmatch_ALL_additive_0.scorefile.gz', '.../goodmatch_ALL_dominant_0.scorefile.gz', '.../goodmatch_ALL_recessive_0.scorefile.gz']
         """
         dataset = self._elements[0].stem.split("_")[0]
         for x in self._elements:
