@@ -7,8 +7,11 @@ import pathlib
 
 import polars as pl
 
+from pgscatalog.corelib import ZeroMatchesError
+
 from ._plinkframe import PlinkFrames
 from ._match.label import label_matches
+from ._match.filter import filter_scores
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +96,7 @@ class MatchResults(collections.abc.Sequence):
     """
     Container for MatchResult. Useful for making match logs and writing scoring files.
 
-    >>> import tempfile, os
+    >>> import tempfile, os, glob
     >>> from ._config import Config
     >>> from .variantframe import VariantFrame
     >>> from .scoringfileframe import ScoringFileFrame, match_variants
@@ -102,25 +105,32 @@ class MatchResults(collections.abc.Sequence):
     >>> score_path =  Config.ROOT_DIR / "tests" / "good_match_scorefile.txt"
     >>> target = VariantFrame(target_path, dataset="goodmatch")
     >>> scorefile = ScoringFileFrame(score_path)
+    >>> foutdir, splitfoutdir = tempfile.mkdtemp(), tempfile.mkdtemp()
+
+    Using a context manager is import to prepare the data frames:
 
     >>> with target as target_df, scorefile as score_df:
     ...     results = match_variants(score_df=score_df, target_df=target_df, target=target)
     ...     _ = results.collect(outfile=fout.name)
-    >>> x = MatchResult.from_ipc(fout.name, dataset="goodmatch")
+
+    >>> with scorefile as score_df:
+    ...     x = MatchResult.from_ipc(fout.name, dataset="goodmatch")
+    ...     MatchResults(x).write_scorefiles(directory=foutdir, score_df=score_df)
+    ...     MatchResults(x).write_scorefiles(directory=splitfoutdir, split=True, score_df=score_df)
     >>> MatchResults(x)  # doctest: +ELLIPSIS
     MatchResults([MatchResult(dataset=goodmatch, matchresult=None, ipc_path=...])
-    >>> foutdir = tempfile.mkdtemp()
-    >>> MatchResults(x).write_scorefiles(directory=foutdir)  # doctest: +ELLIPSIS
-    >>> os.listdir(foutdir)
-    ['goodmatch_ALL_additive_0.scorefile.gz', 'goodmatch_ALL_dominant_0.scorefile.gz', 'goodmatch_ALL_recessive_0.scorefile.gz']
-    >>> assert len(os.listdir(foutdir)) == 3
+
+    By default, scoring files are written with multiple chromosomes per file:
+
+    >>> combined_paths = glob.glob(foutdir + "/*ALL*")
+    >>> combined_paths # doctest: +ELLIPSIS
+    ['.../goodmatch_ALL_additive_0.scorefile.gz', '.../goodmatch_ALL_dominant_0.scorefile.gz', '.../goodmatch_ALL_recessive_0.scorefile.gz']
+    >>> assert len(combined_paths) == 3
 
     Scoring files can be split. The input scoring file contains 20 unique
     chromosomes, with one additive + dominant effect file:
 
-    >>> foutdir = tempfile.mkdtemp()
-    >>> MatchResults(x).write_scorefiles(directory=foutdir, split=True)  # doctest: +ELLIPSIS
-    >>> scorefiles = sorted(os.listdir(foutdir))
+    >>> scorefiles = sorted(os.listdir(splitfoutdir))
     >>> scorefiles # doctest: +ELLIPSIS
     ['goodmatch_10_additive_0.scorefile.gz', 'goodmatch_11_additive_0.scorefile.gz', ...]
     >>> sum("dominant" in f for f in scorefiles)
@@ -128,10 +138,8 @@ class MatchResults(collections.abc.Sequence):
     >>> sum("recessive" in f for f in scorefiles)
     1
     >>> sum("additive" in f for f in scorefiles)
-    20
-    >>> assert len(scorefiles) == 22
-    >>> with scorefile as score_df:
-    ...     MatchResults(x).summary_log(score_df=score_df)
+    19
+    >>> assert len(scorefiles) == 21
     """
 
     def __init__(self, *elements):
@@ -144,9 +152,7 @@ class MatchResults(collections.abc.Sequence):
 
         self.dataset = self._elements[0].dataset
         # a df composed of all match result elements
-        self.df = pl.scan_ipc(x.ipc_path for x in self._elements).select(
-            pl.col("*"), pl.col("match_type").cast(pl.Categorical)
-        )
+        self.df = pl.scan_ipc(x.ipc_path for x in self._elements)
         self._labelled = False
 
     def __len__(self):
@@ -183,24 +189,30 @@ class MatchResults(collections.abc.Sequence):
         self._labelled = True
         return self.df.pipe(label_matches, kwargs)
 
-    def write_scorefiles(self, directory, split=False, **kwargs):
+    def write_scorefiles(self, directory, score_df, split=False, **kwargs):
         if not self._labelled:
             self.df = self.label(**kwargs)
 
-        # TODO: make plink frames from labelled and filtered data...
+        self.df, self.score_summary = filter_scores(
+            scorefile=score_df,
+            matches=self.df,
+            min_overlap=kwargs.get("min_overlap", 0.75),
+            dataset=self.dataset,
+        )
+        self.filtered = True
+
+        if self.score_summary.is_empty():
+            # can happen if min_overlap = 0
+            raise ZeroMatchesError(
+                "Error: no target variants match any variants in scoring files"
+            )
+
         plink = PlinkFrames.from_matchresult(self.df)
-        # TODO: create summary log before writing - need to explode
 
         for frame in plink:
             frame.write(directory=directory, split=split, dataset=self.dataset)
 
-    def summary_log(self, score_df, min_overlap=0.75):
-        """ """
-        # match_candidates = pl.concat(x.df for x in self._elements)
-        # x, y = filter_scores(scorefile=score_df, dataset=self.dataset, matches=match_candidates, min_overlap=min_overlap)
-        pass
-
-    def variant_log(self):
+    def full_variant_log(self):
         raise NotImplementedError
 
 
@@ -241,13 +253,16 @@ class PlinkScoreFiles(collections.abc.Sequence):
         ...     _ = results.collect(outfile=fout.name)
         >>> x = MatchResult.from_ipc(fout.name, dataset="goodmatch")
         >>> foutdir = tempfile.mkdtemp()
-        >>> MatchResults(x).write_scorefiles(directory=foutdir, split=True)  # doctest: +ELLIPSIS
+        >>> with scorefile as score_df:
+        ...     MatchResults(x).write_scorefiles(directory=foutdir, split=True, score_df=score_df)  # doctest: +ELLIPSIS
         >>> plink_files = (pathlib.Path(foutdir) / x for x in os.listdir(foutdir))
         >>> psf = PlinkScoreFiles(*plink_files)
         >>> psf  # doctest: +ELLIPSIS
-        PlinkScoreFiles([PosixPath('.../goodmatch_13_additive_0.scorefile.gz'), ...])
+        PlinkScoreFiles([PosixPath('.../goodmatch_1_additive_0.scorefile.gz'), ...])
         >>> psf.merge(foutdir)
         >>> combined_paths = glob.glob(foutdir + "/*ALL*")
+        >>> len(combined_paths)
+        3
         >>> combined_paths # doctest: +ELLIPSIS
         ['.../goodmatch_ALL_additive_0.scorefile.gz', '.../goodmatch_ALL_dominant_0.scorefile.gz', '.../goodmatch_ALL_recessive_0.scorefile.gz']
         """

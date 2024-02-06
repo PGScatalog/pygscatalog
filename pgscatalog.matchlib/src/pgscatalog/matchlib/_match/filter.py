@@ -1,4 +1,4 @@
-""" This module contains functions to filter match candidates and report th"""
+""" This module contains functions to filter match candidates and report overall match rates"""
 import logging
 
 import polars as pl
@@ -8,8 +8,10 @@ logger = logging.getLogger(__name__)
 
 def filter_scores(
     scorefile: pl.LazyFrame, matches: pl.LazyFrame, min_overlap: float, dataset: str
-) -> tuple[pl.LazyFrame, pl.LazyFrame]:
-    """Check overlap between filtered matches and scorefile, remove scores that don't match well and report stats"""
+) -> tuple[pl.LazyFrame, pl.DataFrame]:
+    """Check overlap between filtered matches and scorefile
+
+    Return a df with bad scores removed and a summary table"""
     filtered_matches: pl.LazyFrame = _filter_matches(matches)
     match_log: pl.LazyFrame = _join_filtered_matches(
         filtered_matches, scorefile, dataset
@@ -53,13 +55,13 @@ def filter_scores(
         score_summary, on="accession", how="left"
     ).filter(pl.col("score_pass"))
 
-    return filtered_scores, score_summary
+    return filtered_scores, score_summary.collect()
 
 
 def _calculate_match_rate(df: pl.LazyFrame) -> pl.LazyFrame:
     logger.debug("Calculating overlap between target genome and scoring file")
     return (
-        df.groupby("accession")
+        df.group_by("accession")
         .agg([pl.all().len(), (pl.col("match_type").is_null()).sum().alias("no_match")])
         .with_columns((pl.col("no_match") / pl.col("count")).alias("fail_rate"))
     )
@@ -75,7 +77,7 @@ def _join_filtered_matches(
 ) -> pl.LazyFrame:
     return (
         scorefile.join(matches, on=["row_nr", "accession"], how="left")
-        .with_columns(pl.lit(dataset).alias("dataset"))
+        .with_columns(pl.lit(dataset).cast(pl.Categorical).alias("dataset"))
         .select(pl.exclude("^.*_right$"))
     )
 

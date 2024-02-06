@@ -43,7 +43,8 @@ class ScoringFileFrame:
     >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "hapnest.bim"
     >>> target = VariantFrame(path, dataset="hapnest")
     >>> with target as target_df, x as score_df:
-    ...     match_variants(score_df=score_df, target_df=target_df, target=target)
+    ...     match_variants(score_df=score_df, target_df=target_df, target=target)  # doctest: +ELLIPSIS
+    MatchResult(dataset=hapnest, matchresult=[<LazyFrame [16 cols...
     """
 
     def __init__(self, path, chrom=None, cleanup=True, tmpdir=None):
@@ -58,6 +59,8 @@ class ScoringFileFrame:
     def __enter__(self):
         """Use a context manager to create arrow IPC files and return a lazyframe"""
         # prevent nested context managers creating multiple arrow files
+        pl.enable_string_cache()
+
         if not self._loosed:
             logger.debug(f"Converting {self!r} to feather format")
             self.arrowpath = loose(
@@ -101,6 +104,7 @@ class ScoringFileFrame:
         if self._cleanup:
             os.unlink(self.arrowpath.name)
             self._loosed = False
+        pl.disable_string_cache()
 
     def __repr__(self):
         return f"{type(self).__name__}({repr(self.scoringfile)})"
