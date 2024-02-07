@@ -21,53 +21,53 @@ def make_summary_log(
     filter_summary: pl.LazyFrame,
     dataset: str,
 ) -> pl.LazyFrame:
-    """Make an aggregated table"""
+    """Make an aggregated table that contains the best match candidate for each row in the original scoring file"""
     logger.debug("Aggregating best matches into a summary table")
+    cols = [
+        "dataset",
+        "accession",
+        "ambiguous",
+        "is_multiallelic",
+        "match_flipped",
+        "duplicate_best_match",
+        "duplicate_ID",
+        "match_IDs",
+        "match_status",
+    ]
+
     best_matches: pl.LazyFrame = match_candidates.filter(pl.col("best_match"))
+
     return (
         scorefile.join(best_matches, on=["row_nr", "accession"], how="outer")
-        .select(pl.exclude("^.*_right$"))
         .with_columns(
-            [
-                pl.col("match_status").fill_null(value="unmatched"),
-                pl.lit(dataset).alias("dataset"),
-            ]
+            pl.col("match_status").fill_null(value="unmatched"), dataset=pl.lit(dataset)
         )  # fill in unmatched variants
-        .groupby(
-            [
-                "dataset",
-                "accession",
-                "ambiguous",
-                "is_multiallelic",
-                "match_flipped",
-                "duplicate_best_match",
-                "duplicate_ID",
-                "match_IDs",
-                "match_status",
-            ]
-        )
-        .agg(pl.all().len())
+        .group_by(cols)
+        .count()
         .join(filter_summary, how="left", on="accession")
         .pipe(_prettify_summary)
     )
 
 
-def check_log_count(scorefile: pl.LazyFrame, summary_log: pl.LazyFrame) -> None:
+def check_log_count(scorefile: pl.LazyFrame, summary_log: pl.LazyFrame):
     """Check aggregated counts vs original from scoring file"""
-    summary_count: pl.DataFrame = (
-        summary_log.groupby(pl.col("accession")).agg(pl.sum("count"))
-    ).collect()
+    summary_count: pl.LazyFrame = summary_log.group_by("accession").agg(pl.sum("count"))
+
     log_count: pl.DataFrame = (
-        scorefile.groupby("accession")
-        .agg(pl.all().len())
-        .collect()
+        scorefile.group_by("accession")
+        .count()
         .join(summary_count, on="accession")
+        .collect()
     )
 
-    assert (
-        log_count.get_column("count") == log_count.get_column("count_right")
-    ).all(), "Log doesn't match input scoring file"
-    logger.debug("Log matches input scoring file")
+    for row in log_count.iter_rows():
+        if (log_count := row[1]) != (score_count := row[2]):
+            logger.critical("Variant log doesn't match input scoring file counts")
+            raise ValueError(
+                f"{row[0]} match failure {log_count=} doesn't match {score_count=}"
+            )
+
+    return True
 
 
 def _prettify_summary(df: pl.LazyFrame) -> pl.LazyFrame:
@@ -118,10 +118,8 @@ def _prettify_log(df: pl.LazyFrame) -> pl.LazyFrame:
         "match_status",
         "dataset",
     ]
-    pretty_df = (
-        df.select(keep_cols)
-        .select(pl.exclude("^.*_right"))
-        .sort(["accession", "row_nr", "chr_name", "chr_position", "match_status"])
+    pretty_df = df.select(keep_cols).sort(
+        ["accession", "row_nr", "chr_name", "chr_position", "match_status"]
     )
     return pretty_df
 

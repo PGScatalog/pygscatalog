@@ -8,6 +8,7 @@ from pgscatalog.corelib import ZeroMatchesError
 from ._plinkframe import PlinkFrames
 from ._match.label import label_matches
 from ._match.filter import filter_scores
+from ._match.log import make_logs, check_log_count, make_summary_log
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,22 @@ class MatchResults(collections.abc.Sequence):
     >>> sum("additive" in f for f in scorefiles)
     19
     >>> assert len(scorefiles) == 21
+
+    An important part of matching variants is reporting a log:
+    >>> with scorefile as score_df:
+    ...     MatchResults(x).full_variant_log(score_df).fetch(2)
+    shape: (3, 23)
+    ┌────────┬───────────┬──────────┬────────────┬───┬────────────┬───────────┬────────────┬───────────┐
+    │ row_nr ┆ accession ┆ chr_name ┆ chr_positi ┆ … ┆ duplicate_ ┆ match_IDs ┆ match_stat ┆ dataset   │
+    │ ---    ┆ ---       ┆ ---      ┆ on         ┆   ┆ ID         ┆ ---       ┆ us         ┆ ---       │
+    │ u64    ┆ cat       ┆ cat      ┆ ---        ┆   ┆ ---        ┆ null      ┆ ---        ┆ cat       │
+    │        ┆           ┆          ┆ u64        ┆   ┆ bool       ┆           ┆ cat        ┆           │
+    ╞════════╪═══════════╪══════════╪════════════╪═══╪════════════╪═══════════╪════════════╪═══════════╡
+    │ null   ┆ null      ┆ null     ┆ null       ┆ … ┆ false      ┆ null      ┆ matched    ┆ goodmatch │
+    │ 0      ┆ PGS000002 ┆ 11       ┆ 69331418   ┆ … ┆ false      ┆ null      ┆ matched    ┆ goodmatch │
+    │ 77     ┆ PGS000002 ┆ 11       ┆ 69331418   ┆ … ┆ null       ┆ null      ┆ unmatched  ┆ goodmatch │
+    └────────┴───────────┴──────────┴────────────┴───┴────────────┴───────────┴────────────┴───────────┘
+
     """
 
     def __init__(self, *elements):
@@ -149,7 +166,14 @@ class MatchResults(collections.abc.Sequence):
         self.dataset = self._elements[0].dataset
         # a df composed of all match result elements
         self.df = pl.scan_ipc(x.ipc_path for x in self._elements)
+        # a summary table containing match rates
+        self.filter_summary = None
+        # have match candidates in df been labelled?
         self._labelled = False
+        # have match candidates in df been filtered?
+        self._filtered = False
+        # does the input scoring file count match the variant log count?
+        self._log_OK = None
 
     def __len__(self):
         return len(self._elements)
@@ -189,24 +213,58 @@ class MatchResults(collections.abc.Sequence):
         if not self._labelled:
             self.df = self.label(**kwargs)
 
-        self.df, self.score_summary = filter_scores(
+        self.df, self.filter_summary = filter_scores(
             scorefile=score_df,
             matches=self.df,
             min_overlap=kwargs.get("min_overlap", 0.75),
             dataset=self.dataset,
         )
-        self.filtered = True
+        self._filtered = True
 
-        if self.score_summary.is_empty():
+        # a filter summary contains match rates for each accession, and a column
+        # indicating if the score passes the minimum matching threshold
+        if self.filter_summary.is_empty():
             # can happen if min_overlap = 0
             raise ZeroMatchesError(
                 "Error: no target variants match any variants in scoring files"
             )
+
+        # a summary log contains up to one variant (the best match) for each variant
+        # in the scoring file
+        self.summary_log = make_summary_log(
+            match_candidates=self.df,
+            dataset=self.dataset,
+            filter_summary=self.filter_summary.lazy(),
+            scorefile=score_df,
+        )
+
+        # double check log count vs scoring file variant count
+        self._log_OK = check_log_count(scorefile=score_df, summary_log=self.summary_log)
 
         plink = PlinkFrames.from_matchresult(self.df)
 
         for frame in plink:
             frame.write(directory=directory, split=split, dataset=self.dataset)
 
-    def full_variant_log(self):
-        raise NotImplementedError
+    def full_variant_log(self, score_df, **kwargs):
+        """Generate a log for each variant in a scoring file
+
+        Multiple match candidates may exist for each variant in the original file.
+        Describe each variant (one variant per row) with match metadata
+        """
+        if not self._labelled:
+            self.df = self.label(**kwargs)
+            self._labelled = True
+
+        if not self._filtered:
+            self.df, self.filter_summary = filter_scores(
+                scorefile=score_df,
+                matches=self.df,
+                min_overlap=kwargs.get("min_overlap", 0.75),
+                dataset=self.dataset,
+            )
+            self._filtered = True
+
+        return make_logs(
+            scorefile=score_df, dataset=self.dataset, match_candidates=self.df
+        )

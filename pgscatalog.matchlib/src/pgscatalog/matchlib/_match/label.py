@@ -302,7 +302,7 @@ def _label_flips(df: pl.LazyFrame, skip_flip: bool) -> pl.LazyFrame:
         )
     else:
         logger.debug("Not excluding flipped matches")
-        return df
+        return df.with_columns(match_IDs=pl.lit("NA"))
 
 
 def _label_filter(df: pl.LazyFrame, filter_IDs: list) -> pl.LazyFrame:
