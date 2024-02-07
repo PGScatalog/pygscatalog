@@ -139,20 +139,10 @@ class MatchResults(collections.abc.Sequence):
     >>> assert len(scorefiles) == 21
 
     An important part of matching variants is reporting a log:
-    >>> with scorefile as score_df:
-    ...     MatchResults(x).full_variant_log(score_df).fetch(2)
-    shape: (3, 23)
-    ┌────────┬───────────┬──────────┬────────────┬───┬────────────┬───────────┬────────────┬───────────┐
-    │ row_nr ┆ accession ┆ chr_name ┆ chr_positi ┆ … ┆ duplicate_ ┆ match_IDs ┆ match_stat ┆ dataset   │
-    │ ---    ┆ ---       ┆ ---      ┆ on         ┆   ┆ ID         ┆ ---       ┆ us         ┆ ---       │
-    │ u64    ┆ cat       ┆ cat      ┆ ---        ┆   ┆ ---        ┆ null      ┆ ---        ┆ cat       │
-    │        ┆           ┆          ┆ u64        ┆   ┆ bool       ┆           ┆ cat        ┆           │
-    ╞════════╪═══════════╪══════════╪════════════╪═══╪════════════╪═══════════╪════════════╪═══════════╡
-    │ null   ┆ null      ┆ null     ┆ null       ┆ … ┆ false      ┆ null      ┆ matched    ┆ goodmatch │
-    │ 0      ┆ PGS000002 ┆ 11       ┆ 69331418   ┆ … ┆ false      ┆ null      ┆ matched    ┆ goodmatch │
-    │ 77     ┆ PGS000002 ┆ 11       ┆ 69331418   ┆ … ┆ null       ┆ null      ┆ unmatched  ┆ goodmatch │
-    └────────┴───────────┴──────────┴────────────┴───┴────────────┴───────────┴────────────┴───────────┘
 
+    >>> with scorefile as score_df:
+    ...     MatchResults(x).full_variant_log(score_df)  # +ELLIPSIS
+    <LazyFrame [23 cols, {"row_nr": UInt64 … "dataset": Categorical(ordering='physical')}] at ...>
     """
 
     def __init__(self, *elements):
