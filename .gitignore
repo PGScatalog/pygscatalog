@@ -20,6 +20,7 @@ pip-log.txt
 
 .DS_Store
 .idea/*
+*/.idea/*
 .python-version
 .vscode/*
 

@@ -15,15 +15,20 @@ logger = logging.getLogger(__name__)
 
 
 def match_variants(score_df, target_df, target):
+    """Get all match candidates for a VariantFrame dataframe and ScoringFileFrame dataframe
+
+    Returns a :class:`MatchResult`
+    """
     matches = get_all_matches(scorefile=score_df, target=target_df)
     return MatchResult(dataset=target.dataset, matchresult=matches)
 
 
 class ScoringFileFrame:
-    """Like NormalisedScoringFile, but backed by the polars dataframe library
+    """Like :class:`pgscatalog.corelib.NormalisedScoringFile`, but backed by the polars dataframe library
 
-    Instantiated with a NormalisedScoringFile written to a file (i.e. the output of
-    combine scorefiles application):
+    Instantiated with a :class:`pgscatalog.corelib.NormalisedScoringFile` written to
+    a file. This is a long format/melted CSV file containing normalised variant data
+    (i.e. the output of combine scorefiles application):
 
     >>> from ._config import Config
     >>> path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "combined.txt.gz"
@@ -31,7 +36,7 @@ class ScoringFileFrame:
     >>> x  # doctest: +ELLIPSIS
     ScoringFileFrame(NormalisedScoringFile('.../combined.txt.gz'))
 
-    The context manager returns a polars dataframe with global string cache enabled:
+    Using a context manager is important to prepare a polars dataframe:
 
     >>> with x as arrow:
     ...     assert os.path.exists(x.arrowpath.name)
@@ -110,6 +115,11 @@ class ScoringFileFrame:
         return f"{type(self).__name__}({repr(self.scoringfile)})"
 
     def save_ipc(self, destination):
+        """Save the dataframe prepared by the context manager to an Arrow IPC file
+
+        Useful because the context manager will clean up the IPC files while exiting.
+
+        This method allows data to be persisted."""
         if not self._loosed:
             raise ValueError(
                 "Can't save IPC because it doesn't exist."

@@ -26,7 +26,10 @@ html_theme = "alabaster"
 html_static_path = ["_static"]
 
 # use autoapi for packages that provide APIs (libraries)
-autoapi_dirs = ["../pgscatalog.corelib/src/pgscatalog"]
+autoapi_dirs = [
+    "../pgscatalog.corelib/src/pgscatalog",
+    "../pgscatalog.matchlib/src/pgscatalog",
+]
 # see _templates/autoapi/index.rst for autoapi fix
 autoapi_template_dir = "_templates/autoapi"
 autoapi_python_use_implicit_namespaces = True

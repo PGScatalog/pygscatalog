@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class VariantFrame:
-    """Similar to TargetVariants, but backed by the polars dataframe library
+    """Similar to :class:`pgscatalog.corelib.TargetVariants`, but backed by the polars dataframe library
 
     Fast, supports more complicated things, but requires more resources.
 
@@ -28,7 +28,7 @@ class VariantFrame:
     >>> x  # doctest: +ELLIPSIS
     VariantFrame(path='.../hapnest.bim', dataset='hapnest', chrom=None, cleanup=True, tmpdir=None)
 
-    The VariantFrame contains a TargetVariant object:
+    The :class:`VariantFrame` contains a :class:`pgscatalog.corelib.TargetVariants` object:
 
     >>> x.variants  # doctest: +ELLIPSIS
     TargetVariants(path='.../hapnest.bim')
@@ -86,6 +86,11 @@ class VariantFrame:
         )
 
     def save_ipc(self, destination):
+        """Save the dataframe prepared by the context manager to an Arrow IPC file
+
+        Useful because the context manager will clean up the IPC files while exiting.
+
+        This method allows data to be persisted."""
         if not self._loosed:
             raise ValueError(
                 "Can't save IPC because it doesn't exist."

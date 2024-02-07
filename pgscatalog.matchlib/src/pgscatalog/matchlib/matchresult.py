@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 class MatchResult:
-    """This class represents variant match results
+    """Represents variants in a scoring file matched against variants in a target genome
+
+    When matching a scoring file, it's normal for matches to be composed of many
+    :class:`MatchResult` objects. This is common if the target genome is split to
+    have one chromosome per scoring file, and the container class
+    :class:`MatchResults` provides some helpful methods for working with split data.
 
     >>> from ._config import Config
     >>> from .variantframe import VariantFrame
@@ -24,13 +29,13 @@ class MatchResult:
     >>> score_path = Config.ROOT_DIR.parent / "pgscatalog.corelib" / "tests" / "combined.txt.gz"
     >>> scorefile = ScoringFileFrame(score_path)
 
-    MatchResults can be instantiated with the lazyframe output of match_variants:
+    A :class:`MatchResult` can be instantiated with the lazyframe output of the match_variants function:
 
     >>> with target as target_df, scorefile as score_df:
     ...     match_variants(score_df=score_df, target_df=target_df, target=target)  # doctest: +ELLIPSIS
     MatchResult(dataset=hapnest, matchresult=[<LazyFrame...], ipc_path=None, df=None)
 
-    MatchResults can also be loaded from IPC files:
+    A :class:`MatchResult` can also be saved to and loaded from Arrow IPC files:
 
     >>> import tempfile
     >>> fout = tempfile.NamedTemporaryFile(delete=False)
@@ -45,9 +50,9 @@ class MatchResult:
     def __init__(self, dataset, matchresult=None, ipc_path=None):
         # a dataset ID
         self.dataset = dataset
+        self.ipc_path = ipc_path
         # df: the dataframe backed by stable arrow files at ipc_path
         # after collect() is written to a file
-        self.ipc_path = ipc_path
         self.df = None
 
         # a lazyframe of match results, backed by arrow files that may get cleaned up
@@ -80,6 +85,7 @@ class MatchResult:
 
     @classmethod
     def from_ipc(cls, matchresults_ipc_path, dataset):
+        """Create an instance from an Arrow IPC file"""
         return cls(
             ipc_path=matchresults_ipc_path,
             dataset=dataset,
@@ -91,7 +97,9 @@ class MatchResult:
 
 class MatchResults(collections.abc.Sequence):
     """
-    Container for MatchResult. Useful for making match logs and writing scoring files.
+    Container for :class:`MatchResult`
+
+    Useful for making matching logs and writing scoring files ready to be used by ``plink2 --score``
 
     >>> import tempfile, os, glob
     >>> from ._config import Config
@@ -104,11 +112,13 @@ class MatchResults(collections.abc.Sequence):
     >>> scorefile = ScoringFileFrame(score_path)
     >>> foutdir, splitfoutdir = tempfile.mkdtemp(), tempfile.mkdtemp()
 
-    Using a context manager is import to prepare the data frames:
+    Using a context manager is really important to prepare :class:`ScoringFileFrame` and :class:`VariantFrame` data frames:
 
     >>> with target as target_df, scorefile as score_df:
     ...     results = match_variants(score_df=score_df, target_df=target_df, target=target)
     ...     _ = results.collect(outfile=fout.name)
+
+    These data frames are transparently backed by Arrow IPC files on disk.
 
     >>> with scorefile as score_df:
     ...     x = MatchResult.from_ipc(fout.name, dataset="goodmatch")
@@ -125,7 +135,7 @@ class MatchResults(collections.abc.Sequence):
     >>> assert len(combined_paths) == 3
 
     Scoring files can be split. The input scoring file contains 20 unique
-    chromosomes, with one additive + dominant effect file:
+    chromosomes, with one additive + dominant effect file (but one chromosome didn't match well):
 
     >>> scorefiles = sorted(os.listdir(splitfoutdir))
     >>> scorefiles # doctest: +ELLIPSIS
@@ -138,7 +148,7 @@ class MatchResults(collections.abc.Sequence):
     19
     >>> assert len(scorefiles) == 21
 
-    An important part of matching variants is reporting a log:
+    An important part of matching variants is reporting a log to see how well you're reproducing a PGS in the new target genomes:
 
     >>> with scorefile as score_df:
     ...     MatchResults(x).full_variant_log(score_df)  # +ELLIPSIS
@@ -179,11 +189,11 @@ class MatchResults(collections.abc.Sequence):
 
         kwargs control labelling parameters:
 
-        **keep_first_match
-        **remove_ambiguous
-        **skip_flip
-        **remove_multiallelic
-        **filter_IDs
+        * ``keep_first_match``: if best match candidates are tied, keep the first? (default: ```False``, drop all candidates for this variant)
+        * ``remove_ambiguous``: Remove ambiguous alleles? (default: ``True``)
+        * ``skip_flip``: Consider matched variants that may be reported on the opposite strand (default: ``False``)
+        * ``remove_multiallelic`` remove multiallelic variants before matching (default: ``True``)
+        * ``filter_IDs``: constrain variants to this list of IDs (default, don't constrain)
         """
         # if multiple match candidates are tied, keep the first (default: drop all)
         kwargs.setdefault("keep_first_match", False)
@@ -199,17 +209,40 @@ class MatchResults(collections.abc.Sequence):
         self._labelled = True
         return self.df.pipe(label_matches, kwargs)
 
-    def write_scorefiles(self, directory, score_df, split=False, **kwargs):
+    def filter(self, score_df, min_overlap=0.75, **kwargs):
+        """Filter match candidates after labelling according to user parameters"""
         if not self._labelled:
             self.df = self.label(**kwargs)
 
-        self.df, self.filter_summary = filter_scores(
+        df, self.filter_summary = filter_scores(
             scorefile=score_df,
             matches=self.df,
-            min_overlap=kwargs.get("min_overlap", 0.75),
+            min_overlap=min_overlap,
             dataset=self.dataset,
         )
         self._filtered = True
+        return df
+
+    def write_scorefiles(self, directory, score_df, split=False, **kwargs):
+        """Write matches to a set of files ready for ``plink2 --score``
+
+        Does some helpful stuff:
+
+        * Labels match candidates
+        * Filters match candidates based on labels and user configuration
+        * Calculates match rates to see how well the PGS reproduces in the new target genomes
+        * Generates a filtered variant log containing the best match candidate
+        * Checks if the number of variants in the summary log matches the input scoring file
+        * Sets up parallel score calculation (pivots data to wide column format)
+        * Writes scores to a directory, splitting based on chromosome and effect type
+        """
+        if not self._labelled:
+            self.df = self.label(**kwargs)
+
+        if not self._filtered:
+            self.df = self.filter(
+                score_df=score_df, min_overlap=kwargs.get("min_overlap", 0.75)
+            )
 
         # a filter summary contains match rates for each accession, and a column
         # indicating if the score passes the minimum matching threshold

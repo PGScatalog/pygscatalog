@@ -10,10 +10,7 @@ import polars as pl
 
 
 class PlinkScoreFiles(collections.abc.Sequence):
-    """Represents a sequence of files written by MatchResults.write_scorefiles()
-
-    Useful to combine split scoring files without re-computing matches
-    """
+    """Represents a sequence of scoring files files written by :class:`MatchResults`"""
 
     def __init__(self, *elements):
         self._elements = [pathlib.Path(x) for x in list(elements)]
@@ -30,7 +27,7 @@ class PlinkScoreFiles(collections.abc.Sequence):
     def merge(self, directory):
         """Merge scoring files without recomputing matches
 
-        Assumes a standard file naming system was used: dataset_chrom_effecttype_n
+        Assumes a standard file naming system was used: ``dataset_chrom_effecttype_n``
 
         >>> import tempfile, os, glob
         >>> from ._config import Config

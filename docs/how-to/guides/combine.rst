@@ -60,3 +60,10 @@ Assuming you have a custom scoring file in GRCh37 (``my_scorefile_grch37.txt.gz`
         --chain_dir my_chain_dir/ \
         -t GRCh38 \
         -o combined.txt
+
+Help
+----
+
+::
+
+    $ pgscatalog-combine --help
