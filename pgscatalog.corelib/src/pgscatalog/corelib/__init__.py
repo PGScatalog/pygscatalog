@@ -1,7 +1,7 @@
 from ._config import Config
 from .catalogapi import ScoreQueryResult, CatalogQuery, CatalogCategory
 from .scorefiles import ScoringFiles, ScoringFile, NormalisedScoringFile
-from .scorevariant import ScoreVariant
+from .scorevariant import ScoreVariant, EffectType
 from .genomebuild import GenomeBuild
 from .targetvariants import TargetVariants, TargetVariant
 from .pgsexceptions import (
@@ -54,4 +54,5 @@ __all__ = [
     "TargetVariant",
     "TargetVariants",
     "NormalisedScoringFile",
+    "EffectType",
 ]

@@ -843,6 +843,9 @@ class NormalisedScoringFile:
                 strict=True,
             )
 
+            # convert truthy strings to bools
+            _dup = (True if x == "True" else False for x in _dup)
+
             yield pa.RecordBatch.from_arrays(
                 [_chrom, _pos, _ea, _oa, _ew, _et, _dup, _acc, _rownr],
                 schema=self.pa_schema(),
