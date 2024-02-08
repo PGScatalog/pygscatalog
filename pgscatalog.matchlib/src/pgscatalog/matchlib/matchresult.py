@@ -101,7 +101,7 @@ class MatchResults(collections.abc.Sequence):
 
     Useful for making matching logs and writing scoring files ready to be used by ``plink2 --score``
 
-    >>> import tempfile, os, glob
+    >>> import tempfile, os, glob, pathlib
     >>> from ._config import Config
     >>> from .variantframe import VariantFrame
     >>> from .scoringfileframe import ScoringFileFrame, match_variants
@@ -129,7 +129,7 @@ class MatchResults(collections.abc.Sequence):
 
     By default, scoring files are written with multiple chromosomes per file:
 
-    >>> combined_paths = glob.glob(foutdir + "/*ALL*")
+    >>> combined_paths = sorted(glob.glob(foutdir + "/*ALL*"), key=lambda x: pathlib.Path(x).stem)
     >>> combined_paths # doctest: +ELLIPSIS
     ['.../goodmatch_ALL_additive_0.scorefile.gz', '.../goodmatch_ALL_dominant_0.scorefile.gz', '.../goodmatch_ALL_recessive_0.scorefile.gz']
     >>> assert len(combined_paths) == 3

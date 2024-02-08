@@ -51,11 +51,12 @@ class PlinkScoreFiles(collections.abc.Sequence):
         >>> psf  # doctest: +ELLIPSIS
         PlinkScoreFiles([PosixPath('.../goodmatch_1_additive_0.scorefile.gz'), ...])
         >>> psf.merge(foutdir)
-        >>> combined_paths = glob.glob(foutdir + "/*ALL*")
+        >>> combined_paths = sorted(glob.glob(foutdir + "/*ALL*"),  key=lambda x: pathlib.Path(x).stem)
         >>> len(combined_paths)
         3
         >>> combined_paths # doctest: +ELLIPSIS
         ['.../goodmatch_ALL_additive_0.scorefile.gz', '.../goodmatch_ALL_dominant_0.scorefile.gz', '.../goodmatch_ALL_recessive_0.scorefile.gz']
+
         """
         dataset = self._elements[0].stem.split("_")[0]
         for x in self._elements:
