@@ -3,7 +3,7 @@ import logging
 
 import polars as pl
 
-from pgscatalog.corelib import ZeroMatchesError
+from pgscatalog.corelib import ZeroMatchesError, MatchRateError
 
 from ._plinkframe import PlinkFrames
 from ._match.label import label_matches
@@ -166,6 +166,9 @@ class MatchResults(collections.abc.Sequence):
         self.dataset = self._elements[0].dataset
         # a df composed of all match result elements
         self.df = pl.scan_ipc(x.ipc_path for x in self._elements)
+        if self.df.select("row_nr").collect().is_empty():
+            raise ZeroMatchesError("No match candidates found for any scoring files")
+
         # a table containing up to one row per variant (the best possible match)
         self.filter_summary = None
         # a summary log containing match rates for variants
@@ -253,12 +256,10 @@ class MatchResults(collections.abc.Sequence):
         if not self._filtered:
             _ = self.filter(score_df=score_df, min_overlap=min_overlap)
 
-        # a filter summary contains match rates for each accession, and a column
-        # indicating if the score passes the minimum matching threshold
-        if self.filter_summary.is_empty():
-            # can happen if min_overlap = 0
-            raise ZeroMatchesError(
-                "Error: no target variants match any variants in scoring files"
+        if not all(x[1] for x in self.filter_summary.iter_rows()):
+            logger.warning(f"{self.filter_summary}")
+            raise MatchRateError(
+                f"All scores fail to meet match threshold {min_overlap}"
             )
 
         # a summary log contains up to one variant (the best match) for each variant

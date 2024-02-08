@@ -18,6 +18,9 @@ python = "^3.11"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 
+[tool.poetry.scripts]
+pgscatalog-match = 'pgscatalog.matchapp.match_cli:run_match'
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
