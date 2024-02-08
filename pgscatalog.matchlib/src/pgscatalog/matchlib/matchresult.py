@@ -166,8 +166,10 @@ class MatchResults(collections.abc.Sequence):
         self.dataset = self._elements[0].dataset
         # a df composed of all match result elements
         self.df = pl.scan_ipc(x.ipc_path for x in self._elements)
-        # a summary table containing match rates
+        # a table containing up to one row per variant (the best possible match)
         self.filter_summary = None
+        # a summary log containing match rates for variants
+        self.summary_log = None
         # have match candidates in df been labelled?
         self._labelled = False
         # have match candidates in df been filtered?
@@ -184,7 +186,14 @@ class MatchResults(collections.abc.Sequence):
     def __repr__(self):
         return f"{type(self).__name__}({self._elements!r})"
 
-    def label(self, **kwargs):
+    def label(
+        self,
+        keep_first_match=False,
+        remove_ambiguous=True,
+        skip_flip=False,
+        remove_multiallelic=True,
+        filter_IDs=None,
+    ):
         """Label match candidates according to matching parameters
 
         kwargs control labelling parameters:
@@ -195,35 +204,37 @@ class MatchResults(collections.abc.Sequence):
         * ``remove_multiallelic`` remove multiallelic variants before matching (default: ``True``)
         * ``filter_IDs``: constrain variants to this list of IDs (default, don't constrain)
         """
-        # if multiple match candidates are tied, keep the first (default: drop all)
-        kwargs.setdefault("keep_first_match", False)
-        # keep variants with ambiguous alleles, (e.g. A/T and G/C SNPs)
-        kwargs.setdefault("remove_ambiguous", True)
-        # consider matched variants that may be reported on the opposite strand
-        kwargs.setdefault("skip_flip", False)
-        # allow matching to multiallelic variants
-        kwargs.setdefault("remove_multiallelic", True)
-        # constrain variants to this list of IDs (ignored if empty list)
-        kwargs.setdefault("filter_IDs", None)
-
+        df = self.df.pipe(
+            label_matches,
+            keep_first_match=keep_first_match,
+            remove_ambiguous=remove_ambiguous,
+            skip_flip=skip_flip,
+            remove_multiallelic=remove_multiallelic,
+            filter_IDs=filter_IDs,
+        )
         self._labelled = True
-        return self.df.pipe(label_matches, kwargs)
+        self.df = df
+        return self.df
 
     def filter(self, score_df, min_overlap=0.75, **kwargs):
         """Filter match candidates after labelling according to user parameters"""
         if not self._labelled:
             self.df = self.label(**kwargs)
 
-        df, self.filter_summary = filter_scores(
+        df, filter_summary = filter_scores(
             scorefile=score_df,
             matches=self.df,
             min_overlap=min_overlap,
             dataset=self.dataset,
         )
+        self.filter_summary = filter_summary
+        self.df = df
         self._filtered = True
-        return df
+        return self.df
 
-    def write_scorefiles(self, directory, score_df, split=False, **kwargs):
+    def write_scorefiles(
+        self, directory, score_df, split=False, min_overlap=0.75, **kwargs
+    ):
         """Write matches to a set of files ready for ``plink2 --score``
 
         Does some helpful stuff:
@@ -237,12 +248,10 @@ class MatchResults(collections.abc.Sequence):
         * Writes scores to a directory, splitting based on chromosome and effect type
         """
         if not self._labelled:
-            self.df = self.label(**kwargs)
+            _ = self.label(**kwargs)  # self.df gets updated
 
         if not self._filtered:
-            self.df = self.filter(
-                score_df=score_df, min_overlap=kwargs.get("min_overlap", 0.75)
-            )
+            _ = self.filter(score_df=score_df, min_overlap=min_overlap)
 
         # a filter summary contains match rates for each accession, and a column
         # indicating if the score passes the minimum matching threshold
@@ -268,6 +277,9 @@ class MatchResults(collections.abc.Sequence):
 
         for frame in plink:
             frame.write(directory=directory, split=split, dataset=self.dataset)
+
+        # collect after joining in check_log_count (can't join df and lazy df)
+        self.summary_log = self.summary_log.collect()
 
     def full_variant_log(self, score_df, **kwargs):
         """Generate a log for each variant in a scoring file

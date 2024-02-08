@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "pgscatalog-matchapp"
+version = "0.1.0"
+description = ""
+authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [
+    { include = "pgscatalog", from = "src" },
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+"pgscatalog.matchlib" = {path = "../pgscatalog.matchlib", develop = true}
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

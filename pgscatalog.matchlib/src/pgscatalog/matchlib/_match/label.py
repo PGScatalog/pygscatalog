@@ -15,7 +15,14 @@ from .preprocess import complement_valid_alleles
 logger = logging.getLogger(__name__)
 
 
-def label_matches(df: pl.LazyFrame, params: dict[str, bool]) -> pl.LazyFrame:
+def label_matches(
+    df: pl.LazyFrame,
+    keep_first_match,
+    remove_ambiguous,
+    remove_multiallelic,
+    skip_flip,
+    filter_IDs,
+) -> pl.LazyFrame:
     """Label match candidates with additional metadata. Column definitions:
 
     - match_candidate: All input variants that were returned from match.get_all_matches() (always True in this function)
@@ -23,26 +30,17 @@ def label_matches(df: pl.LazyFrame, params: dict[str, bool]) -> pl.LazyFrame:
     - duplicate: True if more than one best match exists for the same accession and ID
     - ambiguous: True if ambiguous
     """
-    if set(params.keys()) != {
-        "keep_first_match",
-        "remove_ambiguous",
-        "remove_multiallelic",
-        "skip_flip",
-        "filter_IDs",
-    }:
-        raise KeyError("Invalid labelling parameters")
-
     labelled = (
         df.with_columns(
             exclude=pl.lit(False)
         )  # set up dummy exclude column for _label_*
         .pipe(_label_best_match)
         .pipe(_label_duplicate_best_match)
-        .pipe(_label_duplicate_id, params["keep_first_match"])
-        .pipe(_label_biallelic_ambiguous, params["remove_ambiguous"])
-        .pipe(_label_multiallelic, params["remove_multiallelic"])
-        .pipe(_label_flips, params["skip_flip"])
-        .pipe(_label_filter, params["filter_IDs"])
+        .pipe(_label_duplicate_id, keep_first_match)
+        .pipe(_label_biallelic_ambiguous, remove_ambiguous)
+        .pipe(_label_multiallelic, remove_multiallelic)
+        .pipe(_label_flips, skip_flip)
+        .pipe(_label_filter, filter_IDs)
         .with_columns(match_candidate=pl.lit(True))
     )
 
@@ -97,14 +95,12 @@ def _label_best_match(df: pl.LazyFrame) -> pl.LazyFrame:
     # use a groupby aggregation to guarantee the number of rows stays the same
     # rows were being lost using an anti join + reduce approach
     prioritised: pl.LazyFrame = (
-        df.with_columns(
-            match_priority=pl.col("match_type").apply(lambda x: match_priority[x])
-        )
+        df.with_columns(match_priority=pl.col("match_type").replace(match_priority))
         .with_columns(
             best_match_type=pl.col("match_priority")
             .min()
             .over(["accession", "row_nr"])
-            .apply(lambda x: match_priority_rev[x])
+            .replace(match_priority_rev)
         )
         .with_columns(
             best_match=pl.when(pl.col("best_match_type") == pl.col("match_type"))
