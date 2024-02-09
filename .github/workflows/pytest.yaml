@@ -27,7 +27,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ${{ inputs.package-directory }}/.venv
-          key: venv-${{ hashFiles('poetry.lock') }}
+          key: venv-${{ hashFiles('**/poetry.lock') }}
 
       - run: pip install poetry
 
