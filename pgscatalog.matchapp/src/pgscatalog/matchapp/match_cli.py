@@ -1,6 +1,5 @@
 import argparse
 import atexit
-import gzip
 import logging
 import pathlib
 import sys
@@ -18,6 +17,7 @@ from pgscatalog.matchlib import (
 )
 
 from ._config import Config
+from ._write import write_matches
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,12 @@ def run_match():
     Config.SPLIT = args.split
     Config.COMBINED = args.combined
 
+    # parameters that control how the best match candidate is chosen
+    # missing parameters will be set to defaults specified in matchlib
+    Config.MATCH_PARAMS = {
+        k: v for k in Config.MATCH_KWARGS if (v := getattr(args, k)) is not None
+    }
+
     # start doing the work
     with ScoringFileFrame(
         path=Config.SCOREFILE,
@@ -83,46 +89,9 @@ def run_match():
                 f"You'll need to combine match candidates using the Arrow IPC files in {Config.OUTDIR}"
             )
             sys.exit()
-
-        matchresults = MatchResults(*matchresults)
-
-        # parameters that control how the best match candidate is chosen
-        # missing parameters will be set to defaults specified in matchlib
-        Config.MATCH_PARAMS = {
-            k: v for k in Config.MATCH_KWARGS if (v := getattr(args, k)) is not None
-        }
-
-        match (Config.SPLIT, Config.COMBINED):
-            case (True, True):
-                # requires extra work: first write split, then re-combine without recomputing matches
-                raise NotImplementedError
-            case (True, False) | (False, True):
-                # split parameter can handle this case OK
-                matchresults.write_scorefiles(
-                    directory=Config.OUTDIR,
-                    split=Config.SPLIT,
-                    score_df=score_df,
-                    min_overlap=args.min_overlap,
-                    **Config.MATCH_PARAMS,
-                )
-            case _:
-                raise ValueError
-
-        # write logs:
-        if Config.CHROM is None:
-            logfname = Config.OUTDIR / f"{Config.DATASET}_log.csv.gz"
         else:
-            logfname = (
-                Config.OUTDIR / f"{Config.DATASET}_chrom{Config.CHROM}_log.csv.gz"
-            )
-        # summary log is smol
-        matchresults.summary_log.write_csv(
-            Config.OUTDIR / f"{Config.DATASET}_summary.csv"
-        )
-
-        # this one can get big. gzip is slow, but everywhere
-        with gzip.open(logfname, "wb") as f:
-            matchresults.full_variant_log(score_df=score_df).collect().write_csv(f)
+            matchresults = MatchResults(*matchresults)
+            _ = write_matches(matchresults=matchresults, score_df=score_df)
 
 
 def get_match_candidates(target, score_df, chrom, dataset, **kwargs):

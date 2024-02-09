@@ -20,6 +20,7 @@ pytest = "^8.0.0"
 
 [tool.poetry.scripts]
 pgscatalog-match = 'pgscatalog.matchapp.match_cli:run_match'
+pgscatalog-matchmerge = 'pgscatalog.matchapp.merge_cli:run_merge'
 
 [build-system]
 requires = ["poetry-core"]

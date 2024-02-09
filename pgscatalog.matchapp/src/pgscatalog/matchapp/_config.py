@@ -28,3 +28,4 @@ class Config:
         "remove_multiallelic",
     ]
     MATCH_PARAMS = None
+    MIN_OVERLAP = 0.75
