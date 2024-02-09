@@ -46,6 +46,7 @@ def run_match():
     Config.TMPDIR = Config.OUTDIR / "tmp"
     Config.TMPDIR.mkdir(exist_ok=False)
     Config.CHROM = args.chrom
+    Config.MIN_OVERLAP = args.min_overlap
 
     if (n_target := len(args.target)) == 0:
         raise ValueError(f"{n_target=} must provide at least one target")
