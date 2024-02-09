@@ -1,4 +1,5 @@
 import itertools
+import os
 from unittest.mock import patch
 import pytest
 
@@ -36,6 +37,8 @@ def test_match(tmp_path_factory, good_scorefile, good_variants):
             str(good_variants),
             "--outdir",
             str(outdir),
+            "--min_overlap",
+            "0.75",
         )
     ]
     flargs = list(itertools.chain(*args))
@@ -48,6 +51,34 @@ def test_match(tmp_path_factory, good_scorefile, good_variants):
     assert (outdir / "test_ALL_recessive_0.scorefile.gz").exists()
     assert (outdir / "test_ALL_dominant_0.scorefile.gz").exists()
     assert (outdir / "test_ALL_additive_0.scorefile.gz").exists()
+
+
+def test_only_match(tmp_path_factory, good_scorefile, good_variants):
+    """Test just matching (for big data)"""
+    outdir = tmp_path_factory.mktemp("outdir")
+
+    args = [
+        (
+            "pgscatalog-match",
+            "-d",
+            "test",
+            "-s",
+            str(good_scorefile),
+            "-t",
+            str(good_variants),
+            "--outdir",
+            str(outdir),
+            "--only_match",
+        )
+    ]
+    flargs = list(itertools.chain(*args))
+
+    with pytest.raises(SystemExit):
+        with patch("sys.argv", flargs):
+            run_match()
+
+    # arrow IPC files have been written
+    assert len(os.listdir(outdir / "matchtmp")) == 1
 
 
 def test_strict_match(tmp_path_factory, good_scorefile, good_variants):
@@ -91,6 +122,8 @@ def test_match_fail(tmp_path_factory, bad_scorefile, good_variants):
             str(good_variants),
             "--outdir",
             str(outdir),
+            "--min_overlap",
+            "0.75",
         )
     ]
     flargs = list(itertools.chain(*args))

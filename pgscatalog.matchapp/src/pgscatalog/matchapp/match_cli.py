@@ -154,7 +154,6 @@ def parse_args(args=None):
         dest="min_overlap",
         required=False,
         type=float,
-        default=0.75,
         help="<Optional> Minimum proportion of variants to match before error",
     )
     parser.add_argument(
