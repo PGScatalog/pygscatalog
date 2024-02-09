@@ -1,0 +1,13 @@
+on:
+  push:
+    paths:
+      - 'pgscatalog.calclib/**.py'
+  pull_request:
+    paths:
+      - 'pgscatalog.calclib/**.py'
+
+jobs:
+  pytest-calclib:
+    uses: ./.github/workflows/pytest.yaml
+    with:
+      package-directory: "pgscatalog.calclib"
