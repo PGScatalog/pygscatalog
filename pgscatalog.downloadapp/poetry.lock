@@ -132,22 +132,9 @@ files = [
 ]
 
 [[package]]
-name = "pgscatalog-calclib"
-version = "0.1.0"
-description = ""
-optional = false
-python-versions = "^3.11"
-files = []
-develop = true
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.calclib"
-
-[[package]]
 name = "pgscatalog-corelib"
 version = "0.1.0"
-description = ""
+description = "Library for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
 python-versions = "^3.11"
 files = []
@@ -155,6 +142,7 @@ develop = true
 
 [package.dependencies]
 httpx = "^0.26.0"
+pyliftover = "^0.4"
 tenacity = "^8.2.3"
 
 [package.source]
@@ -175,6 +163,16 @@ files = [
 [package.extras]
 dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
+
+[[package]]
+name = "pyliftover"
+version = "0.4"
+description = "Pure-python implementation of UCSC ``liftOver`` genome coordinate conversion."
+optional = false
+python-versions = "*"
+files = [
+    {file = "pyliftover-0.4.tar.gz", hash = "sha256:72bcfb7de907569b0eb75e86c817840365297d63ba43a961da394187e399da41"},
+]
 
 [[package]]
 name = "pytest"
@@ -221,7 +219,27 @@ files = [
 [package.extras]
 doc = ["reno", "sphinx", "tornado (>=4.5)"]
 
+[[package]]
+name = "tqdm"
+version = "4.66.1"
+description = "Fast, Extensible Progress Meter"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tqdm-4.66.1-py3-none-any.whl", hash = "sha256:d302b3c5b53d47bce91fea46679d9c3c6508cf6332229aa1e7d8653723793386"},
+    {file = "tqdm-4.66.1.tar.gz", hash = "sha256:d88e651f9db8d8551a62556d3cff9e3034274ca5d66e93197cf2490e2dcb69c7"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+dev = ["pytest (>=6)", "pytest-cov", "pytest-timeout", "pytest-xdist"]
+notebook = ["ipywidgets (>=6)"]
+slack = ["slack-sdk"]
+telegram = ["requests"]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "eca65e5b03171ed7e15f10b82fc7f21f31ddc0595553ba4daec16ab116dbb28b"
+content-hash = "b1cef66582975a7b16cb076bae3cf1d72a795f84c7ad2bc9d6a8ecb6aa63ee0e"

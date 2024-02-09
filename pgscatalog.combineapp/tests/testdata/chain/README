@@ -1,0 +1,69 @@
+The data files ("UCSC Chain Files") in this directory are property of The
+Regents of the University of California, and made available free for
+non-commercial use by Independent Researchers and Nonprofit Organizations. Any
+other use of UCSC Chain Files requires a commercial license, for which users
+should contact genomebrowser@ucsc.edu. As used herein, "Independent
+Researcher" means an individual who is autonomous with respect to the
+research activities for which he or she uses the UCSC Chain Files (note: such
+use does not extend to any use of the UCSC Chain Files at the direction and/or
+for the benefit of a for-profit organization); and "Nonprofit
+Organization" means a university or other institution of higher education,
+or a not-for-profit organization officially recognized or qualified under the
+laws of the country in which it is organized or located, or any nonprofit
+scientific or educational organization qualified under a federal, state or local
+jurisdiction's nonprofit organization statute. Downloading or using UCSC Chain
+Files indicates your acceptance of the End User License Agreement (EULA) posted
+at "https://genome.ucsc.edu/license/EULA.pdf"; redistribution of UCSC Chain
+Files by you must include this README file with these license restrictions, in
+the same archive or directory with the chain files.
+
+This directory contains the data files required as input to the
+liftOver utility. This tool -- which requires a Linux platform --
+allows the mass conversion of coordinates from one assembly to
+another. The executable file for the utility can be downloaded from
+http://hgdownload.soe.ucsc.edu/admin/exe/
+
+The file names reflect the assembly conversion data contained within
+in the format <db1>To<Db2>.over.chain.gz. For example, a file named
+hg15ToHg16.over.chain.gz file contains the liftOver data needed to
+convert hg15 (Human Build 33) coordinates to hg16 (Human Build 34).
+If no file is available for the assembly in which you're interested,
+please send a request to the genome mailing list
+(genome@soe.ucsc.edu) and we will attempt to provide you with one.
+
+To download a large file or multiple files from this directory,
+we recommend that you use ftp rather than downloading the files via our
+website. To do so, ftp to hgdownload.soe.ucsc.edu (user: anonymous),
+then cd to goldenPath/hg38/liftOver.  To download multiple files,
+use the "mget" command:
+
+    mget <filename1> <filename2> ...
+    - or -
+    mget -a (to download all the files in the directory)
+
+-------------------------------------------------------
+Please refer to the credits page
+(http://genome.ucsc.edu/goldenPath/credits.html) for guidelines and
+restrictions regarding data use for these assemblies.
+-------------------------------------------------------
+Alternate methods to ftp access.
+
+Using an rsync command to download the entire directory:
+    rsync -avzP rsync://hgdownload.soe.ucsc.edu/goldenPath/hg38/liftOver/ .
+For a single file, e.g. hg38ToHg19.over.chain.gz
+    rsync -avzP
+        rsync://hgdownload.soe.ucsc.edu/goldenPath/hg38/liftOver/hg38ToHg19.over.chain.gz .
+    (Hg19 is merely an example here, not necessarily existing.)
+
+Or with wget, all files:
+    wget --timestamping
+        'ftp://hgdownload.soe.ucsc.edu/goldenPath/hg38/liftOver/*'
+With wget, a single file:
+    wget --timestamping
+        'ftp://hgdownload.soe.ucsc.edu/goldenPath/hg38/liftOver/hg38ToHg19.over.chain.gz'
+        -O hg38ToHg19.over.chain.gz
+
+To uncompress the *.chain.gz files:
+    gunzip <file>.chain.gz
+The liftOver utility can read the files in their .gz format,
+it is not necessary to uncompress them to use with the liftOver command.

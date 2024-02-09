@@ -1,4 +1,58 @@
-from pgscatalog.corelib.scorefiles import ScoringFile, GenomeBuild, ScoringFiles
-from pgscatalog.corelib import config
+from ._config import Config
+from .catalogapi import ScoreQueryResult, CatalogQuery, CatalogCategory
+from .scorefiles import ScoringFiles, ScoringFile, NormalisedScoringFile
+from .scorevariant import ScoreVariant, EffectType
+from .genomebuild import GenomeBuild
+from .targetvariants import TargetVariants, TargetVariant
+from .pgsexceptions import (
+    BasePGSException,
+    MatchError,
+    DuplicateMatchError,
+    MatchRateError,
+    ZeroMatchesError,
+    MatchValueError,
+    CombineError,
+    BuildError,
+    ScoreFormatError,
+    CatalogError,
+    ScoreDownloadError,
+    ScoreChecksumError,
+    QueryError,
+    InvalidAccessionError,
+    SamplesheetError,
+    GenomesNotFound,
+    SamplesheetFormatError,
+)
 
-__all__ = ["ScoringFile", "ScoringFiles", "GenomeBuild", "config"]
+
+__all__ = [
+    "BasePGSException",
+    "MatchError",
+    "DuplicateMatchError",
+    "MatchRateError",
+    "ZeroMatchesError",
+    "MatchValueError",
+    "CombineError",
+    "BuildError",
+    "ScoreFormatError",
+    "CatalogError",
+    "ScoreDownloadError",
+    "ScoreChecksumError",
+    "QueryError",
+    "InvalidAccessionError",
+    "SamplesheetError",
+    "GenomesNotFound",
+    "SamplesheetFormatError",
+    "ScoringFiles",
+    "ScoringFile",
+    "ScoreVariant",
+    "Config",
+    "GenomeBuild",
+    "CatalogQuery",
+    "ScoreQueryResult",
+    "CatalogCategory",
+    "TargetVariant",
+    "TargetVariants",
+    "NormalisedScoringFile",
+    "EffectType",
+]

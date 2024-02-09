@@ -5,8 +5,8 @@ This repository contains Python applications and libraries for working with poly
 
 These CLI applications are used by the PGS Catalog Calculator workflow. 
 
-| Application           | Description                                    | Link                                                  |
-|-----------------------|------------------------------------------------|-------------------------------------------------------|
+| Application           | Description                                    | Link                                                 |
+|-----------------------|------------------------------------------------|------------------------------------------------------|
 | `pgscatalog-download` | Download scoring files from the PGS Catalog    | [README](pgscatalog.downloadapp/README.md) |
 | `pgscatalog-combine`  | Combine scoring files into a consistent format |
 
@@ -22,6 +22,23 @@ If you write  code to work with PGS, we publish some libraries that might be hel
 | `pgscatalog-matchlib`  | Variant matching across scoring files and target genomes |
 | `pgscatalog-calclib`   | Ancestry estimation and normalisation                    |
 
+
+## Installation
+
+### pip
+
+If you want to use the packages in this repository, use pip:
+
+### Local install for developers
+
+If you want to make changes to a package or application, it's simplest to clone the repository and install packages in editable mode.
+
+```
+$ git clone https://github.com/PGScatalog/pygscatalog.git
+$ cd pygscatalog/pgscatalog.downloadapp # replace with the package you want to edit
+$ poetry add --editable ../pgscatalog.corelib # downloadapp requires corelib
+$ poetry install  
+```
 
 ## Documentation
 

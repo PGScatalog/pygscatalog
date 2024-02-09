@@ -19,19 +19,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
           cache: 'pip'
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ${{ inputs.package-directory }}/.venv
           key: venv-${{ hashFiles('poetry.lock') }}
 
       - run: pip install poetry
 
-      - run: poetry install --with dev
+      - run: poetry install --with dev --all-extras
         working-directory: ${{ inputs.package-directory }}
 
       - run: poetry run pytest --doctest-modules

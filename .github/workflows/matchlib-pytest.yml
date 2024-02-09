@@ -1,0 +1,13 @@
+on:
+  push:
+    paths:
+      - 'pgscatalog.matchlib/**.py'
+  pull_request:
+    paths:
+      - 'pgscatalog.matchlib/**.py'
+
+jobs:
+  pytest-matchlib:
+    uses: ./.github/workflows/pytest.yaml
+    with:
+      package-directory: "pgscatalog.matchlib"

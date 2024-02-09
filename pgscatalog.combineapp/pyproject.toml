@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "pgscatalog.combineapp"
+version = "0.1.0"
+description = "CLI application to standardise and combine polygenic scoring files"
+license = "Apache-2.0"
+authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>"]
+readme = "README.md"
+packages = [
+    { include = "pgscatalog", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+"pgscatalog.corelib" = {path = "../pgscatalog.corelib", develop = true}
+tqdm = "^4.66.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+pgscatalog-combine = 'pgscatalog.combineapp.cli:run'
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
+

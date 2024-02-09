@@ -4,11 +4,15 @@ import enum
 import httpx
 import tenacity
 
-from pgscatalog.corelib import config
+from .pgsexceptions import QueryError, InvalidAccessionError
+from .genomebuild import GenomeBuild
+from ._config import Config
 
 
 class CatalogCategory(enum.Enum):
-    """The main categories in the PGS Catalog. Enumeration values don't mean anything.
+    """The three main categories in the PGS Catalog
+
+    Enumeration values don't mean anything and are automatically generated:
 
     >>> CatalogCategory.SCORE
     <CatalogCategory.SCORE: 1>
@@ -19,24 +23,37 @@ class CatalogCategory(enum.Enum):
     PUBLICATION = enum.auto()
 
 
+def _query_error(retry_state):
+    """Couldn't query the PGS Catalog API after retrying and waiting a bunch"""
+    try:
+        retry_state.outcome.result()
+    except Exception as e:
+        raise QueryError("Can't query PGS Catalog API") from e
+
+
 class CatalogQuery:
-    """Efficiently batch query the PGS Catalog API using trait (EFO), score (PGS ID),
-    or publication identifier (PGP ID).
+    """Efficiently query the PGS Catalog API using accessions
+
+    Supports trait (EFO), score (PGS ID), or publication identifier (PGP ID)
 
     >>> CatalogQuery(accession="PGS000001")
     CatalogQuery(accession='PGS000001', category=CatalogCategory.SCORE, include_children=None)
 
     Supports multiple PGS ID input in a list:
+
     >>> CatalogQuery(accession=["PGS000001", "PGS000002"])
     CatalogQuery(accession=['PGS000001', 'PGS000002'], category=CatalogCategory.SCORE, include_children=None)
 
     Duplicates are automatically dropped:
+
     >>> CatalogQuery(accession=["PGS000001", "PGS000001"])
     CatalogQuery(accession=['PGS000001'], category=CatalogCategory.SCORE, include_children=None)
 
     Publications and trait accessions are supported too:
+
     >>> CatalogQuery(accession="PGP000001")
     CatalogQuery(accession='PGP000001', category=CatalogCategory.PUBLICATION, include_children=None)
+
     >>> CatalogQuery(accession="EFO_0001645")
     CatalogQuery(accession='EFO_0001645', category=CatalogCategory.TRAIT, include_children=False)
     """
@@ -67,12 +84,8 @@ class CatalogQuery:
             f"{self.category}, include_children={self.include_children})"
         )
 
-    def infer_category(self) -> CatalogCategory:
+    def infer_category(self):
         """Inspect an accession and guess the Catalog category
-
-        Assume lists of accessions only contain PGS IDs:
-        >>> CatalogQuery(accession=["PGS000001", "PGS000002"]).infer_category()
-        <CatalogCategory.SCORE: 1>
 
         >>> CatalogQuery(accession="PGS000001").infer_category()
         <CatalogCategory.SCORE: 1>
@@ -85,6 +98,11 @@ class CatalogQuery:
 
         >>> CatalogQuery(accession="PGP000001").infer_category()
         <CatalogCategory.PUBLICATION: 3>
+
+        Be careful, assume lists of accessions only contain PGS IDs:
+
+        >>> CatalogQuery(accession=["PGS000001", "PGS000002"]).infer_category()
+        <CatalogCategory.SCORE: 1>
         """
         match accession := self.accession:
             case list() if all([x.startswith("PGS") for x in accession]):
@@ -101,7 +119,7 @@ class CatalogQuery:
                 # simple check for structured text like EFO_ACCESSION, HP_ACCESSION, etc
                 category = CatalogCategory.TRAIT
             case _:
-                raise ValueError(f"Invalid accession: {accession!r}. Only")
+                raise InvalidAccessionError(f"Invalid accession: {accession!r}")
 
         return category
 
@@ -112,20 +130,24 @@ class CatalogQuery:
 
         A list is returned because when querying multiple score accessions batches
         are created:
+
         >>> CatalogQuery(accession=["PGS000001","PGS000002"]).get_query_url()
         ['https://www.pgscatalog.org/rest/score/search?pgs_ids=PGS000001,PGS000002']
 
         (each element in this list contains up to 50 score IDs)
 
         Multiple score accessions are automatically deduplicated:
+
         >>> CatalogQuery(accession = ["PGS000001"] * 100).get_query_url()
         ['https://www.pgscatalog.org/rest/score/search?pgs_ids=PGS000001']
 
         Publications don't batch because they natively support many scores:
+
         >>> CatalogQuery(accession="PGP000001").get_query_url()
         'https://www.pgscatalog.org/rest/publication/PGP000001'
 
         Traits don't batch for the same reason as publications:
+
         >>> CatalogQuery(accession="EFO_0001645").get_query_url()
         'https://www.pgscatalog.org/rest/trait/EFO_0001645?include_children=0'
 
@@ -161,22 +183,26 @@ class CatalogQuery:
         return (accessions[pos : pos + size] for pos in range(0, len(accessions), size))
 
     @tenacity.retry(
-        stop=tenacity.stop_after_attempt(config.MAX_ATTEMPTS),
+        stop=tenacity.stop_after_attempt(Config.MAX_RETRIES),
         retry=tenacity.retry_if_exception_type(httpx.RequestError),
+        retry_error_callback=_query_error,
         wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
     )
     def score_query(self):
-        """Query the PGS Catalog API and return ScoreQueryResult
+        """Query the PGS Catalog API and return :class:`ScoreQueryResult`
 
         Information about a single score is returned as a dict:
+
         >>> CatalogQuery(accession="PGS000001").score_query() # doctest: +ELLIPSIS
         ScoreQueryResult(pgs_id='PGS000001', ftp_url=...
 
         If information about multiple scores is found, it's returned as a list:
+
         >>> CatalogQuery(accession=["PGS000001", "PGS000002"]).score_query() # doctest: +ELLIPSIS
         [ScoreQueryResult(pgs_id='PGS000001', ftp_url=...
 
         Publications and traits always return a list of score information:
+
         >>> CatalogQuery(accession="PGP000001").score_query() # doctest: +ELLIPSIS
         [ScoreQueryResult(pgs_id='PGS000001', ftp_url=...
         """
@@ -185,7 +211,7 @@ class CatalogQuery:
                 results = []
 
                 for url in self.get_query_url():
-                    r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
+                    r = httpx.get(url, timeout=5, headers=Config.API_HEADER).json()
 
                     if "request limit exceeded" in r.get("message", ""):
                         raise httpx.RequestError("request limit exceeded")
@@ -198,21 +224,32 @@ class CatalogQuery:
                         return ScoreQueryResult.from_query(results)
                     case str():
                         # a PGS string accession input can only ever return one result
-                        return ScoreQueryResult.from_query(results[0])
+                        try:
+                            return ScoreQueryResult.from_query(results[0])
+                        except IndexError:
+                            raise InvalidAccessionError(
+                                f"No Catalog result for accession {self.accession!r}"
+                            )
                     case _:
                         raise ValueError
             case CatalogCategory.PUBLICATION:
                 url = self.get_query_url()
-                r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
-                pgs_ids = [
-                    score
-                    for scores in list(r["associated_pgs_ids"].values())
-                    for score in scores
-                ]
-                return CatalogQuery(accession=pgs_ids).score_query()
+                r = httpx.get(url, timeout=5, headers=Config.API_HEADER).json()
+                try:
+                    pgs_ids = [
+                        score
+                        for scores in list(r["associated_pgs_ids"].values())
+                        for score in scores
+                    ]
+                except KeyError:
+                    raise InvalidAccessionError(
+                        f"No Catalog result for accession {self.accession!r}"
+                    )
+                else:
+                    return CatalogQuery(accession=pgs_ids).score_query()
             case CatalogCategory.TRAIT:
                 url = self.get_query_url()
-                r = httpx.get(url, timeout=5, headers=config.API_HEADER).json()
+                r = httpx.get(url, timeout=5, headers=Config.API_HEADER).json()
                 pgs_ids = r["associated_pgs_ids"]
                 if self.include_children:
                     pgs_ids.extend(r["child_associated_pgs_ids"])
@@ -239,7 +276,10 @@ class ScoreQueryResult:
     @classmethod
     def from_query(cls, result_response):
         """
-        Create a ScoreQueryResult from PGS Catalog API response
+        Parses PGS Catalog API JSON response
+
+        :param result_response: PGS Catalog API JSON response
+        :returns: :class:`ScoreQueryResult`
 
         >>> fake_response = {"id": "fake", "ftp_harmonized_scoring_files":
         ... {"GRCh37": {"positions": "fake.txt.gz"}, "GRCh38": {"positions": "fake.txt.gz"}},
@@ -290,47 +330,3 @@ class ScoreQueryResult:
                 return self.ftp_url
             case _:
                 raise ValueError(f"Invalid genome build {build!r}")
-
-
-class GenomeBuild(enum.Enum):
-    """Enumeration of genome build: the reference genome release that a scoring file
-    is aligned to.
-
-    >>> GenomeBuild.GRCh38
-    GenomeBuild.GRCh38
-    >>> GenomeBuild.from_string("GRCh38")
-    GenomeBuild.GRCh38
-    >>> str(GenomeBuild.from_string("GRCh37"))
-    'GRCh37'
-    >>> GenomeBuild.from_string("NR") is None
-    True
-    >>> GenomeBuild.from_string("pangenome")
-    Traceback (most recent call last):
-    ...
-    ValueError: Can't match build='pangenome'
-    """
-
-    GRCh37 = "GRCh37"
-    GRCh38 = "GRCh38"
-    # just included to handle older files, incompatible unless harmonised:
-    NCBI36 = "NCBI36"  # ew
-
-    def __str__(self):
-        return str(self.value)
-
-    def __repr__(self):
-        return f"{type(self).__name__}.{self.name}"
-
-    @classmethod
-    def from_string(cls, build):
-        match build:
-            case "GRCh37" | "hg19":
-                return cls(GenomeBuild.GRCh37)
-            case "GRCh38" | "hg38":
-                return cls(GenomeBuild.GRCh38)
-            case "NR" | "" | None:
-                return None
-            case "NCBI36" | "hg18":
-                return cls(GenomeBuild.NCBI36)
-            case _:
-                raise ValueError(f"Can't match {build=}")

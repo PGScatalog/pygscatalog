@@ -13,9 +13,16 @@ packages = [
 python = "^3.11"
 httpx = "^0.26.0"
 tenacity = "^8.2.3"
+pyliftover = "^0.4"
+xopen = {version = "^1.8.0", extras = ["zstd"]}
+pyarrow = {version = "^15.0.0", optional = true}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"
+sphinx-autoapi = "^3.0.0"
+
+[tool.poetry.extras]
+pyarrow = ["pyarrow"]
 
 [build-system]
 requires = ["poetry-core"]
