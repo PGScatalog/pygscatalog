@@ -65,6 +65,7 @@ class PolygenicScore:
         return f"{type(self).__name__}(sampleset={repr(self.sampleset)}, path={repr(self.path)}, df={df})"
 
     def read(self):
+        """Read a PGS file as a pandas dataframe"""
         if self.df is None:
             df = (
                 pd.read_table(self.path)
@@ -86,6 +87,7 @@ class PolygenicScore:
         return self.df
 
     def write(self, outdir, split=False):
+        """Write a PGS to a compressed TSV"""
         outdir = pathlib.Path(outdir)
         if split:
             for sampleset, group in self.df.groupby("sampleset"):
