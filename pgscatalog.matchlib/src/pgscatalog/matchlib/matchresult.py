@@ -122,8 +122,8 @@ class MatchResults(collections.abc.Sequence):
 
     >>> with scorefile as score_df:
     ...     x = MatchResult.from_ipc(fout.name, dataset="goodmatch")
-    ...     MatchResults(x).write_scorefiles(directory=foutdir, score_df=score_df)
-    ...     MatchResults(x).write_scorefiles(directory=splitfoutdir, split=True, score_df=score_df)
+    ...     _ = MatchResults(x).write_scorefiles(directory=foutdir, score_df=score_df)
+    ...     _ = MatchResults(x).write_scorefiles(directory=splitfoutdir, split=True, score_df=score_df)
     >>> MatchResults(x)  # doctest: +ELLIPSIS
     MatchResults([MatchResult(dataset=goodmatch, matchresult=None, ipc_path=...])
 
@@ -275,12 +275,14 @@ class MatchResults(collections.abc.Sequence):
         self._log_OK = check_log_count(scorefile=score_df, summary_log=self.summary_log)
 
         plink = PlinkFrames.from_matchresult(self.df)
-
+        outfs = []
         for frame in plink:
-            frame.write(directory=directory, split=split, dataset=self.dataset)
+            f = frame.write(directory=directory, split=split, dataset=self.dataset)
+            outfs.append(f)
 
         # collect after joining in check_log_count (can't join df and lazy df)
         self.summary_log = self.summary_log.collect()
+        return outfs
 
     def full_variant_log(self, score_df, **kwargs):
         """Generate a log for each variant in a scoring file

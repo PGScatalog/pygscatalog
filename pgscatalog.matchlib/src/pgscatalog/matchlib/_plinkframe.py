@@ -37,6 +37,7 @@ class PlinkFrame:
 
     def write(self, directory, dataset, split=False):
         """Write a plink2 --score compatible file, optionally splitting"""
+        fouts = []
         if split:
             dfs = self.split_pivot()
             for chrom, df in dfs.items():
@@ -46,6 +47,7 @@ class PlinkFrame:
                 )
                 with gzip.open(fout, "wb") as f:
                     df.write_csv(f, separator="\t")
+                fouts.append(fout)
         else:
             chrom = "ALL"
             fout = (
@@ -55,6 +57,8 @@ class PlinkFrame:
             df = self.pivot_wide()
             with gzip.open(fout, "wb") as f:
                 df.write_csv(f, separator="\t")
+            fouts.append(fout)
+        return fouts
 
 
 class PlinkFrames(collections.abc.Sequence):

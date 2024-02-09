@@ -87,6 +87,38 @@ def test_split_output(tmp_path_factory, good_scorefile, match_ipc):
     assert sum("recessive" in x for x in splitf) == 1
 
 
+def test_splitcombine_output(tmp_path_factory, good_scorefile, match_ipc):
+    """Test merging runs without errors with good data outputting both combined and split scorefiles"""
+    outdir = tmp_path_factory.mktemp("outdir")
+
+    args = [
+        (
+            "pgscatalog-matchmerge",
+            "-d",
+            "test",
+            "-s",
+            str(good_scorefile),
+            "--matches",
+            str(match_ipc),
+            "--outdir",
+            str(outdir),
+            "--min_overlap",
+            str(0.75),
+            "--split",
+            "--combined",
+        )
+    ]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run_merge()
+    splitf = glob(str(outdir / "*scorefile.gz"))
+    assert len(splitf) == 21 + 3  # split + combined
+    assert sum("additive" in x for x in splitf) == 19 + 1
+    assert sum("dominant" in x for x in splitf) == 1 + 1
+    assert sum("recessive" in x for x in splitf) == 1 + 1
+
+
 def test_strict_merge(tmp_path_factory, good_scorefile, match_ipc):
     """Test merging with extremely strict overlap to trigger a MatchRateError"""
     outdir = tmp_path_factory.mktemp("outdir")

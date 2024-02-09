@@ -45,7 +45,7 @@ class PlinkScoreFiles(collections.abc.Sequence):
         >>> x = MatchResult.from_ipc(fout.name, dataset="goodmatch")
         >>> foutdir = tempfile.mkdtemp()
         >>> with scorefile as score_df:
-        ...     MatchResults(x).write_scorefiles(directory=foutdir, split=True, score_df=score_df)  # doctest: +ELLIPSIS
+        ...     _ = MatchResults(x).write_scorefiles(directory=foutdir, split=True, score_df=score_df)  # doctest: +ELLIPSIS
         >>> plink_files = (pathlib.Path(foutdir) / x for x in os.listdir(foutdir))
         >>> psf = PlinkScoreFiles(*plink_files)
         >>> psf  # doctest: +ELLIPSIS

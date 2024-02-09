@@ -3,6 +3,9 @@
 It expects Config class attributes to be set up before being called
 """
 import gzip
+import itertools
+
+from pgscatalog.matchlib.plinkscorefiles import PlinkScoreFiles
 
 from ._config import Config
 
@@ -11,11 +14,19 @@ def write_matches(matchresults, score_df):
     """Write matchresults out to scoring files and logs"""
     match (Config.SPLIT, Config.COMBINED):
         case (True, True):
-            # requires extra work: first write split, then re-combine without recomputing matches
-            raise NotImplementedError
+            # requires extra work: first write split
+            outfs = matchresults.write_scorefiles(
+                directory=Config.OUTDIR,
+                split=True,
+                score_df=score_df,
+                min_overlap=Config.MIN_OVERLAP,
+                **Config.MATCH_PARAMS,
+            )
+            # now re-combine without recomputing matches
+            PlinkScoreFiles(*list(itertools.chain(*outfs))).merge(Config.OUTDIR)
         case (True, False) | (False, True):
             # split parameter can handle this case OK
-            matchresults.write_scorefiles(
+            _ = matchresults.write_scorefiles(
                 directory=Config.OUTDIR,
                 split=Config.SPLIT,
                 score_df=score_df,
