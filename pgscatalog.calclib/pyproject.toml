@@ -10,7 +10,14 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
+"pgscatalog.corelib" = {path = "../pgscatalog.corelib", develop = true}
+numpy = "^1.26.4"
+pandas = "^2.2.0"
+pyarrow = "^15.0.0"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
 
 [build-system]
 requires = ["poetry-core"]
