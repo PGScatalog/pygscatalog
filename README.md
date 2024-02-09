@@ -18,7 +18,7 @@ If you write  code to work with PGS, we publish some libraries that might be hel
 
 | Library                | Description                                              | Link                                              |
 |------------------------|----------------------------------------------------------|---------------------------------------------------|
-| `pgscatalog-corelib`   | Core classes and functions                               | [README](pgscatalog.corelib/pgscatalog/README.md) |
+| `pgscatalog-corelib`   | Core classes and functions                               | [README](pgscatalog.corelib/README.md) |
 | `pgscatalog-matchlib`  | Variant matching across scoring files and target genomes |
 | `pgscatalog-calclib`   | Ancestry estimation and normalisation                    |
 
