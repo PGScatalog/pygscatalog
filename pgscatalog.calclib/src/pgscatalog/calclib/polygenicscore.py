@@ -1,7 +1,6 @@
 import pathlib
 
 import pandas as pd
-import reprlib
 
 
 class PolygenicScore:
@@ -9,23 +8,29 @@ class PolygenicScore:
 
     >>> from ._config import Config
     >>> score1 = Config.ROOT_DIR / "tests" / "cineca_22_additive_0.sscore.zst"
-    >>> pgs1 = PolygenicScore(sampleset="test", path=score1)  # doctest: +ELLIPSIS
+    >>> pgs1 = PolygenicScore(path=score1)  # doctest: +ELLIPSIS
     >>> pgs1
-    PolygenicScore(sampleset='test', path=PosixPath('.../cineca_22_additive_0.sscore.zst'), df=None)
-    >>> pgs2 = PolygenicScore(sampleset="test", path=score1)
-    >>> pgs1.read().to_dict()  # doctest: +ELLIPSIS
-    {'DENOM': ...}, 'PGS001229_22_SUM': {('test', 'HG00096'): 0.54502, ('test', 'HG00097'): 0.674401, ('test', 'HG00099'): 0.63727, ('test', 'HG00100'): 0.863944, ...}}
+    PolygenicScore(sampleset='cineca', path=PosixPath('.../cineca_22_additive_0.sscore.zst'))
+    >>> pgs2 = PolygenicScore(path=score1)
 
     It's often helpful to combine PGS that were split per chromosome or by effect type:
 
     >>> aggregated_score = pgs1 + pgs2
     >>> aggregated_score  # doctest: +ELLIPSIS
-    PolygenicScore(sampleset='test', path=None, df={'DENOM': ...}, 'PGS001229_22_SUM': {('test', 'HG00096'): 1.09004, ('test', 'HG00097'): 1.348802, ('test', 'HG00099'): 1.27454, ('test', 'HG00100'): 1.727888, ...}})
+    PolygenicScore(sampleset='cineca', path=None)
+
+    The backing dataframe is loaded lazily in chunks:
+
+    >>> for chunk in aggregated_score:
+    ...     chunk.to_dict()
+    ...     break
+    {'DENOM': {('cineca', 'HG00096'): 3128, ...}, 'PGS001229_22_SUM': {('cineca', 'HG00096'): 1.09004, ...}}
+
 
     Once a score has been fully aggregated it can be helpful to recalculate an average:
 
     >>> aggregated_score.average().to_dict()  # doctest: +ELLIPSIS
-    {'DENOM': ...}, 'PGS001229_22_SUM': {('test', 'HG00096'): 1.09004, ...}, 'PGS001229_22_AVG': {('test', 'HG00096'): 0.000348...
+    {'DENOM': ...}, 'PGS001229_22_SUM': {('cineca', 'HG00096'): 1.09004, ...}, 'PGS001229_22_AVG': {('cineca', 'HG00096'): 0.000348...
 
     Scores can be written to a TSV file:
 
@@ -40,10 +45,10 @@ class PolygenicScore:
     >>> splitoutd = tempfile.mkdtemp()
     >>> aggregated_score.write(splitoutd, split=True)
     >>> sorted(os.listdir(splitoutd), key = lambda x: x.split("_")[0])
-    ['test_pgs.txt.gz']
+    ['cineca_pgs.txt.gz']
     """
 
-    def __init__(self, *, sampleset, path=None, df=None):
+    def __init__(self, *, path=None, df=None, sampleset=None):
         match (path, df):
             case (None, None):
                 raise ValueError("init with path or df")
@@ -52,62 +57,102 @@ class PolygenicScore:
             case _:
                 pass
 
-        self.path = path
-        self.df = df
-        self.sampleset = sampleset
+        try:
+            self.path = pathlib.Path(path)
+        except TypeError:
+            self.path = None
+
+        if sampleset is None:
+            self.sampleset = path.stem.split("_")[0]
+        else:
+            self.sampleset = sampleset
+
+        self._chunksize = 50000
+
+        if df is not None:
+            # big df is an in-memory pandas df
+            self._bigdf = df
+        else:
+            self._bigdf = None
+            self._df = None
 
     def __repr__(self):
-        if self.df is not None:
-            df = reprlib.repr(self.df.to_dict())
-        else:
-            df = reprlib.repr(None)
+        return f"{type(self).__name__}(sampleset={repr(self.sampleset)}, path={repr(self.path)})"
 
-        return f"{type(self).__name__}(sampleset={repr(self.sampleset)}, path={repr(self.path)}, df={df})"
-
-    def read(self):
-        """Read a PGS file as a pandas dataframe"""
-        if self.df is None:
-            df = (
-                pd.read_table(self.path)
-                .assign(sampleset=self.sampleset)
-                .set_index(["sampleset", "#IID"])
-            )
-
-            df.index.names = ["sampleset", "IID"]
-            df = df[_select_agg_cols(df.columns)]
-            self.df = df
-        return self.df
-
-    def average(self):
-        avgs = self.df.loc[:, self.df.columns.str.endswith("_SUM")].divide(
-            self.df["DENOM"], axis=0
-        )
-        avgs.columns = avgs.columns.str.replace("_SUM", "_AVG")
-        self.df = pd.concat([self.df, avgs], axis=1)
-        return self.df
-
-    def write(self, outdir, split=False):
-        """Write a PGS to a compressed TSV"""
-        outdir = pathlib.Path(outdir)
-        if split:
-            for sampleset, group in self.df.groupby("sampleset"):
-                fout = outdir / f"{sampleset}_pgs.txt.gz"
-                group.to_csv(fout, sep="\t", compression="gzip")
-        else:
-            fout = outdir / "aggregated_scores.txt.gz"
-            self.df.to_csv(fout, sep="\t", compression="gzip")
+    def __iter__(self):
+        yield from self.df
 
     def __add__(self, other):
         if isinstance(other, PolygenicScore):
-            if self.sampleset != other.sampleset:
-                raise ValueError("Can't add PolygenicScore with different samplesets")
-
-            df1 = self.read()
-            df2 = other.read()
-            sumdf = df1.add(df2, fill_value=0)
-            return PolygenicScore(sampleset=self.sampleset, df=sumdf)
+            dfs = []
+            for df1, df2 in zip(self, other, strict=True):
+                sumdf = df1.add(df2, fill_value=0)
+                dfs.append(sumdf)
+            return PolygenicScore(sampleset=self.sampleset, df=pd.concat(dfs, axis=0))
         else:
             return NotImplemented
+
+    @property
+    def df(self):
+        if self.path is not None:
+            self._df = self.lazy_read()
+        elif self._bigdf is not None:
+            # a fake generator
+            self._df = (x for x in [self._bigdf])
+        return self._df
+
+    def lazy_read(self):
+        """Lazily read a PGS in chunks"""
+        if self.path is None:
+            raise ValueError("Missing path")
+
+        for chunk in pd.read_csv(self.path, chunksize=self._chunksize, sep="\t"):
+            df = chunk.assign(sampleset=self.sampleset).set_index(["sampleset", "#IID"])
+
+            df.index.names = ["sampleset", "IID"]
+            df = df[_select_agg_cols(df.columns)]
+            yield df
+
+    def read(self):
+        """Eagerly load a PGS into a pandas dataframe"""
+        if self.path is None:
+            raise ValueError("Missing path")
+
+        df = (
+            pd.read_csv(self.path, sep="\t")
+            .assign(sampleset=self.sampleset)
+            .set_index(["sampleset", "#IID"])
+        )
+
+        df.index.names = ["sampleset", "IID"]
+        df = df[_select_agg_cols(df.columns)]
+        return df
+
+    def write(self, outdir, split=False):
+        """Write PGS to a compressed TSV"""
+        outdir = pathlib.Path(outdir)
+        for chunk in self:
+            if split:
+                for sampleset, group in chunk.groupby("sampleset"):
+                    fout = outdir / f"{sampleset}_pgs.txt.gz"
+                    chunk.to_csv(fout, sep="\t", compression="gzip", mode="a")
+            else:
+                fout = outdir / "aggregated_scores.txt.gz"
+                chunk.to_csv(fout, sep="\t", compression="gzip", mode="a")
+
+    def average(self):
+        """Recalculate average.
+
+        This is an eager operation, and immediately returns a dataframe
+        """
+        chunk_list = []
+        for chunk in self:
+            avgs = chunk.loc[:, chunk.columns.str.endswith("_SUM")].divide(
+                chunk["DENOM"], axis=0
+            )
+            avgs.columns = avgs.columns.str.replace("_SUM", "_AVG")
+            chunk_list.append(pd.concat([chunk, avgs], axis=1))
+        return pd.concat(chunk_list, axis=0)
 
 
 def _select_agg_cols(cols):
