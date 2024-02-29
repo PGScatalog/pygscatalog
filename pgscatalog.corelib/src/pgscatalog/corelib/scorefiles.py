@@ -259,7 +259,7 @@ class ScoringFile:
             self._directory = self.local_path.parent
 
     def _init_from_accession(self, accession, target_build):
-        logger.debug(f"Instantiating ScoringFile from accession {accession.pgs_id}")
+        logger.debug("Instantiating ScoringFile from accession")
 
         match self._identifier:
             case ScoreQueryResult():
