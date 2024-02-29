@@ -128,10 +128,13 @@ class PolygenicScore:
         df = df[_select_agg_cols(df.columns)]
         return df
 
-    def write(self, outdir, split=False):
+    def write(self, outdir, split=False, melt=True):
         """Write PGS to a compressed TSV"""
         outdir = pathlib.Path(outdir)
         for chunk in self:
+            if melt:
+                chunk = _melt(chunk, "SUM")
+
             if split:
                 for sampleset, group in chunk.groupby("sampleset"):
                     fout = outdir / f"{sampleset}_pgs.txt.gz"
@@ -163,3 +166,16 @@ def _select_agg_cols(cols):
         for x in cols
         if (x.endswith("_SUM") and (x != "NAMED_ALLELE_DOSAGE_SUM")) or (x in keep_cols)
     ]
+
+
+def _melt(df, value_name):
+    """Melt the score dataframe from wide format to long format"""
+    df = df.melt(
+        id_vars=["DENOM"],
+        value_name=value_name,
+        var_name="PGS",
+        ignore_index=False,
+    )
+    # e.g. PGS000822_SUM -> PGS000822
+    df["PGS"] = df["PGS"].str.replace(f"_{value_name}", "")
+    return df
