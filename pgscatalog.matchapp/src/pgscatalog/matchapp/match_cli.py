@@ -32,6 +32,12 @@ def run_match():
     atexit.register(_exit, cleanup=Config.CLEANUP)
     args = parse_args()
 
+    if args.verbose:
+        logging.getLogger("pgscatalog.corelib").setLevel(logging.DEBUG)
+        logging.getLogger("pgscatalog.matchlib").setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Verbose logging enabled")
+
     Config.DATASET = args.dataset
     Config.CLEANUP = False
     Config.OUTDIR = pathlib.Path(args.outdir)

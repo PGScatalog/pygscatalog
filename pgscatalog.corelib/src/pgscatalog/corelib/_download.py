@@ -27,6 +27,8 @@ def score_download_failed(retry_state):
         raise ScoreChecksumError("All checksum retries failed") from e
     except Exception as download_exc:
         raise ScoreDownloadError("All download retries failed") from download_exc
+    finally:
+        logger.critical(f"Score download failed after all retries: {retry_state!r}")
 
 
 @tenacity.retry(
@@ -81,6 +83,7 @@ def ftp_fallback(retry_state):
     else:
         # no exceptions thrown, move the temporary file to the final output path
         os.rename(score_f.name, out_path)
+        logger.info(f"FTP download OK, {out_path} checksum validation passed")
 
 
 @tenacity.retry(
@@ -124,3 +127,4 @@ def https_download(*, url, out_path, directory, overwrite):
     else:
         # no exceptions thrown, move the temporary file to the final output path
         os.rename(f.name, out_path)
+        logger.info(f"HTTPS download OK, {out_path} checksum validation passed")

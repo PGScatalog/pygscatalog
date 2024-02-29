@@ -259,6 +259,8 @@ class ScoringFile:
             self._directory = self.local_path.parent
 
     def _init_from_accession(self, accession, target_build):
+        logger.debug(f"Instantiating ScoringFile from accession {accession.pgs_id}")
+
         match self._identifier:
             case ScoreQueryResult():
                 # skip hitting the API unnecessarily
@@ -288,6 +290,8 @@ class ScoringFile:
         self.local_path = None
 
     def _init_from_path(self, target_build=None):
+        logger.debug(f"Instantiating ScoringFile from {self.local_path=}")
+
         if target_build is not None:
             raise ValueError(
                 "target_build must be None for local files. "
@@ -395,6 +399,7 @@ class ScoringFile:
         self._directory = pathlib.Path(directory)
         fn = pathlib.Path(self.path).name
         out_path = self._directory / fn
+        logger.debug(f"Downloading {self.path} to {out_path}")
         https_download(
             url=self.path,
             out_path=out_path,
@@ -467,6 +472,19 @@ class ScoringFile:
         ('rs78540526', '11', 69701882)
 
         A :class:`LiftoverError` is only raised when many converted coordinates are missing.
+
+        Normalising converts the is_dominant and is_recessive optional fields in
+        scoring files into an EffectType:
+
+        >>> testpath = Config.ROOT_DIR / "tests" / "PGS000802_hmPOS_GRCh37.txt"
+        >>> variants = ScoringFile(testpath).normalise()
+        >>> for i, x in enumerate(variants): # doctest: +ELLIPSIS
+        ...     (x.is_dominant, x.is_recessive, x.effect_type)
+        ...     if i == 2:
+        ...         break
+        (True, False, EffectType.DOMINANT)
+        (False, True, EffectType.RECESSIVE)
+        (True, False, EffectType.DOMINANT)
         """
         yield from normalise(
             scoring_file=self,
@@ -478,6 +496,7 @@ class ScoringFile:
 
     def get_log(self, drop_missing=False, variant_log=None):
         """Create a JSON log from a ScoringFile's header and variant rows."""
+        logger.debug(f"Creating JSON log for {self!r}")
         log = {}
 
         for attr in self._header.fields:
@@ -630,19 +649,25 @@ class ScoringFiles:
         for arg in flargs:
             match arg:
                 case ScoringFile() if arg.target_build == target_build:
+                    logger.info("ScoringFile build matches target build")
                     scorefiles.append(arg)
                 case ScoringFile() if arg.target_build != target_build:
                     raise ValueError(
                         f"{arg.target_build=} doesn't match {target_build=}"
                     )
                 case _ if pathlib.Path(arg).is_file() and target_build is None:
+                    logger.info(f"Local path: {arg}, no target build is OK")
                     scorefiles.append(ScoringFile(arg))
                 case _ if pathlib.Path(arg).is_file() and target_build is not None:
+                    logger.critical(f"{arg} is a local file and {target_build=}")
                     raise ValueError(
                         "Can't load local scoring file when target_build is set"
                         "Try .normalise() method to do liftover, or load harmonised scoring files from PGS Catalog"
                     )
                 case str() if arg.startswith("PGP") or "_" in arg:
+                    logger.info(
+                        "Term associated with multiple scores detected (PGP or trait)"
+                    )
                     self.include_children = kwargs.get("include_children", None)
                     traitpub_query = CatalogQuery(
                         accession=arg, include_children=self.include_children
@@ -656,6 +681,7 @@ class ScoringFiles:
                         ]
                     )
                 case str() if arg.startswith("PGS"):
+                    logger.info("PGS ID detected")
                     pgs_batch.append(arg)
                 case str():
                     raise ValueError(f"{arg!r} is not a valid path or an accession")
@@ -664,6 +690,7 @@ class ScoringFiles:
 
         # batch PGS IDs to avoid overloading the API
         batched_queries = CatalogQuery(accession=pgs_batch).score_query()
+        logger.debug(f"Batching queries to PGS Catalog API: {pgs_batch}")
         batched_scores = [
             ScoringFile(x, target_build=target_build) for x in batched_queries
         ]

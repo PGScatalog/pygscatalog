@@ -24,6 +24,10 @@ def normalise(
     2. remap harmonised data, failed harmonisations get None'd
     3. log and optionally drop bad variants
     """
+    logger.info(
+        f"Normalise parameters: {drop_missing=}, {liftover=}, {chain_dir=}, {target_build=}"
+    )
+
     if liftover:
         variants = lift(
             scoring_file=scoring_file,
@@ -169,23 +173,25 @@ def assign_effect_type(variants):
 
     The most common type of effect type is additive:
 
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "FALSE", "is_dominant": "FALSE"})
+    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "False", "is_dominant": "False"})
     >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
     [ScoreVariant(...,effect_type=EffectType.ADDITIVE,...)]
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "TRUE", "is_dominant": "FALSE"})
+    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "True", "is_dominant": "False"})
     >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
     [ScoreVariant(...,effect_type=EffectType.RECESSIVE,...)]
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "FALSE", "is_dominant": "TRUE"})
+    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "False", "is_dominant": "True"})
     >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
     [ScoreVariant(...,effect_type=EffectType.DOMINANT,...)]
+
+    is_recessive and is_dominant fields are parsed from strings to bools during __init__.
     """
     for variant in variants:
         match (variant.is_recessive, variant.is_dominant):
-            case (None, None) | ("FALSE", "FALSE"):
+            case (None, None) | (False, False):
                 pass  # default value is additive, pass to break match and yield
-            case ("FALSE", "TRUE"):
+            case (False, True):
                 variant.effect_type = EffectType.DOMINANT
-            case ("TRUE", "FALSE"):
+            case (True, False):
                 variant.effect_type = EffectType.RECESSIVE
             case _:
                 logger.critical(f"Bad effect type setting: {variant}")
