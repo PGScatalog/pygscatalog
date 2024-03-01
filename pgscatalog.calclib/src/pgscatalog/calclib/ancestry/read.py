@@ -56,7 +56,7 @@ def read_pcs(loc_pcs: list[str], dataset: str, loc_related_ids=None, nPCs=None):
 
 
 def extract_ref_psam_cols(
-    loc_psam, dataset: str, df_target, keepcols=["SuperPop", "Population"]
+    loc_psam, dataset: str, df_target, keepcols=("SuperPop", "Population")
 ):
     psam = pd.read_csv(loc_psam, sep="\t", header=0)
 
