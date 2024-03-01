@@ -16,6 +16,7 @@ class PrincipalComponents:
     """
     This class represents principal components data calculated by fraposa-pgsc
 
+    >>> from ._config import Config
     >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "ref.psam", pop_type=PopulationType.REFERENCE)
     >>> ref_pc
     PrincipalComponents(dataset='reference', pop_type=PopulationType.REFERENCE, pcs_path=[PosixPath('.../pgscatalog.calclib/tests/ref.pcs')], psam_path=PosixPath('.../pgscatalog.calclib/tests/ref.psam'))
