@@ -25,8 +25,9 @@ build-backend = "poetry.core.masonry.api"
 pgscatalog-download = 'pgscatalog.downloadapp.cli:run'
 
 [tool.pytest.ini_options]
-
-pythonpath = [
-  "src"
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests"
 ]
-
+filterwarnings = ["error"]

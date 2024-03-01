@@ -291,7 +291,7 @@ class ScoringFile:
 
     def _init_from_path(self, target_build=None):
         logger.debug(f"Instantiating ScoringFile from {self.local_path=}")
-  
+
         if target_build is not None:
             raise ValueError(
                 "target_build must be None for local files. "
@@ -660,8 +660,6 @@ class ScoringFiles:
                         f"{arg.target_build=} doesn't match {target_build=}"
                     )
                 case _ if pathlib.Path(arg).is_file() and target_build is None:
-                    scorefiles.append(ScoringFile(arg))
-                case _ if pathlib.Path(arg).is_file() and target_build is not None:
                     logger.info(f"Local path: {arg}, no target build is OK")
                     scorefiles.append(ScoringFile(arg))
                 case _ if pathlib.Path(arg).is_file() and target_build is not None:
@@ -794,7 +792,8 @@ class NormalisedScoringFile:
 
     def __init__(self, path):
         try:
-            xopen(path)
+            with xopen(path):
+                pass
         except TypeError:
             self.path = False
         else:

@@ -28,8 +28,8 @@ class PlinkFrame:
 
     def split_pivot(self):
         """Splitting scoring files is helpful for split - apply - combine on big data"""
-        dfs = self.df.collect().partition_by("chr_name", as_dict=True)
-        return {k: v.pipe(pivot_score) for k, v in dfs.items()}
+        dfs = self.df.collect().partition_by(["chr_name"], as_dict=True)
+        return {k[0]: v.pipe(pivot_score) for k, v in dfs.items()}
 
     def pivot_wide(self):
         """Pivoting wide is important to enable parallel score calculation"""

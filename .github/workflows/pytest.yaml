@@ -34,5 +34,5 @@ jobs:
       - run: poetry install --with dev --all-extras
         working-directory: ${{ inputs.package-directory }}
 
-      - run: poetry run pytest --doctest-modules
+      - run: poetry run pytest
         working-directory: ${{ inputs.package-directory }}

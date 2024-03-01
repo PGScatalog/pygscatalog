@@ -2,9 +2,6 @@ import pathlib
 
 import pandas as pd
 
-import reprlib
-
-
 
 class PolygenicScore:
     """Represents the output of plink2 --score written to a file
@@ -13,7 +10,7 @@ class PolygenicScore:
     >>> score1 = Config.ROOT_DIR / "tests" / "cineca_22_additive_0.sscore.zst"
     >>> pgs1 = PolygenicScore(sampleset="test", path=score1)  # doctest: +ELLIPSIS
     >>> pgs1
-    PolygenicScore(sampleset='test', path=PosixPath('.../cineca_22_additive_0.sscore.zst'), df=None)
+    PolygenicScore(sampleset='test', path=PosixPath('.../cineca_22_additive_0.sscore.zst'))
     >>> pgs2 = PolygenicScore(sampleset="test", path=score1)
     >>> pgs1.read().to_dict()  # doctest: +ELLIPSIS
     {'DENOM': ...}, 'PGS001229_22_SUM': {('test', 'HG00096'): 0.54502, ('test', 'HG00097'): 0.674401, ('test', 'HG00099'): 0.63727, ('test', 'HG00100'): 0.863944, ...}}
@@ -22,7 +19,7 @@ class PolygenicScore:
 
     >>> aggregated_score = pgs1 + pgs2
     >>> aggregated_score  # doctest: +ELLIPSIS
-    PolygenicScore(sampleset='test', path=None, df={'DENOM': ...}, 'PGS001229_22_SUM': {('test', 'HG00096'): 1.09004, ('test', 'HG00097'): 1.348802, ('test', 'HG00099'): 1.27454, ('test', 'HG00100'): 1.727888, ...}})
+    PolygenicScore(sampleset='test', path=None)
 
     Once a score has been fully aggregated it can be helpful to recalculate an average:
 
@@ -45,7 +42,7 @@ class PolygenicScore:
     ['test_pgs.txt.gz']
     """
 
-    def __init__(self, *, sampleset, path=None, df=None):
+    def __init__(self, *, path=None, df=None, sampleset=None):
         match (path, df):
             case (None, None):
                 raise ValueError("init with path or df")
@@ -164,6 +161,7 @@ def _select_agg_cols(cols):
         if (x.endswith("_SUM") and (x != "NAMED_ALLELE_DOSAGE_SUM")) or (x in keep_cols)
     ]
 
+
 def _melt(df, value_name):
     """Melt the score dataframe from wide format to long format"""
     df = df.melt(
@@ -175,4 +173,3 @@ def _melt(df, value_name):
     # e.g. PGS000822_SUM -> PGS000822
     df["PGS"] = df["PGS"].str.replace(f"_{value_name}", "")
     return df
-

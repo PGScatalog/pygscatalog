@@ -27,13 +27,8 @@ def test_split_aggregate(tmp_path_factory, scorefiles):
     outf = list(outdir.glob("*.txt.gz"))
     assert [x.name for x in outf] == ["hgdp_pgs.txt.gz"]
     outdf = pd.read_csv(outf[0], sep="\t")
-    assert list(outdf.columns) == [
-        "sampleset",
-        "IID",
-        "DENOM",
-        "PGS001229_hmPOS_GRCh38_SUM",
-    ]
-    assert outdf.shape == (929, 4)
+    assert list(outdf.columns) == ["sampleset", "IID", "DENOM", "PGS", "SUM"]
+    assert outdf.shape == (929, 5)
 
 
 def test_nosplit_aggregate(tmp_path_factory, scorefiles):
@@ -58,10 +53,5 @@ def test_nosplit_aggregate(tmp_path_factory, scorefiles):
     outf = list(outdir.glob("*.txt.gz"))
     assert [x.name for x in outf] == ["aggregated_scores.txt.gz"]
     outdf = pd.read_csv(outf[0], sep="\t")
-    assert list(outdf.columns) == [
-        "sampleset",
-        "IID",
-        "DENOM",
-        "PGS001229_hmPOS_GRCh38_SUM",
-    ]
-    assert outdf.shape == (929, 4)
+    assert list(outdf.columns) == ["sampleset", "IID", "DENOM", "PGS", "SUM"]
+    assert outdf.shape == (929, 5)
