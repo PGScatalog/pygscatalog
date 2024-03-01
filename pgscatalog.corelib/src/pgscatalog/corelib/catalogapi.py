@@ -1,5 +1,6 @@
 """ Classes and functions related to the PGS Catalog API """
 import enum
+import logging
 
 import httpx
 import tenacity
@@ -7,6 +8,9 @@ import tenacity
 from .pgsexceptions import QueryError, InvalidAccessionError
 from .genomebuild import GenomeBuild
 from ._config import Config
+
+
+logger = logging.getLogger(__name__)
 
 
 class CatalogCategory(enum.Enum):
@@ -121,6 +125,7 @@ class CatalogQuery:
             case _:
                 raise InvalidAccessionError(f"Invalid accession: {accession!r}")
 
+        logger.debug(f"{accession=} {category=}")
         return category
 
     def get_query_url(self):
@@ -153,14 +158,14 @@ class CatalogQuery:
 
         Child traits terms aren't included by default. Only traits can have children.
         """
+        urls: list[str] | str = []
         match (self.category, self.accession):
             case CatalogCategory.TRAIT, str():
                 child_flag: int = int(self.include_children)
-                return f"{self._rest_url_root}/trait/{self.accession}?include_children={child_flag}"
+                urls = f"{self._rest_url_root}/trait/{self.accession}?include_children={child_flag}"
             case CatalogCategory.SCORE, str():
-                return [f"{self._rest_url_root}/score/search?pgs_ids={self.accession}"]
+                urls = [f"{self._rest_url_root}/score/search?pgs_ids={self.accession}"]
             case CatalogCategory.SCORE, list():
-                urls: list[str] = []
                 for chunk in self._chunk_accessions():
                     chunked_accession = ",".join(chunk)
                     urls.append(
@@ -169,12 +174,14 @@ class CatalogQuery:
                     )
                 return urls
             case CatalogCategory.PUBLICATION, str():
-                return f"{self._rest_url_root}/publication/{self.accession}"
+                urls = f"{self._rest_url_root}/publication/{self.accession}"
             case _:
                 raise ValueError(
                     f"Invalid CatalogCategory and accession type: {self.category!r}, "
                     f"type({self.accession!r})"
                 )
+        logger.debug(f"Resolved API query URL: {urls}")
+        return urls
 
     def _chunk_accessions(self):
         size = 50  # /rest/score/{pgs_id} limit when searching multiple IDs
@@ -323,10 +330,16 @@ class ScoreQueryResult:
         """
         match build := genome_build:
             case GenomeBuild() if build == GenomeBuild.GRCh37:
-                return self.ftp_grch37_url
+                url = self.ftp_grch37_url
             case GenomeBuild() if build == GenomeBuild.GRCh38:
-                return self.ftp_grch38_url
+                url = self.ftp_grch38_url
             case None:
-                return self.ftp_url
+                url = self.ftp_url
             case _:
                 raise ValueError(f"Invalid genome build {build!r}")
+
+        logger.debug(
+            f"Scoring file download URL for {self.pgs_id} with {build=}: {url}"
+        )
+        return url
+

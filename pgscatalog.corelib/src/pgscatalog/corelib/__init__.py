@@ -1,3 +1,5 @@
+import logging
+
 from ._config import Config
 from .catalogapi import ScoreQueryResult, CatalogQuery, CatalogCategory
 from .scorefiles import ScoringFiles, ScoringFile, NormalisedScoringFile
@@ -24,6 +26,9 @@ from .pgsexceptions import (
     SamplesheetFormatError,
 )
 
+log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"
+logging.basicConfig(format=log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "BasePGSException",

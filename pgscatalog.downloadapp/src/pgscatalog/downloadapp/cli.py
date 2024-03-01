@@ -13,16 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 def run():
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        level=logging.WARNING,
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
     args = parse_args()
 
     if args.verbose:
-        logger.setLevel(logging.INFO)
+        logging.getLogger("pgscatalog.corelib").setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Verbose logging enabled")
 
     if not (outdir := pathlib.Path(args.outdir)).exists():
         raise FileNotFoundError(f"--outdir {outdir.name} doesn't exist")
@@ -32,7 +28,12 @@ def run():
         Config.API_HEADER = {"user-agent": args.user_agent}
 
     build = GenomeBuild.from_string(args.build)
-    logger.info(f"Genome build set to: {build!r}")
+    if build is None:
+        logger.warning(
+            "--build is missing, downloading scoring files in author-reported build"
+        )
+    else:
+        logger.info(f"Downloading scoring files that have been harmonised to {build=}")
 
     # unpack all accessions into a single flat list
     sfs = ScoringFiles(
@@ -60,7 +61,7 @@ def run():
             future.result()
             logger.info("Download complete")
 
-        logger.info("All downloads finished")
+    logger.info("All downloads finished")
 
 
 description_text = textwrap.dedent(

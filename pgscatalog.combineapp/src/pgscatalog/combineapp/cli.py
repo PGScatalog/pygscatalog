@@ -15,26 +15,25 @@ logger = logging.getLogger(__name__)
 
 
 def run():
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        level=logging.WARNING,
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
     args = parse_args()
 
     if args.verbose:
-        logger.setLevel(logging.INFO)
+        logging.getLogger("pgscatalog.corelib").setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Verbose logging enabled")
 
     out_path = pathlib.Path(args.outfile)
 
     if out_path.exists():
-        raise FileExistsError(f"{args.outfile}")
+        logger.critical(f"Output file already exists: {args.outfile}")
+        raise FileExistsError
 
     match x := out_path.name:
         case _ if x.endswith("gz"):
+            logger.debug("Compressing output with gzip")
             compress_output = True
         case _:
+            logger.debug("Not compressing output")
             compress_output = False
 
     paths = list(set(args.scorefiles))  # unique paths only
@@ -52,6 +51,7 @@ def run():
     if args.liftover:
         chain_dir = pathlib.Path(args.chain_dir)
         if not chain_dir.exists():
+            logger.critical(f"Chain directory is missing: {chain_dir}")
             raise FileNotFoundError
 
         liftover_kwargs = {
@@ -65,7 +65,7 @@ def run():
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = []
         for scorefile in scoring_files:
-            logger.info(f"Submitting {scorefile!r}")
+            logger.info(f"Submitting {scorefile!r} for execution")
             futures.append(
                 executor.submit(
                     normalise,
