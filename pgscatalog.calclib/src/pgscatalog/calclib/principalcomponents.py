@@ -49,11 +49,19 @@ class PrincipalComponents:
         self._df = None
         # File of related sample IDs (excluded from training ancestry assignments)
         self._related_ids = kwargs.get("related_id_path", None)
-        # Population labels in REFERENCE psam to use for assignment
-        self._poplabel = kwargs.get("ref_label", "SuperPop")
+
+        if self.pop_type == PopulationType.REFERENCE:
+            # Population labels in REFERENCE psam to use for assignment
+            self._poplabel = kwargs.get("ref_label", "SuperPop")
+        else:
+            self._poplabel = None
 
     def __repr__(self):
         return f"PrincipalComponents(dataset={self.dataset!r}, pop_type={self.pop_type}, pcs_path={self.pcs_path!r}, psam_path={self.psam_path!r})"
+
+    @property
+    def poplabel(self):
+        return self._poplabel
 
     @property
     def max_pcs(self):
@@ -87,20 +95,20 @@ class PrincipalComponents:
     @property
     def df(self):
         if self._df is None:
-            self._df = read.read_pcs(
+            df = read.read_pcs(
                 loc_pcs=self.pcs_path,
                 dataset=self.dataset,
                 loc_related_ids=self._related_ids,
                 nPCs=self.max_pcs,
             )
-
-        if self.pop_type == PopulationType.REFERENCE:
-            self._df = read.extract_ref_psam_cols(
-                loc_psam=self.psam_path,
-                dataset=self.dataset,
-                df_target=self._df,
-                keepcols=self._poplabel,
-            )
+            if self.pop_type == PopulationType.REFERENCE:
+                df = read.extract_ref_psam_cols(
+                    loc_psam=self.psam_path,
+                    dataset=self.dataset,
+                    df_target=df,
+                    keepcols=self._poplabel,
+                )
+            self._df = df
 
         if self._df.shape[0] < 100 and self.pop_type == PopulationType.REFERENCE:
             logger.critical(
