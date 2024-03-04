@@ -1,10 +1,8 @@
 import logging
 import pathlib
-from collections import namedtuple
 
 import pandas as pd
 
-from .ancestry.tools import choose_pval_threshold, compare_ancestry
 from .principalcomponents import PopulationType
 from .ancestry import read
 
@@ -67,6 +65,7 @@ class AggregatedPGS:
     def adjust(self, *, ref_pc, target_pc, **kwargs):
         """
         >>> from ._config import Config
+        >>> from .principalcomponents import PrincipalComponents
         >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "ref.psam", pop_type=PopulationType.REFERENCE)
         >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
         >>> score_path = Config.ROOT_DIR / "tests" / "aggregated_scores.txt.gz"
@@ -81,28 +80,28 @@ class AggregatedPGS:
         self._check_overlap(ref_pc=ref_pc, target_pc=target_pc)
 
         # join pgs + pca data
-        target_df = target_pc.df.join(self.df.loc[self.target_name], on="IID")
-        reference_df = ref_pc.df.join(self.df.loc["reference"], on="IID")
-
-        # set up
-        ancestry_args = namedtuple("ancestry_args", ["method_compare", "pThreshold"])
-        args = ancestry_args(
-            kwargs.get("method_compare", "RandomForest"), kwargs.get("pThreshold", None)
-        )
-        assignment_threshold_p = choose_pval_threshold(args)
+        # target_df = target_pc.df.join(self.df.loc[self.target_name], on="IID")
+        # reference_df = ref_pc.df.join(self.df.loc["reference"], on="IID")
+        #
+        # # set up
+        # ancestry_args = namedtuple("ancestry_args", ["method_compare", "pThreshold"])
+        # args = ancestry_args(
+        #     kwargs.get("method_compare", "RandomForest"), kwargs.get("pThreshold", None)
+        # )
+        # assignment_threshold_p = choose_pval_threshold(args)
 
         # TODO: bork
-        ancestry_ref, ancestry_target, compare_info = compare_ancestry(
-            ref_df=reference_df,
-            ref_pop_col=ref_pc.poplabel,
-            ref_train_col="Unrelated",
-            target_df=target_df,
-            n_pcs=ref_pc.npcs_popcomp,
-            method=args.method_compare,
-            p_threshold=assignment_threshold_p,
-        )
+        # ancestry_ref, ancestry_target, compare_info = compare_ancestry(
+        #     ref_df=reference_df,
+        #     ref_pop_col=ref_pc.poplabel,
+        #     ref_train_col="Unrelated",
+        #     target_df=target_df,
+        #     n_pcs=ref_pc.npcs_popcomp,
+        #     method=args.method_compare,
+        #     p_threshold=assignment_threshold_p,
+        # )
 
-        pass
+        raise NotImplementedError
 
 
 class PolygenicScore:
