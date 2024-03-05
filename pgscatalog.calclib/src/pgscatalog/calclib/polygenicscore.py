@@ -1,13 +1,21 @@
+import collections
 import logging
 import pathlib
 
 import pandas as pd
 
+from .ancestry.tools import compare_ancestry, choose_pval_threshold, pgs_adjust
 from .principalcomponents import PopulationType
 from .ancestry import read
 
 
 logger = logging.getLogger(__name__)
+
+AdjustArguments = collections.namedtuple(
+    typename="AdjustArguments",
+    field_names=["method_compare", "pThreshold", "method_normalization"],
+    defaults=("RandomForest", None, ["empirical", "mean", "mean+var"]),
+)
 
 
 class AggregatedPGS:
@@ -62,15 +70,24 @@ class AggregatedPGS:
             logger.critical("Error: PGS data missing for target samples with PCA data.")
             raise ValueError
 
-    def adjust(self, *, ref_pc, target_pc, **kwargs):
+    def adjust(self, *, ref_pc, target_pc, adjust_arguments=None):
         """
         >>> from ._config import Config
         >>> from .principalcomponents import PrincipalComponents
-        >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "ref.psam", pop_type=PopulationType.REFERENCE)
+        >>> related_path = Config.ROOT_DIR / "tests" / "ref.king.cutoff.id"
+        >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "ref.psam", pop_type=PopulationType.REFERENCE, related_path=related_path)
         >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
         >>> score_path = Config.ROOT_DIR / "tests" / "aggregated_scores.txt.gz"
-        >>> AggregatedPGS(path=score_path, target_name="hgdp").adjust(ref_pc=ref_pc, target_pc=target_pcs)
+        >>> models, adjpgs = AggregatedPGS(path=score_path, target_name="hgdp").adjust(ref_pc=ref_pc, target_pc=target_pcs)
+        >>> adjpgs.to_dict().keys()
+        dict_keys(['SUM|PGS001229_hmPOS_GRCh38_SUM', 'SUM|PGS001229_hmPOS_GRCh38_AVG', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38_SUM', 'Z_MostSimilarPop|PGS001229_hmPOS_GRCh38_SUM', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38_AVG', 'Z_MostSimilarPop|PGS001229_hmPOS_GRCh38_AVG', 'Z_norm1|PGS001229_hmPOS_GRCh38_SUM', 'Z_norm2|PGS001229_hmPOS_GRCh38_SUM', 'Z_norm1|PGS001229_hmPOS_GRCh38_AVG', 'Z_norm2|PGS001229_hmPOS_GRCh38_AVG'])
+
+        >>> models
+        {'dist_empirical': {'PGS001229_hmPOS_GRCh38_SUM': {'EUR': {'percentiles': array([-1.04069000e+01, -7.94665080e+00, -6.71345760e+00, ...
         """
+        if adjust_arguments is None:
+            adjust_arguments = AdjustArguments()  # uses default values
+
         if ref_pc.pop_type != PopulationType.REFERENCE:
             raise ValueError("ref_pc argument has bad pop_type")
 
@@ -78,30 +95,55 @@ class AggregatedPGS:
             raise ValueError("target_pc argument has bad pop_type")
 
         self._check_overlap(ref_pc=ref_pc, target_pc=target_pc)
+        scorecols = list(self.df.columns)
 
         # join pgs + pca data
-        # target_df = target_pc.df.join(self.df.loc[self.target_name], on="IID")
-        # reference_df = ref_pc.df.join(self.df.loc["reference"], on="IID")
-        #
-        # # set up
-        # ancestry_args = namedtuple("ancestry_args", ["method_compare", "pThreshold"])
-        # args = ancestry_args(
-        #     kwargs.get("method_compare", "RandomForest"), kwargs.get("pThreshold", None)
-        # )
-        # assignment_threshold_p = choose_pval_threshold(args)
+        target_df = target_pc.df.join(self.df.loc[self.target_name], on="IID")
+        reference_df = ref_pc.df.join(self.df.loc["reference"], on="IID")
 
-        # TODO: bork
-        # ancestry_ref, ancestry_target, compare_info = compare_ancestry(
-        #     ref_df=reference_df,
-        #     ref_pop_col=ref_pc.poplabel,
-        #     ref_train_col="Unrelated",
-        #     target_df=target_df,
-        #     n_pcs=ref_pc.npcs_popcomp,
-        #     method=args.method_compare,
-        #     p_threshold=assignment_threshold_p,
-        # )
+        assignment_threshold_p = choose_pval_threshold(adjust_arguments)
 
-        raise NotImplementedError
+        if (ref_popcomp := ref_pc.npcs_popcomp) != (
+            target_popcomp := target_pc.npcs_popcomp
+        ):
+            logger.warning(
+                f"Reference PC: {ref_popcomp=} doesn't match {target_popcomp=}. Taking min()"
+            )
+
+        npcs_popcomp = min([ref_pc.npcs_popcomp, target_pc.npcs_popcomp])
+        ancestry_ref, ancestry_target, compare_info = compare_ancestry(
+            ref_df=reference_df,
+            ref_pop_col=ref_pc.poplabel,
+            ref_train_col="Unrelated",
+            target_df=target_df,
+            n_pcs=npcs_popcomp,
+            method=adjust_arguments.method_compare,
+            p_threshold=assignment_threshold_p,
+        )
+
+        reference_df = pd.concat([reference_df, ancestry_ref], axis=1)
+        target_df = pd.concat([target_df, ancestry_target], axis=1)
+
+        if (ref_norm := ref_pc.npcs_norm) != (target_norm := ref_pc.npcs_norm):
+            logger.warning(
+                f"Reference PC: {ref_norm=} doesn't match {target_norm=}. Taking min()"
+            )
+
+        npcs_norm = min([ref_pc.npcs_norm, target_pc.npcs_norm])
+
+        # Adjust PGS values
+        adjpgs_ref, adjpgs_target, adjpgs_models = pgs_adjust(
+            reference_df,
+            target_df,
+            scorecols,
+            ref_pc.poplabel,
+            "MostSimilarPop",
+            use_method=adjust_arguments.method_normalization,
+            ref_train_col="Unrelated",
+            n_pcs=npcs_norm,
+        )
+        adjpgs = pd.concat([adjpgs_ref, adjpgs_target], axis=0)
+        return adjpgs_models, adjpgs
 
 
 class PolygenicScore:
