@@ -1,31 +1,116 @@
-import collections
+import dataclasses
+import gzip
 import logging
 import pathlib
+import typing
 
 import pandas as pd
 
-from .ancestry.tools import compare_ancestry, choose_pval_threshold, pgs_adjust
+from .ancestry.tools import (
+    compare_ancestry,
+    choose_pval_threshold,
+    pgs_adjust,
+    write_model,
+)
 from .principalcomponents import PopulationType
 from .ancestry import read
 
 
 logger = logging.getLogger(__name__)
 
-AdjustArguments = collections.namedtuple(
-    typename="AdjustArguments",
-    field_names=["method_compare", "pThreshold", "method_normalization"],
-    defaults=("RandomForest", None, ["empirical", "mean", "mean+var"]),
-)
+
+@dataclasses.dataclass(frozen=True)
+class AdjustArguments:
+    """Arguments that control genetic similarity estimation and PGS adjustment
+
+    >>> AdjustArguments(method_compare="Mahalanobis", pThreshold=None, method_normalization=("empirical", "mean"))
+    AdjustArguments(method_compare='Mahalanobis', pThreshold=None, method_normalization=('empirical', 'mean'))
+    """
+
+    method_compare: str = "RandomForest"
+    pThreshold: typing.Optional[float] = None
+    method_normalization: tuple[str, ...] = ("empirical", "mean", "mean+var")
+
+    def __post_init__(self):
+        if self.method_compare not in {"Mahalanobis", "RandomForest"}:
+            raise ValueError(f"Bad method: {self.method_compare}")
+
+        if not set(self.method_normalization) <= {"empirical", "mean", "mean+var"}:
+            raise ValueError(f"Bad normalisation: {self.method_normalization}")
+
+
+@dataclasses.dataclass(frozen=True)
+class AdjustResults:
+    """Results returned by the adjust method of a PolygenicScore"""
+
+    target_label: str
+    models: pd.DataFrame
+    model_meta: dict
+    pca: pd.DataFrame
+    pgs: pd.DataFrame
+    scorecols: list[str]
+
+    def write(self, directory):
+        self._write_model(directory)
+        self._write_pgs(directory)
+        self._write_pca(directory)
+
+    def _write_pca(self, directory):
+        directory = pathlib.Path(directory)
+        loc_popsim_out = directory / f"{self.target_label}_popsimilarity.txt.gz"
+        logger.debug(f"Writing PCA and popsim results to: {loc_popsim_out}")
+        self.pca.drop(self.scorecols, axis=1).to_csv(loc_popsim_out, sep="\t")
+
+    def _write_model(self, directory):
+        """Write results to a directory"""
+        directory = pathlib.Path(directory)
+        write_model(
+            {"pgs": self.models, "compare_pcs": self.model_meta},
+            str(directory / f"{self.target_label}_info.json.gz"),
+        )
+
+    def _write_pgs(self, directory):
+        scorecols = self.scorecols
+        directory = pathlib.Path(directory)
+        loc_pgs_out = str(directory / f"{self.target_label}_pgs.txt.gz")
+        with gzip.open(loc_pgs_out, "wt") as outf:
+            logger.debug(
+                "Writing adjusted PGS values (long format) to: {}".format(loc_pgs_out)
+            )
+            for i, pgs_id in enumerate(scorecols):
+                df_pgs = self.pgs.loc[:, self.pgs.columns.str.endswith(pgs_id)].melt(
+                    ignore_index=False
+                )  # filter to 1 PGS
+                df_pgs[["method", "PGS"]] = df_pgs.variable.str.split("|", expand=True)
+                df_pgs = (
+                    df_pgs.drop("variable", axis=1)
+                    .reset_index()
+                    .pivot(
+                        index=["sampleset", "IID", "PGS"],
+                        columns="method",
+                        values="value",
+                    )
+                )
+                if i == 0:
+                    logger.debug(
+                        "{}/{}: Writing {}".format(i + 1, len(scorecols), pgs_id)
+                    )
+                    colorder = list(df_pgs.columns)  # to ensure sort order
+                    df_pgs.to_csv(outf, sep="\t")
+                else:
+                    logger.debug(
+                        "{}/{}: Appending {}".format(i + 1, len(scorecols), pgs_id)
+                    )
+                    df_pgs[colorder].to_csv(outf, sep="\t", header=False)
 
 
 class AggregatedPGS:
-    """A PGS that's been aggregated and melted, and may contain multiple samplesets
+    """A PGS that's been aggregated and melted, and may contain a reference panel and a target set
 
     >>> from ._config import Config
     >>> score_path = Config.ROOT_DIR / "tests" / "aggregated_scores.txt.gz"
     >>> AggregatedPGS(path=score_path, target_name="hgdp")
     AggregatedPGS(path=PosixPath('.../pgscatalog.calclib/tests/aggregated_scores.txt.gz'))
-
     """
 
     def __init__(self, *, target_name, df=None, path=None):
@@ -71,19 +156,30 @@ class AggregatedPGS:
             raise ValueError
 
     def adjust(self, *, ref_pc, target_pc, adjust_arguments=None):
-        """
+        """Adjust a PGS based on genetic ancestry similarity.
+
+        Adjusting a PGS returns AdjustResults:
+
         >>> from ._config import Config
         >>> from .principalcomponents import PrincipalComponents
         >>> related_path = Config.ROOT_DIR / "tests" / "ref.king.cutoff.id"
         >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "ref.psam", pop_type=PopulationType.REFERENCE, related_path=related_path)
         >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
         >>> score_path = Config.ROOT_DIR / "tests" / "aggregated_scores.txt.gz"
-        >>> models, adjpgs = AggregatedPGS(path=score_path, target_name="hgdp").adjust(ref_pc=ref_pc, target_pc=target_pcs)
-        >>> adjpgs.to_dict().keys()
-        dict_keys(['SUM|PGS001229_hmPOS_GRCh38_SUM', 'SUM|PGS001229_hmPOS_GRCh38_AVG', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38_SUM', 'Z_MostSimilarPop|PGS001229_hmPOS_GRCh38_SUM', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38_AVG', 'Z_MostSimilarPop|PGS001229_hmPOS_GRCh38_AVG', 'Z_norm1|PGS001229_hmPOS_GRCh38_SUM', 'Z_norm2|PGS001229_hmPOS_GRCh38_SUM', 'Z_norm1|PGS001229_hmPOS_GRCh38_AVG', 'Z_norm2|PGS001229_hmPOS_GRCh38_AVG'])
+        >>> results = AggregatedPGS(path=score_path, target_name="hgdp").adjust(ref_pc=ref_pc, target_pc=target_pcs)
+        >>> results.pgs.to_dict().keys()
+        dict_keys(['SUM|PGS001229_hmPOS_GRCh38_SUM', 'SUM|PGS001229_hmPOS_GRCh38_AVG', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38_SUM', ...
 
-        >>> models
-        {'dist_empirical': {'PGS001229_hmPOS_GRCh38_SUM': {'EUR': {'percentiles': array([-1.04069000e+01, -7.94665080e+00, -6.71345760e+00, ...
+        >>> results.models
+        {'dist_empirical': {'PGS001229_hmPOS_GRCh38_SUM': {'EUR': {'percentiles': array([-1.04069000e+01, -7.94665080e+00, ...
+
+        Write the adjusted results to a directory:
+
+        >>> import tempfile, os
+        >>> dout = tempfile.mkdtemp()
+        >>> results.write(directory=dout)
+        >>> sorted(os.listdir(dout))
+        ['target_info.json.gz', 'target_pgs.txt.gz', 'target_popsimilarity.txt.gz']
         """
         if adjust_arguments is None:
             adjust_arguments = AdjustArguments()  # uses default values
@@ -138,12 +234,24 @@ class AggregatedPGS:
             scorecols,
             ref_pc.poplabel,
             "MostSimilarPop",
-            use_method=adjust_arguments.method_normalization,
+            use_method=list(adjust_arguments.method_normalization),
             ref_train_col="Unrelated",
             n_pcs=npcs_norm,
         )
         adjpgs = pd.concat([adjpgs_ref, adjpgs_target], axis=0)
-        return adjpgs_models, adjpgs
+
+        reference_df["REFERENCE"] = True
+        target_df["REFERENCE"] = False
+        final_df = pd.concat([target_df, reference_df], axis=0)
+
+        return AdjustResults(
+            target_label=target_pc.dataset,
+            models=adjpgs_models,
+            model_meta=compare_info,
+            pgs=adjpgs,
+            pca=final_df,
+            scorecols=scorecols,
+        )
 
 
 class PolygenicScore:
