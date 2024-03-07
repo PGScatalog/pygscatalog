@@ -239,11 +239,11 @@ def compare_ancestry(
                 )
             )
             ref_assign["MostSimilarPop_LowConfidence"] = [
-                (ref_assign["RF_P_{}".format(x)][i] < p_threshold)
+                (ref_assign["RF_P_{}".format(x)].iloc[i] < p_threshold)
                 for i, x in enumerate(clf_rf.predict(ref_df[cols_pcs]))
             ]
             target_assign["MostSimilarPop_LowConfidence"] = [
-                (target_assign["RF_P_{}".format(x)][i] < p_threshold)
+                (target_assign["RF_P_{}".format(x)].iloc[i] < p_threshold)
                 for i, x in enumerate(clf_rf.predict(target_df[cols_pcs]))
             ]
 

@@ -29,4 +29,4 @@ addopts = "-ra -q"
 testpaths = [
     "tests"
 ]
-# filterwarnings = ["error"]
+filterwarnings = ["error"]

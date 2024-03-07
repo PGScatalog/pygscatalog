@@ -342,4 +342,3 @@ class ScoreQueryResult:
             f"Scoring file download URL for {self.pgs_id} with {build=}: {url}"
         )
         return url
-
