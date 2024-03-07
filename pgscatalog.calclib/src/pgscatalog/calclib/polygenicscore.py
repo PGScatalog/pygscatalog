@@ -6,14 +6,14 @@ import typing
 
 import pandas as pd
 
-from .ancestry.tools import (
+from ._ancestry.tools import (
     compare_ancestry,
     choose_pval_threshold,
     pgs_adjust,
     write_model,
 )
 from .principalcomponents import PopulationType
-from .ancestry import read
+from ._ancestry import read
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class AdjustArguments:
 
 @dataclasses.dataclass(frozen=True)
 class AdjustResults:
-    """Results returned by the adjust method of a PolygenicScore"""
+    """Results returned by :class:`AggregatedPGS.adjust()`"""
 
     target_label: str
     models: pd.DataFrame
@@ -51,6 +51,7 @@ class AdjustResults:
     scorecols: list[str]
 
     def write(self, directory):
+        """Write model, PGS, and PCA data to a directory"""
         self._write_model(directory)
         self._write_pgs(directory)
         self._write_pca(directory)
@@ -105,7 +106,9 @@ class AdjustResults:
 
 
 class AggregatedPGS:
-    """A PGS that's been aggregated and melted, and may contain a reference panel and a target set
+    """A PGS that's been aggregated, melted, and probably contains samples from a reference panel and a target population.
+
+    The most useful method in this class adjusts PGS based on :func:`genetic ancestry similarity estimation <pgscatalog.calclib.AggregatedPGS.adjust>`.
 
     >>> from ._config import Config
     >>> score_path = Config.ROOT_DIR / "tests" / "aggregated_scores.txt.gz"
@@ -156,9 +159,9 @@ class AggregatedPGS:
             raise ValueError
 
     def adjust(self, *, ref_pc, target_pc, adjust_arguments=None):
-        """Adjust a PGS based on genetic ancestry similarity.
+        """Adjust a PGS based on genetic ancestry similarity estimations.
 
-        Adjusting a PGS returns AdjustResults:
+        :returns: :class:`AdjustResults`
 
         >>> from ._config import Config
         >>> from .principalcomponents import PrincipalComponents
@@ -255,7 +258,7 @@ class AggregatedPGS:
 
 
 class PolygenicScore:
-    """Represents the output of plink2 --score written to a file
+    """Represents the output of ``plink2 --score`` written to a file
 
     >>> from ._config import Config
     >>> import reprlib
@@ -340,6 +343,7 @@ class PolygenicScore:
 
     @property
     def df(self):
+        """A generator that yields dataframe chunks."""
         if self.path is not None:
             self._df = self.lazy_read()
         elif self._bigdf is not None:

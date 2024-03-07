@@ -2,19 +2,25 @@ import enum
 import itertools
 import logging
 
-from .ancestry import read
+from ._ancestry import read
 
 logger = logging.getLogger(__name__)
 
 
 class PopulationType(enum.Enum):
+    """PGS can be calculated on a reference panel or target population.
+
+    This enum mostly helps to disambiguate instances of :class:`PrincipalComponents`."""
+
     TARGET = "target"
     REFERENCE = "reference"
 
 
 class PrincipalComponents:
     """
-    This class represents principal components data calculated by fraposa-pgsc
+    This class represents principal components analysis (PCA) data calculated by ``fraposa-pgsc``.
+
+    PCA data may come from a reference population or a target population. Target populations have been projected onto the reference population.
 
     >>> from ._config import Config
     >>> related_path = Config.ROOT_DIR / "tests" / "ref.king.cutoff.id"
@@ -24,7 +30,6 @@ class PrincipalComponents:
     PrincipalComponents(dataset='reference', pop_type=PopulationType.REFERENCE, pcs_path=[PosixPath('.../pgscatalog.calclib/tests/ref.pcs')], psam_path=PosixPath('.../pgscatalog.calclib/tests/ref.psam'))
     >>> ref_pc.df.to_dict()
     {'PC1': {('reference', 'HG00096'): -23.8212, ('reference', 'HG00097'): -24.8106, ...
-
     >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
     >>> target_pcs
     PrincipalComponents(dataset='target', pop_type=PopulationType.TARGET, pcs_path=[PosixPath('.../pgscatalog.calclib/tests/target.pcs')], psam_path=None)
@@ -65,18 +70,25 @@ class PrincipalComponents:
 
     @property
     def pop_type(self):
+        """See :class:`PopulationType`"""
         return self._pop_type
 
     @property
     def psam_path(self):
+        """Path to a plink2 sample information file for the reference population"""
         return self._psam_path
 
     @property
     def related_path(self):
+        """Path to a plink2 kinship cutoff file
+
+        Related reference samples are removed from analysis
+        """
         return self._related_path
 
     @property
     def poplabel(self):
+        """The group label used to assign target samples that are similar to reference population groups, e.g. SAS/EUR/AFR"""
         return self._poplabel
 
     @property
@@ -98,7 +110,7 @@ class PrincipalComponents:
 
     @property
     def npcs_norm(self):
-        """Number of PCs used for population NORMALIZATION (default = 4)"""
+        """Number of PCs used for population normalization (default = 4)"""
         return self._npcs_norm
 
     @npcs_norm.setter
@@ -110,6 +122,12 @@ class PrincipalComponents:
 
     @property
     def df(self):
+        """A pandas dataframe that contains PCA data.
+
+        Reference data also contains population label columns loaded from sample information files.
+
+        :raises ValueError: If the reference population consists of fewer than 100 samples
+        """
         if self._df is None:
             df = read.read_pcs(
                 loc_pcs=self.pcs_path,
