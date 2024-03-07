@@ -1,4 +1,5 @@
 import argparse
+import logging
 import pathlib
 import textwrap
 import operator
@@ -6,9 +7,24 @@ import functools
 
 from pgscatalog.calclib.polygenicscore import PolygenicScore
 
+logger = logging.getLogger(__name__)
+
 
 def run_aggregate():
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
+        level=logging.WARNING,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     args = _parse_args()
+
+    if args.verbose:
+        logger.setLevel(logging.INFO)
+
+    if not (outdir := pathlib.Path(args.outdir)).exists():
+        raise FileNotFoundError(f"--outdir {outdir.name} doesn't exist")
+
     score_paths = [pathlib.Path(x) for x in args.scores]
     pgs = [PolygenicScore(path=x) for x in score_paths]
     # call __add__ a lot

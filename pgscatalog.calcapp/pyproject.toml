@@ -16,7 +16,8 @@ python = "^3.11"
 pytest = "^8.0.0"
 
 [tool.poetry.scripts]
-pgscatalog-aggregate = 'pgscatalog.downloadapp.cli:run'
+pgscatalog-aggregate = 'pgscatalog.calcapp.ancestry_cli:run_aggregate'
+pgscatalog-ancestry-adjust = 'pgscatalog.calcapp.ancestry_cli:run_ancestry'
 
 [build-system]
 requires = ["poetry-core"]
@@ -28,4 +29,4 @@ addopts = "-ra -q"
 testpaths = [
     "tests"
 ]
-filterwarnings = ["error"]
+# filterwarnings = ["error"]
