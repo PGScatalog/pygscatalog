@@ -6,7 +6,7 @@ Various match strategies are used to generate a list of match candidates. These 
 
 Matching fails if not enough variants are present in the target variant information files. You can adjust `--min_overlap` to change the matching failure threshold, but it's not a good idea normally.
 
-The [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc) uses this CLI application internally. If you want to calculate polygenic scores using an automated workflow, the PGS Catalog Calculator is the best method to use.
+The [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc) uses this CLI application internally. 
 
 ## Installation 
 
@@ -14,18 +14,6 @@ The [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc) uses this 
 $ pip install pgscatalog-match
 ```
 
-## Usage
-
-```
-$ pgscatalog-match ...
-```
-
 ## Documentation
 
 See **link to docs**.
-
-## Help
-
-```
-$ pgscatalog-match --help
-```

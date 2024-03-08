@@ -20,18 +20,6 @@ The [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc) uses this 
 $ pip install pgscatalog-combine
 ```
 
-## Usage
-
-```
-$ pgscatalog-combine -s PGS000001_hmPOS_GRCh38.txt.gz PGS0001229_hmPOS_GRCh38.txt.gz -t GRCh38 -o combined.txt
-```
-
 ## Documentation
 
 See **link to docs**.
-
-## Help
-
-```
-$ pgscatalog-combine --help
-```
