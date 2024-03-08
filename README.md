@@ -25,8 +25,8 @@ If you write Python code to work with PGS, we publish some libraries that might 
 | Library               | Description                                              | Link                                   |
 |-----------------------|----------------------------------------------------------|----------------------------------------|
 | `pgscatalog-corelib`  | Core classes and functions to work with PGS data         | [README](pgscatalog.corelib/README.md) |
-| `pgscatalog-matchlib` | Variant matching across scoring files and target genomes | [README](pgscatalog.corelib/README.md) |
-| `pgscatalog-calclib`  | Genetic ancestry similarity estimation and normalisation | [README](pgscatalog.corelib/README.md) |
+| `pgscatalog-matchlib` | Variant matching across scoring files and target genomes | [README](pgscatalog.matchlib/README.md)|
+| `pgscatalog-calclib`  | Genetic ancestry similarity estimation and normalisation | [README](pgscatalog.calclib/README.md) |
 
 ## Documentation
 
