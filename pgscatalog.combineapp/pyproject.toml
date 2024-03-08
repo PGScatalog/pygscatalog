@@ -3,7 +3,7 @@ name = "pgscatalog.combineapp"
 version = "0.1.0"
 description = "CLI application to standardise and combine polygenic scoring files"
 license = "Apache-2.0"
-authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>"]
+authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
 readme = "README.md"
 packages = [
     { include = "pgscatalog", from = "src" },
