@@ -1,5 +1,7 @@
 # `pgscatalog-match`
 
+[![.github/workflows/matchapp-pytest.yml](https://github.com/PGScatalog/pygscatalog/actions/workflows/matchapp-pytest.yml/badge.svg?branch=main)](https://github.com/PGScatalog/pygscatalog/actions/workflows/matchapp-pytest.yml)
+
 A CLI application that matches (intersects) variants in a normalised scoring file against variant information files. It outputs scoring files compatible with `plink2 --score`, a summary log, and a large match candidate information log.
 
 Various match strategies are used to generate a list of match candidates. These candidates are filtered by user parameters to produce up to one "best match"  variant for each variant in the original scoring file.
