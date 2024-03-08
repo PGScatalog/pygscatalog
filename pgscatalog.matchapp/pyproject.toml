@@ -25,3 +25,11 @@ pgscatalog-matchmerge = 'pgscatalog.matchapp.merge_cli:run_merge'
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests"
+]
+filterwarnings = ["error"]

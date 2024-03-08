@@ -52,12 +52,12 @@ def _encode_match_priority(df: pl.LazyFrame) -> pl.LazyFrame:
     return (
         df.with_columns(
             # set false best match to not_best
-            match_priority=pl.col("best_match").apply(
+            match_priority=pl.col("best_match").map_elements(
                 lambda x: {None: 0, True: 1, False: 3}[x]
             )
         )
         .with_columns(
-            excluded_match_priority=pl.col("exclude").apply(
+            excluded_match_priority=pl.col("exclude").map_elements(
                 lambda x: {None: 0, True: 2, False: 0}[x]
             )
         )
@@ -66,7 +66,7 @@ def _encode_match_priority(df: pl.LazyFrame) -> pl.LazyFrame:
         )
         .with_columns(
             match_status=pl.col("max")
-            .apply(
+            .map_elements(
                 lambda x: {0: "unmatched", 1: "matched", 2: "excluded", 3: "not_best"}[
                     x
                 ]
@@ -140,7 +140,7 @@ def _label_duplicate_best_match(df: pl.LazyFrame) -> pl.LazyFrame:
             .otherwise(pl.lit(False))
         )
         .drop("count")
-        .with_row_count(
+        .with_row_index(
             name="temp_row_nr"
         )  # add temporary row count to get first variant
         .with_columns(

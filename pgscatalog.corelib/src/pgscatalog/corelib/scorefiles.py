@@ -399,7 +399,9 @@ class ScoringFile:
         self._directory = pathlib.Path(directory)
         fn = pathlib.Path(self.path).name
         out_path = self._directory / fn
+
         logger.debug(f"Downloading {self.path} to {out_path}")
+
         https_download(
             url=self.path,
             out_path=out_path,
@@ -496,7 +498,9 @@ class ScoringFile:
 
     def get_log(self, drop_missing=False, variant_log=None):
         """Create a JSON log from a ScoringFile's header and variant rows."""
+
         logger.debug(f"Creating JSON log for {self!r}")
+
         log = {}
 
         for attr in self._header.fields:
@@ -788,7 +792,8 @@ class NormalisedScoringFile:
 
     def __init__(self, path):
         try:
-            xopen(path)
+            with xopen(path):
+                pass
         except TypeError:
             self.path = False
         else:

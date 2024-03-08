@@ -29,6 +29,7 @@ html_static_path = ["_static"]
 autoapi_dirs = [
     "../pgscatalog.corelib/src/pgscatalog",
     "../pgscatalog.matchlib/src/pgscatalog",
+    "../pgscatalog.calclib/src/pgscatalog",
 ]
 # see _templates/autoapi/index.rst for autoapi fix
 autoapi_template_dir = "_templates/autoapi"

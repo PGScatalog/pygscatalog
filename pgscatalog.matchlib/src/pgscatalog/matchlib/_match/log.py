@@ -43,7 +43,8 @@ def make_summary_log(
             pl.col("match_status").fill_null(value="unmatched"), dataset=pl.lit(dataset)
         )  # fill in unmatched variants
         .group_by(cols)
-        .count()
+        .len()
+        .rename({"len": "count"})
         .join(filter_summary, how="left", on="accession")
         .pipe(_prettify_summary)
     )
@@ -55,7 +56,8 @@ def check_log_count(scorefile: pl.LazyFrame, summary_log: pl.LazyFrame):
 
     log_count: pl.DataFrame = (
         scorefile.group_by("accession")
-        .count()
+        .len()
+        .rename({"len": "count"})
         .join(summary_count, on="accession")
         .collect()
     )

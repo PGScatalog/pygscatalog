@@ -27,3 +27,8 @@ pyarrow = ["pyarrow"]
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --doctest-modules"
+filterwarnings = ["error"]
