@@ -70,8 +70,8 @@ def relabel_write(relabelled, dataset, split_output, combined_output, out_dir):
     >>> x = relabel(in_path=in_target, map_paths=maps, relabel_args=args)
     >>> with tempfile.TemporaryDirectory() as tmp_dir:
     ...     relabel_write(x, dataset="test", split_output=True, combined_output=True, out_dir=tmp_dir)
-    ...     os.listdir(tmp_dir)
-    ['test_ALL_relabelled.gz', 'test_1_relabelled.gz', 'test_8_relabelled.gz']
+    ...     sorted(os.listdir(tmp_dir))
+    ['test_1_relabelled.gz', 'test_8_relabelled.gz', 'test_ALL_relabelled.gz']
     """
     if combined_output:
         combined_output = out_dir / pathlib.Path(
