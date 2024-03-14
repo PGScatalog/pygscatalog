@@ -25,6 +25,7 @@ from .pgsexceptions import (
     GenomesNotFound,
     SamplesheetFormatError,
 )
+from .relabel import RelabelArgs, relabel, relabel_write
 
 log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"
 logging.basicConfig(format=log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
@@ -60,4 +61,7 @@ __all__ = [
     "TargetVariants",
     "NormalisedScoringFile",
     "EffectType",
+    "RelabelArgs",
+    "relabel",
+    "relabel_write",
 ]
