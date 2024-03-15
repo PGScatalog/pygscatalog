@@ -22,7 +22,8 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-pgscatalog-combine = 'pgscatalog.combineapp.cli:run'
+pgscatalog-combine = 'pgscatalog.combineapp.combine_cli:run'
+pgscatalog-relabel = 'pgscatalog.combineapp.relabel_cli:run'
 
 [tool.pytest.ini_options]
 minversion = "6.0"

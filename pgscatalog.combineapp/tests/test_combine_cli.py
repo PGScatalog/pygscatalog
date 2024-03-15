@@ -5,7 +5,7 @@ import itertools
 from unittest.mock import patch
 import pytest
 
-from pgscatalog.combineapp.cli import run
+from pgscatalog.combineapp.combine_cli import run
 from pgscatalog.corelib import ScoringFile
 
 
