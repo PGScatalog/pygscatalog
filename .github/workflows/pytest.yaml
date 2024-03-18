@@ -10,6 +10,24 @@ on:
       package-directory:
         type: string
         required: true
+  workflow_dispatch:
+    inputs:
+      package-directory:
+        required: true
+        type: choice
+        options:
+        - pgscatalog.corelib
+        - pgscatalog.matchlib
+        - pgscatalog.calclib
+        - pgscatalog.downloadapp
+        - pgscatalog.combineapp
+        - pgscatalog.matchapp
+        - pgscatalog.calcapp
+      python-version:
+        required: false
+        default: '3.11'
+        type: string
+        
 
 jobs:
   pytest:
@@ -34,7 +52,7 @@ jobs:
       - run: poetry install --with dev --all-extras
         working-directory: ${{ inputs.package-directory }}
 
-      - run: poetry run pytest
+      - run: poetry run pytest --cov
         working-directory: ${{ inputs.package-directory }}
     
       - name: Upload coverage reports to Codecov
@@ -42,3 +60,4 @@ jobs:
         with:
             token: ${{ secrets.CODECOV_TOKEN }}
             slug: PGScatalog/pygscatalog
+            flags: ${{ inputs.package-directory }}
