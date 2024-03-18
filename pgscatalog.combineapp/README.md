@@ -1,6 +1,7 @@
 # `pgscatalog-combine`
 
 [![.github/workflows/combineapp-pytest.yml](https://github.com/PGScatalog/pygscatalog/actions/workflows/combineapp-pytest.yml/badge.svg)](https://github.com/PGScatalog/pygscatalog/actions/workflows/combineapp-pytest.yml)
+[![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/combine.html)
 
 A CLI application that combines polygenic score (PGS) scoring files into a standardised output. 
 
@@ -19,7 +20,3 @@ The [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc) uses this 
 ```
 $ pip install pgscatalog-combine
 ```
-
-## Documentation
-
-See **link to docs**.
