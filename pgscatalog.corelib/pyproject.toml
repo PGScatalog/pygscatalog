@@ -20,6 +20,7 @@ pyarrow = {version = "^15.0.0", optional = true}
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"
 sphinx-autoapi = "^3.0.0"
+pytest-cov = "^4.1.0"
 
 [tool.poetry.extras]
 pyarrow = ["pyarrow"]
