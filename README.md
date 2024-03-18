@@ -35,7 +35,7 @@ If you write Python code to work with PGS, we publish some libraries that might 
 
 ## Documentation
 
-Full documentation is provided **LINK TO DOCS**
+[Full documentation is available here](https://pygscatalog.readthedocs.io/en/latest/).
 
 ## License
 
