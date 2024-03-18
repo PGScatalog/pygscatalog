@@ -1,6 +1,7 @@
 # `pgscatalog-calclib`
 
 [![.github/workflows/calclib-pytest.yml](https://github.com/PGScatalog/pygscatalog/actions/workflows/calclib-pytest.yml/badge.svg?branch=main)](https://github.com/PGScatalog/pygscatalog/actions/workflows/calclib-pytest.yml)
+[![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/calclib/index.html)
 
 This Python library contains classes and functions useful for aggregating and adjusting calculated PGS in the context of genetic ancestry similarity.
 
@@ -14,6 +15,3 @@ Please note this package doesn't contain functionality to calculate a PGS from t
 $ pip install pgscatalog-calclib
 ```
 
-## Documentation
-
-See **link to docs**.
