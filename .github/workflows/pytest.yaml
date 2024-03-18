@@ -36,3 +36,9 @@ jobs:
 
       - run: poetry run pytest
         working-directory: ${{ inputs.package-directory }}
+    
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+            token: ${{ secrets.CODECOV_TOKEN }}
+            slug: PGScatalog/pygscatalog
