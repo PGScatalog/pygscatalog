@@ -10,7 +10,16 @@ flag_management:
   individual_flags: # exceptions to the default rules above, stated flag by flag
     - name: pgscatalog.downloadapp  #fill in your own flag name
       paths: 
-      - pgscatalog.downloadapp
+      - pgscatalog.downloadapp/
+      carryforward: true
+      statuses:
+        - type: project
+          target: 20%
+        - type: patch
+          target: 100%
+    - name: pgscatalog.corelib 
+      paths: 
+      - pgscatalog.corelib/
       carryforward: true
       statuses:
         - type: project
