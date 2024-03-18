@@ -1,6 +1,7 @@
 # `pgscatalog-calcapp`
 
 [![.github/workflows/calcapp-pytest.yml](https://github.com/PGScatalog/pygscatalog/actions/workflows/calcapp-pytest.yml/badge.svg?branch=main)](https://github.com/PGScatalog/pygscatalog/actions/workflows/calcapp-pytest.yml)
+[![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/aggregate.html)
 
 A CLI application that can:
 
@@ -15,7 +16,3 @@ The [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc) uses this 
 ```
 $ pip install pgscatalog-calcapp
 ```
-
-## Documentation
-
-See **link to docs**.
