@@ -165,8 +165,8 @@ class ScoringFile:
     :param identifier: A PGS Catalog score accession in the format ``PGS123456`` or a path to a local scoring file
     :param target_build: An optional :class:`GenomeBuild`, which represents the build you want the scoring file to align to
     :param query_result: An optional :class:`ScoreQueryResult`, if provided with an accession identifier it prevents hitting the PGS Catalog API
-    :raises InvalidAccessionError: If the PGS Catalog API can't find the provided accession
-    :raises ScoreFormatError: If you try to iterate over a ``ScoringFile`` without a local path (before downloading it)
+    :raises pgscatalog.corelib.InvalidAccessionError: If the PGS Catalog API can't find the provided accession
+    :raises pgscatalog.corelib.ScoreFormatError: If you try to iterate over a ``ScoringFile`` without a local path (before downloading it)
 
     You can make ``ScoringFiles`` with a path to a scoring file:
 
@@ -376,8 +376,8 @@ class ScoringFile:
         :param directory: Directory to write file to
         :param overwrite: Overwrite existing file if present
 
-        :raises ScoreDownloadError: If there's an unrecoverable problem downloading the file
-        :raises ScoreChecksumError: If md5 validation consistently fails
+        :raises pgscatalog.corelib.ScoreDownloadError: If there's an unrecoverable problem downloading the file
+        :raises pgscatalog.corelib.ScoreChecksumError: If md5 validation consistently fails
 
         :returns: None
 
