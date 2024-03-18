@@ -33,3 +33,6 @@ testpaths = [
     "tests"
 ]
 filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ['src/pgscatalog/combineapp']

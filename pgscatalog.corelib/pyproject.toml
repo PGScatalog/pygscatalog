@@ -33,3 +33,6 @@ build-backend = "poetry.core.masonry.api"
 minversion = "6.0"
 addopts = "-ra -q --doctest-modules"
 filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ['src/pgscatalog/corelib']
