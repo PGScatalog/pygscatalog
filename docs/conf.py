@@ -13,11 +13,18 @@ author = "PGS Catalog"
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["autoapi.extension"]
+extensions = [
+    "autoapi.extension",
+    "sphinx_toolbox.sidebar_links",
+    "sphinx_toolbox.github",
+    "sphinx_toolbox.shields",
+]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+github_username = "pgscatalog"
+github_repository = "pygscatalog"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
