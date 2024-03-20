@@ -34,10 +34,11 @@ html_theme = "alabaster"
 
 # use autoapi for packages that provide APIs (libraries)
 autoapi_dirs = [
-    "../pgscatalog.corelib/src/pgscatalog",
-    "../pgscatalog.matchlib/src/pgscatalog",
+    "../pgscatalog.core/src/pgscatalog/",
+    "../pgscatalog.match/src/pgscatalog",
     "../pgscatalog.calclib/src/pgscatalog",
 ]
+
 # see _templates/autoapi/index.rst for autoapi fix
 autoapi_template_dir = "_templates/autoapi"
 autoapi_python_use_implicit_namespaces = True
@@ -56,6 +57,8 @@ autoapi_member_order = "groupwise"
 
 def skip_submodules(app, what, name, obj, skip, options):
     if what == "module":
+        skip = True
+    if "cli" in name:
         skip = True
     return skip
 
