@@ -13,7 +13,7 @@ Installation
 
 ::
 
-    $ pip install pgscatalog-download
+    $ pip install pgscatalog-core
 
 Usage
 -----

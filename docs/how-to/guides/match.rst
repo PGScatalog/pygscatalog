@@ -16,7 +16,7 @@ Installation
 
 ::
 
-    $ pip install pgscatalog-matchapp
+    $ pip install pgscatalog-match
 
 Usage
 -----

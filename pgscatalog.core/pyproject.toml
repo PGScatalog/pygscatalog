@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "pgscatalog.core"
+version = "0.1.0"
+description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
+license = "Apache-2.0"
+authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
+readme = "README.md"
+packages = [
+    { include = "pgscatalog", from = "src" },
+]
+
+[tool.poetry.scripts]
+pgscatalog-download = 'pgscatalog.core.cli.download_cli:run'
+pgscatalog-combine = 'pgscatalog.core.cli.combine_cli:run'
+pgscatalog-relabel = 'pgscatalog.core.cli.relabel_cli:run'
+
+[tool.poetry.dependencies]
+python = "^3.11"
+httpx = "^0.26.0"
+tenacity = "^8.2.3"
+pyliftover = "^0.4"
+xopen = {version = "^1.8.0", extras = ["zstd"]}
+pyarrow = {version = "^15.0.0", optional = true}
+tqdm = "^4.66.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+sphinx-autoapi = "^3.0.0"
+pytest-cov = "^4.1.0"
+
+[tool.poetry.extras]
+pyarrow = ["pyarrow"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --doctest-modules"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ['src/pgscatalog/core']

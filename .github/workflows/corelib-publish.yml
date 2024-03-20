@@ -1,4 +1,4 @@
-name: Publish corelib
+name: Publish pgscatalog.core
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       package-directory:
         type: choice
         options:
-          - pgscatalog.corelib
+          - pgscatalog.core
       python-version:
         required: false
         type: choice
