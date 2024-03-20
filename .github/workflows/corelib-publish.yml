@@ -3,13 +3,15 @@ name: Publish corelib
 on:
   workflow_dispatch:
     inputs:
-      package-version:
-        required: true
-        type: string
+      package-directory:
+        type: choice
+        options:
+          - pgscatalog.corelib
       python-version:
         required: false
-        default: '3.11'
-        type: string
+        type: choice
+        options:
+          - "3.11"
     
 jobs:
   publish:
@@ -38,11 +40,29 @@ jobs:
 
       - name: Build package
         run: poetry build --no-interaction
-        working-directory: pgscatalog.corelib
+        working-directory: ${{inputs.package-directory}}
 
       - name: Publish package distributions to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
-          packages-dir: pgscatalog.corelib/dist
+          packages-dir: ${{inputs.package-directory}}/dist
+          skip-existing: true          
+
+      - name: Read package version
+        run: |
+          echo "TAG_NAME=$(poetry version | tr -s ' ' '-')" >> $GITHUB_ENV
+        working-directory: ${{inputs.package-directory}}
+
+      - name: Create tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+              github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'refs/tags/${TAG_NAME}',
+                sha: context.sha
+              })
+       
       
