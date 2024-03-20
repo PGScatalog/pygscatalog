@@ -1,0 +1,58 @@
+name: Publish package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package-directory:
+        required: true
+        type: choice
+        options:
+        - pgscatalog.corelib
+        - pgscatalog.matchlib
+        - pgscatalog.calclib
+        - pgscatalog.downloadapp
+        - pgscatalog.combineapp
+        - pgscatalog.matchapp
+        - pgscatalog.calcapp
+      package-version:
+        required: true
+        type: string
+      python-version:
+        required: false
+        default: '3.11'
+        type: string
+    
+jobs:
+  publish:
+    name: build and publish pypi package
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+            
+      - name: Python Poetry Action
+        uses: abatilo/actions-poetry@v3.0.0
+
+      - name: Set up test pypi repository
+        run: |
+          poetry config repositories.test-pypi https://test.pypi.org/legacy/
+
+      - name: Build package
+        run: poetry build --no-interaction
+        working-directory: ${{ inputs.package-directory }}
+
+      - name: Publish package distributions to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+      
