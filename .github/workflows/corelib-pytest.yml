@@ -1,3 +1,5 @@
+name: Run pytest on pgscatalog.corelib
+
 on:
   push:
     paths:

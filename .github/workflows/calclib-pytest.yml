@@ -1,3 +1,5 @@
+name: Run pytest on pgscatalog.calclib
+
 on:
   push:
     paths:
