@@ -36,7 +36,7 @@ html_theme = "alabaster"
 autoapi_dirs = [
     "../pgscatalog.core/src/pgscatalog/",
     "../pgscatalog.match/src/pgscatalog",
-    "../pgscatalog.calclib/src/pgscatalog",
+    "../pgscatalog.calc/src/pgscatalog",
 ]
 
 # see _templates/autoapi/index.rst for autoapi fix
