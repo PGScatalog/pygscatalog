@@ -20,6 +20,7 @@ jobs:
     environment: release
     permissions:
       id-token: write
+      contents: write
 
     steps:
       - name: Checkout repository
