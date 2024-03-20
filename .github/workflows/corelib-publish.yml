@@ -1,19 +1,8 @@
-name: Publish package
+name: Publish corelib
 
 on:
   workflow_dispatch:
     inputs:
-      package-directory:
-        required: true
-        type: choice
-        options:
-        - pgscatalog.corelib
-        - pgscatalog.matchlib
-        - pgscatalog.calclib
-        - pgscatalog.downloadapp
-        - pgscatalog.combineapp
-        - pgscatalog.matchapp
-        - pgscatalog.calcapp
       package-version:
         required: true
         type: string
@@ -24,7 +13,7 @@ on:
     
 jobs:
   publish:
-    name: build and publish pypi package
+    name: build and publish corelib package
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -49,11 +38,11 @@ jobs:
 
       - name: Build package
         run: poetry build --no-interaction
-        working-directory: ${{ inputs.package-directory }}
+        working-directory: pgscatalog.corelib
 
       - name: Publish package distributions to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
-          packages-dir: ${{ inputs.package-directory }}/dist
+          packages-dir: pgscatalog.corelib/dist
       
