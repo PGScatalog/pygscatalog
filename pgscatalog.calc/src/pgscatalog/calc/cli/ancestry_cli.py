@@ -3,8 +3,8 @@ import logging
 import pathlib
 import textwrap
 
-from pgscatalog.calclib.polygenicscore import AdjustArguments, AggregatedPGS
-from pgscatalog.calclib.principalcomponents import PrincipalComponents, PopulationType
+from ..lib.polygenicscore import AdjustArguments, AggregatedPGS
+from ..lib.principalcomponents import PrincipalComponents, PopulationType
 
 logger = logging.getLogger(__name__)
 

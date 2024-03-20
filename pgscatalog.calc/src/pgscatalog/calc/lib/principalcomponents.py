@@ -23,16 +23,16 @@ class PrincipalComponents:
     PCA data may come from a reference population or a target population. Target populations have been projected onto the reference population.
 
     >>> from ._config import Config
-    >>> related_path = Config.ROOT_DIR / "tests" / "ref.king.cutoff.id"
-    >>> psam_path = Config.ROOT_DIR / "tests" / "ref.psam"
-    >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "ref.pcs"], dataset="reference", psam_path=psam_path, related_path=related_path, pop_type=PopulationType.REFERENCE)
+    >>> related_path = Config.ROOT_DIR / "tests" / "data" / "ref.king.cutoff.id"
+    >>> psam_path = Config.ROOT_DIR / "tests" / "data" / "ref.psam"
+    >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "data" / "ref.pcs"], dataset="reference", psam_path=psam_path, related_path=related_path, pop_type=PopulationType.REFERENCE)
     >>> ref_pc
-    PrincipalComponents(dataset='reference', pop_type=PopulationType.REFERENCE, pcs_path=[PosixPath('.../pgscatalog.calclib/tests/ref.pcs')], psam_path=PosixPath('.../pgscatalog.calclib/tests/ref.psam'))
+    PrincipalComponents(dataset='reference', pop_type=PopulationType.REFERENCE, pcs_path=[PosixPath('.../ref.pcs')], psam_path=PosixPath('.../ref.psam'))
     >>> ref_pc.df.to_dict()
     {'PC1': {('reference', 'HG00096'): -23.8212, ('reference', 'HG00097'): -24.8106, ...
-    >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
+    >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "data" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
     >>> target_pcs
-    PrincipalComponents(dataset='target', pop_type=PopulationType.TARGET, pcs_path=[PosixPath('.../pgscatalog.calclib/tests/target.pcs')], psam_path=None)
+    PrincipalComponents(dataset='target', pop_type=PopulationType.TARGET, pcs_path=[PosixPath('.../target.pcs')], psam_path=None)
     >>> target_pcs.df.to_dict()
     {'PC1': {('target', 'HGDP00001'): -18.5135, ('target', 'HGDP00003'): -18.8314, ...
     """

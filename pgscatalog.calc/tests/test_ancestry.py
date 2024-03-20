@@ -6,32 +6,32 @@ from unittest.mock import patch
 import pytest
 import pandas as pd
 
-from pgscatalog.calcapp.ancestry_cli import run_ancestry
+from pgscatalog.calc.cli.ancestry_cli import run_ancestry
 
 
 @pytest.fixture(scope="module")
 def scorefile(request):
-    return request.path.parent / "testdata" / "aggregated_scores.txt.gz"
+    return request.path.parent / "data" / "aggregated_scores.txt.gz"
 
 
 @pytest.fixture(scope="module")
 def ref_psam(request):
-    return request.path.parent / "testdata" / "ref.psam"
+    return request.path.parent / "data" / "ref.psam"
 
 
 @pytest.fixture(scope="module")
 def ref_pcs(request):
-    return request.path.parent / "testdata" / "ref.pcs"
+    return request.path.parent / "data" / "ref.pcs"
 
 
 @pytest.fixture(scope="module")
 def target_pcs(request):
-    return request.path.parent / "testdata" / "target.pcs"
+    return request.path.parent / "data" / "target.pcs"
 
 
 @pytest.fixture(scope="module")
 def relatedness(request):
-    return request.path.parent / "testdata" / "ref.king.cutoff.id"
+    return request.path.parent / "data" / "ref.king.cutoff.id"
 
 
 def test_ancestry(

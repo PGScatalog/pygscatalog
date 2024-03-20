@@ -1,7 +1,8 @@
+import glob
 import itertools
 from unittest.mock import patch
 
-from pgscatalog.calcapp.aggregate_cli import run_aggregate
+from pgscatalog.calc.cli.aggregate_cli import run_aggregate
 
 import pytest
 import pandas as pd
@@ -9,7 +10,8 @@ import pandas as pd
 
 @pytest.fixture(scope="module")
 def scorefiles(request):
-    return [str(x) for x in list(request.path.parent.glob("testdata/*.zst"))]
+    basedir = request.path.parent / "data"
+    return glob.glob(str(basedir / "hgdp*.zst"))
 
 
 def test_split_aggregate(tmp_path_factory, scorefiles):

@@ -5,7 +5,7 @@ import textwrap
 import operator
 import functools
 
-from pgscatalog.calclib.polygenicscore import PolygenicScore
+from ..lib.polygenicscore import PolygenicScore
 
 logger = logging.getLogger(__name__)
 

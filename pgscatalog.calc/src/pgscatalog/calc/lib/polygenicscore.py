@@ -108,12 +108,12 @@ class AdjustResults:
 class AggregatedPGS:
     """A PGS that's been aggregated, melted, and probably contains samples from a reference panel and a target population.
 
-    The most useful method in this class adjusts PGS based on :func:`genetic ancestry similarity estimation <pgscatalog.calclib.AggregatedPGS.adjust>`.
+    The most useful method in this class adjusts PGS based on :func:`genetic ancestry similarity estimation <pgscatalog.calc.AggregatedPGS.adjust>`.
 
     >>> from ._config import Config
-    >>> score_path = Config.ROOT_DIR / "tests" / "aggregated_scores.txt.gz"
+    >>> score_path = Config.ROOT_DIR / "tests" / "data" / "aggregated_scores.txt.gz"
     >>> AggregatedPGS(path=score_path, target_name="hgdp")
-    AggregatedPGS(path=PosixPath('.../pgscatalog.calclib/tests/aggregated_scores.txt.gz'))
+    AggregatedPGS(path=PosixPath('.../aggregated_scores.txt.gz'))
     """
 
     def __init__(self, *, target_name, df=None, path=None):
@@ -165,10 +165,10 @@ class AggregatedPGS:
 
         >>> from ._config import Config
         >>> from .principalcomponents import PrincipalComponents
-        >>> related_path = Config.ROOT_DIR / "tests" / "ref.king.cutoff.id"
-        >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "ref.psam", pop_type=PopulationType.REFERENCE, related_path=related_path)
-        >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
-        >>> score_path = Config.ROOT_DIR / "tests" / "aggregated_scores.txt.gz"
+        >>> related_path = Config.ROOT_DIR / "tests" / "data" / "ref.king.cutoff.id"
+        >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "data" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "data" / "ref.psam", pop_type=PopulationType.REFERENCE, related_path=related_path)
+        >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "data" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
+        >>> score_path = Config.ROOT_DIR / "tests" / "data" / "aggregated_scores.txt.gz"
         >>> results = AggregatedPGS(path=score_path, target_name="hgdp").adjust(ref_pc=ref_pc, target_pc=target_pcs)
         >>> results.pgs.to_dict().keys()
         dict_keys(['SUM|PGS001229_hmPOS_GRCh38_SUM', 'SUM|PGS001229_hmPOS_GRCh38_AVG', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38_SUM', ...
@@ -262,7 +262,7 @@ class PolygenicScore:
 
     >>> from ._config import Config
     >>> import reprlib
-    >>> score1 = Config.ROOT_DIR / "tests" / "cineca_22_additive_0.sscore.zst"
+    >>> score1 = Config.ROOT_DIR / "tests" / "data" / "cineca_22_additive_0.sscore.zst"
     >>> pgs1 = PolygenicScore(sampleset="test", path=score1)  # doctest: +ELLIPSIS
     >>> pgs1
     PolygenicScore(sampleset='test', path=PosixPath('.../cineca_22_additive_0.sscore.zst'))

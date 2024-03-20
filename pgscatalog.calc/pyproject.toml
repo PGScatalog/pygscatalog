@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pgscatalog-calcapp"
+name = "pgscatalog.calclib"
 version = "0.1.0"
 description = ""
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
@@ -10,15 +10,20 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-"pgscatalog.calclib" = {path = "../pgscatalog.calclib", develop = true}
+"pgscatalog.core" = {path = "../pgscatalog.core", develop = true}
+numpy = "^1.26.4"
+pandas = "^2.2.0"
+pyarrow = "^15.0.0"
+scikit-learn = "^1.4.0"
+scipy = "^1.12.0"
+
+[tool.poetry.scripts]
+pgscatalog-aggregate = 'pgscatalog.calc.cli.aggregate_cli:run_aggregate'
+pgscatalog-ancestry-adjust = 'pgscatalog.calc.cli.ancestry_cli:run_ancestry'
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 pytest-cov = "^4.1.0"
-
-[tool.poetry.scripts]
-pgscatalog-aggregate = 'pgscatalog.calcapp.aggregate_cli:run_aggregate'
-pgscatalog-ancestry-adjust = 'pgscatalog.calcapp.ancestry_cli:run_ancestry'
 
 [build-system]
 requires = ["poetry-core"]
@@ -26,11 +31,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
-testpaths = [
-    "tests"
-]
+addopts = "-ra -q --doctest-modules"
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ['src/pgscatalog/calcapp']
+source = ['src/pgscatalog/calc']
