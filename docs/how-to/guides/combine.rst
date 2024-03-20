@@ -19,7 +19,7 @@ Installation
 
 ::
 
-    $ pip install pgscatalog-combine
+    $ pip install pgscatalog-core
 
 Usage
 -----

@@ -14,7 +14,7 @@ Installation
 
 ::
 
-    $ pip install pgscatalog-calcapp
+    $ pip install pgscatalog-calc
 
 Usage
 -----
