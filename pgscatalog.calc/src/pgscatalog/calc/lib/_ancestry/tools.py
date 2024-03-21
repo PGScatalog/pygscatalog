@@ -280,8 +280,7 @@ def pgs_adjust(
     :param norm2_2step: boolean (default=False) whether to use the two-step model vs. the full-fit
     :param ref_train_col: column name with true/false labels of samples that should be included in training PGS methods
     :param n_pcs: number of genetic PCs that will be used for PGS-adjustment
-    :return: [results_ref:df , results_target:df , results_models: dict] adjusted dfs for reference and target
-        populations, and a dictionary with model fit/parameters.
+    :return: [results_ref:df , results_target:df , results_models: dict] adjusted dfs for reference and target populations, and a dictionary with model fit/parameters.
     """
     # Check that datasets have the correct columns
     ## Check that score is in both dfs
