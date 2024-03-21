@@ -16,13 +16,9 @@ on:
         required: true
         type: choice
         options:
-        - pgscatalog.corelib
-        - pgscatalog.matchlib
-        - pgscatalog.calclib
-        - pgscatalog.downloadapp
-        - pgscatalog.combineapp
-        - pgscatalog.matchapp
-        - pgscatalog.calcapp
+        - pgscatalog.core
+        - pgscatalog.match
+        - pgscatalog.calc
       python-version:
         required: false
         default: '3.11'
