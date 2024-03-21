@@ -21,7 +21,7 @@ If you want to do automatic PGS calculation check out the [PGS Catalog Calculato
 ## Installation 
 
 ```
-$ pip install pgscatalog-core
+$ pipx install pgscatalog-core
 ```
 
 ## Documentation
