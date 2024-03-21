@@ -19,24 +19,26 @@ If you want an automatic method of calculating PGS, including genetic ancestry s
 the workflow is the easiest method.
 
 
-| Application                  | Description                                                 | Link                                       |
-|------------------------------|-------------------------------------------------------------|--------------------------------------------|
-| `pgscatalog-download`        | Download scoring files from the PGS Catalog                 | [README](pgscatalog.downloadapp/README.md) |
-| `pgscatalog-combine`         | Combine multiple scoring files into a consistent structure  | [README](pgscatalog.combineapp/README.md) |
-| `pgscatalog-match`           | Match structured scoring file to variants in target genomes | [README](pgscatalog.matchapp/README.md) |
-| `pgscatalog-matchmerge`      | Merge variant match results, useful on larger datasets      | [README](pgscatalog.matchapp/README.md) |
-| `pgscatalog-aggregate`       | Aggregate calculated PGS split across multiple files        | [README](pgscatalog.calcapp/README.md) |
-| `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry    | [README](pgscatalog.calcapp/README.md) |
+| Application                  | Description                                                            | Install                         | Link                                 |
+|------------------------------|------------------------------------------------------------------------|---------------------------------|--------------------------------------|
+| `pgscatalog-download`        | Download scoring files from the PGS Catalog in specific genome builds  | `pipx install pgscatalog-core`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/download.html)  |
+| `pgscatalog-combine`         | Combine multiple scoring files into a consistent structure             | `pipx install pgscatalog-core`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/combine.html)  |
+| `pgscatalog-relabel`         | Relabel values in a column based on values in a column in another file | `pipx install pgscatalog-core`  | [README](pgscatalog.core/README.md)  |
+| `pgscatalog-match`           | Match structured scoring file to variants in target genomes            | `pipx install pgscatalog-match` | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/match.html) |
+| `pgscatalog-matchmerge`      | Merge variant match results, useful on larger datasets                 | `pipx install pgscatalog-match` | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/match.html) |
+| `pgscatalog-aggregate`       | Aggregate calculated PGS split across multiple files                   | `pipx install pgscatalog-calc`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/aggregate.html)  |
+| `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry               | `pipx install pgscatalog-calc`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/ancestry.html)  |
+
 
 ## Developer libraries
 
 If you write Python code to work with PGS, the underlying libraries for the apps are documented and available for re-use:
 
-| Library               | Description                                              | Link                                   |
-|-----------------------|----------------------------------------------------------|----------------------------------------|
-| `pgscatalog-corelib`  | Core classes and functions to work with PGS data         | [README](pgscatalog.corelib/README.md) |
-| `pgscatalog-matchlib` | Variant matching across scoring files and target genomes | [README](pgscatalog.matchlib/README.md)|
-| `pgscatalog-calclib`  | Genetic ancestry similarity estimation and normalisation | [README](pgscatalog.calclib/README.md) |
+| Library            | Description                                              | Link                                                                                              |
+|--------------------|----------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| `pgscatalog-core`  | Core classes and functions to work with PGS data         | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/core/index.html)  |
+| `pgscatalog-match` | Variant matching across scoring files and target genomes | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/match/index.html) |
+| `pgscatalog-calc`  | Genetic ancestry similarity estimation and normalisation | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/calc/index.html)  |
 
 ## Documentation
 
