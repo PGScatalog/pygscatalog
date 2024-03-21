@@ -1,7 +1,7 @@
 # `pgscatalog-core`
 
 [![Run pytest on pgscatalog.core](https://github.com/PGScatalog/pygscatalog/actions/workflows/core-pytest.yml/badge.svg)](https://github.com/PGScatalog/pygscatalog/actions/workflows/core-pytest.yml)
-[![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/corelib/index.html)
+[![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/core/index.html)
 
 This Python package contains:
 
