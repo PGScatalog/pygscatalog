@@ -8,21 +8,30 @@ flag_management:
       - type: patch
         target: 90%
   individual_flags: # exceptions to the default rules above, stated flag by flag
-    - name: pgscatalog.downloadapp  #fill in your own flag name
+    - name: pgscatalog.core  #fill in your own flag name
       paths: 
-      - pgscatalog.downloadapp/
+      - pgscatalog.core/
       carryforward: true
       statuses:
         - type: project
-          target: 20%
+          target: 80%
         - type: patch
-          target: 100%
-    - name: pgscatalog.corelib 
+          target: 80%
+    - name: pgscatalog.match 
       paths: 
-      - pgscatalog.corelib/
+      - pgscatalog.match/
       carryforward: true
       statuses:
         - type: project
-          target: 20%
+          target: 80%
         - type: patch
-          target: 100%
+          target: 80%
+    - name: pgscatalog.calc 
+      paths: 
+      - pgscatalog.match/
+      carryforward: true
+      statuses:
+        - type: project
+          target: 80%
+        - type: patch
+          target: 80%      
