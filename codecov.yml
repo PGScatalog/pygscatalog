@@ -1,6 +1,6 @@
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
-    carryforward: false
+    carryforward: true
     statuses:
       - type: project
         target: auto
@@ -11,7 +11,7 @@ flag_management:
     - name: pgscatalog.core  #fill in your own flag name
       paths: 
       - pgscatalog.core/
-      carryforward: false
+      carryforward: true
       statuses:
         - type: project
           target: 80%
@@ -20,7 +20,7 @@ flag_management:
     - name: pgscatalog.match 
       paths: 
       - pgscatalog.match/
-      carryforward: false
+      carryforward: true
       statuses:
         - type: project
           target: 80%
@@ -29,7 +29,7 @@ flag_management:
     - name: pgscatalog.calc 
       paths: 
       - pgscatalog.match/
-      carryforward: false
+      carryforward: true
       statuses:
         - type: project
           target: 80%
