@@ -8,7 +8,7 @@
 This repository contains Python applications and libraries for working with polygenic scores (PGS :dna:) and the 
 [PGS Catalog](https://www.pgscatalog.org/), an open database of polygenic scores and the relevant metadata required for 
 accurate application and evaluation. It is based on a previous codebase of utilities ([pgscatalog_utils](https://github.com/PGScatalog/pgscatalog_utils)) 
-that has been converted to a namespace pacakge for modularity and re-use.
+that has been converted to namespace packages for modularity and re-use.
 
 ## User applications 
 
