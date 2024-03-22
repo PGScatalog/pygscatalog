@@ -15,7 +15,7 @@ on:
     
 jobs:
   publish:
-    name: build and publish corelib package
+    name: build and publish core package
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -35,20 +35,15 @@ jobs:
       - name: Python Poetry Action
         uses: abatilo/actions-poetry@v3.0.0
 
-      - name: Set up test pypi repository
-        run: |
-          poetry config repositories.test-pypi https://test.pypi.org/legacy/
-
       - name: Build package
         run: poetry build --no-interaction
         working-directory: ${{inputs.package-directory}}
 
-      - name: Publish package distributions to TestPyPI
+      - name: Publish package distributions
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: https://test.pypi.org/legacy/
           packages-dir: ${{inputs.package-directory}}/dist
-          skip-existing: true          
+          skip-existing: false          
 
       - name: Read package version
         run: |
