@@ -1,12 +1,12 @@
 import argparse
 import logging
 import sys
+import os
 from xopen import xopen
 import csv
 import textwrap
+import heapq
 
-
-from pgscatalog.core import TargetVariants
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 def run_intersect():
     args = parse_args()
 
-    # Process reference variants
+    # Process & sort reference variants
     with xopen('reference_variants.txt', 'wt') as outf:
         outf.write('CHR:POS:A0:A1\tID_REF\tREF_REF\tIS_INDEL\tSTRANDAMB\tIS_MA_REF\n')
+        ref_heap = []
         ref_pvar = read_var_general(args.reference, chrom=args.filter_chrom)
         for v in ref_pvar:
             ALTs = v['ALT'].split(',')
@@ -29,11 +30,18 @@ def run_intersect():
 
                 IS_INDEL = (len(v['REF']) > 1) | (len(ALT) > 1)
                 STRANDAMB = (v['REF'] == allele_complement(ALT))
-                outf.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(key,v['ID'], v['REF'], IS_INDEL, STRANDAMB, IS_MA_REF))
+                heapq.heappush(ref_heap, ([key, v['ID'], v['REF']],[IS_INDEL, STRANDAMB, IS_MA_REF]))
 
-    # Process target variants
+        # Output the sorted variants
+        for i in range(len(ref_heap)):
+            popped = heapq.heappop(ref_heap)
+            outf.write('\t'.join([str(x) for x in popped[0] + popped[1]]) + '\n')
+        del ref_heap
+
+    # Process & sort target variants
     with xopen('target_variants.txt', 'wt') as outf:
         outf.write('CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tALT_FREQ\tF_MISS_DOSAGE\n')
+        target_heap = []
         for path in args.target:
             pvar = read_var_general(path)
 
@@ -56,17 +64,20 @@ def run_intersect():
                         key = '{}:{}:{}:{}'.format(v['#CHROM'], v['POS'], v['REF'], ALT)
                     else:
                         key = '{}:{}:{}:{}'.format(v['#CHROM'], v['POS'], ALT, v['REF'])
-                    outf.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(key,v['ID'],v['REF'], str(IS_MA_TARGET), ALT_FREQS[i], F_MISS_DOSAGE))
+                    heapq.heappush(target_heap, ([key, v['ID'], v['REF']], [IS_MA_TARGET, ALT_FREQS[i], F_MISS_DOSAGE]))
+
+        for i in range(len(target_heap)):
+            popped = heapq.heappop(target_heap)
+            outf.write('\t'.join([str(x) for x in popped[0] + popped[1]]) + '\n')
+        del target_heap
+
+    # ToDo: implement merge (on the same keys) of the two sorted files
 
 
 def read_var_general(path, chrom=None):
     with xopen(path, "rt") as f:
-        for line in f:
-            if line.startswith("##"):
-                continue
-            else:
-                fieldnames = line.strip().split("\t")
-        reader = csv.DictReader(f, fieldnames=fieldnames, delimiter="\t")
+        # ToDo: check if this is memory inefficent
+        reader = csv.DictReader(filter(lambda row: row[:2]!='##', f), delimiter="\t") # need to remove comments of VCF-like characters, might be fully in memory though
         if chrom is None:
             for row in reader:
                 yield row
