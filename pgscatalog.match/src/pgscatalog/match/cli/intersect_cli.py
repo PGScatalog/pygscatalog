@@ -48,7 +48,7 @@ def run_intersect():
     # Process & sort target variants
     # ToDo: check if it works for bim format files?
     with xopen('target_variants.txt', 'wt') as outf:
-        outf.write('CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tALT_FREQ\tF_MISS_DOSAGE\n')
+        outf.write('CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n')
         target_heap = []
         for path in args.target:
             logger.info("Reading & sorting TARGET variants: {}".format(path))
@@ -64,7 +64,7 @@ def run_intersect():
                 # if v['ID'] != freq['ID'] != miss['ID']:
                 #     print(v)
                 ALTs = v['ALT'].split(',')
-                ALT_FREQS = freq['ALT_FREQS'].split(',')
+                ALT_FREQS = [float(x) for x in freq['ALT_FREQS'].split(',')]
                 F_MISS_DOSAGE = miss['F_MISS_DOSAGE']
                 IS_MA_TARGET = len(ALTs) > 1
                 for i, ALT in enumerate(ALTs):
@@ -74,7 +74,8 @@ def run_intersect():
                         key = '{}:{}:{}:{}'.format(v['#CHROM'], v['POS'], ALT, v['REF'])
                     # outf.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(key, v['ID'], v['REF'], str(IS_MA_TARGET), ALT_FREQS[i],
                     #                                              F_MISS_DOSAGE))
-                    heapq.heappush(target_heap, ([key, v['ID'], v['REF']], [IS_MA_TARGET, ALT_FREQS[i],F_MISS_DOSAGE]))
+                    MAF = AAF2MAF(ALT_FREQS[i])
+                    heapq.heappush(target_heap, ([key, v['ID'], v['REF']], [IS_MA_TARGET, MAF,F_MISS_DOSAGE]))
 
         # Output the sorted reference variants
         logger.info("Outputting TARGET variants -> target_variants.txt")
@@ -91,6 +92,15 @@ def run_intersect():
         for vmatch in sorted_join_variants('reference_variants.txt', 'target_variants.txt'):
             n_matched += 1
             vmatch['SAME_REF'] = vmatch['REF_REF'] == vmatch['REF_REF']
+
+            # Define variant's eligibility for PCA
+            # From original implementation: ((IS_MA_REF == FALSE) && (IS_MA_TARGET == FALSE)) && (((IS_INDEL == FALSE) && (STRANDAMB == FALSE)) || ((IS_INDEL == TRUE) && (SAME_REF == TRUE)))
+            PCA_ELIGIBLE = ((vmatch['IS_MA_REF'] is False) and (vmatch['IS_MA_TARGET'] is False)) and \
+                           (((vmatch['IS_INDEL'] is False) and (vmatch['STRANDAMB'] is False)) or ((vmatch['IS_INDEL'] is True) and (vmatch['SAME_REF'] is True)))
+
+            PCA_ELIGIBLE = PCA_ELIGIBLE and (vmatch['MAF'] > args.maf_filter) and (vmatch['F_MISS_DOSAGE'] < args.maf_filter)
+            vmatch['PCA_ELIGIBLE'] = PCA_ELIGIBLE
+
             if n_matched == 1:
                 writer = csv.DictWriter(csvfile, fieldnames=vmatch.keys(), delimiter='\t')
                 writer.writeheader()
@@ -119,6 +129,9 @@ def sorted_join_variants(reffile, targetfile):
     f1_iter = read_var_general(reffile)
     f2_iter = read_var_general(targetfile)
 
+    prev_key1 = None  # Initialize previous key for file 1
+    prev_key2 = None  # Initialize previous key for file 2
+
     line1 = next(f1_iter, None)
     line2 = next(f2_iter, None)
 
@@ -126,20 +139,46 @@ def sorted_join_variants(reffile, targetfile):
         key1 = line1['CHR:POS:A0:A1']
         key2 = line2['CHR:POS:A0:A1']
 
+        # Check if lines are sorted by the key for each file
+        if prev_key1 is not None and key1 < prev_key1:
+            raise ValueError("REFERENCE keys are not sorted")
+        if prev_key2 is not None and key2 < prev_key2:
+            raise ValueError("TARGET keys are not sorted")
+
         if key1 == key2:
             line1.update(line2)
             yield line1
+            prev_key1 = key1  # Update previous key for file 1
+            prev_key2 = key2  # Update previous key for file 2
+
             line1 = next(f1_iter, None)
             line2 = next(f2_iter, None)
         elif key1 < key2:
+            prev_key1 = key1  # Update previous key for file 1
             line1 = next(f1_iter, None)
         else:
+            prev_key2 = key2  # Update previous key for file 2
             line2 = next(f2_iter, None)
 
 
 def allele_complement(s):
+    '''
+    Complement alleles
+    :param s: allele to be complemented
+    :return: complement
+    '''
     return s.replace("A", "V").replace("T", "X").replace("C", "Y").replace("G", "Z").replace("V", "T").replace("X", "A").replace("Y", "G").replace("Z", "C")
 
+def AAF2MAF(aaf):
+    '''
+    Convert alternative allele frequency (AAF) to minor allele frequency (MAF)
+    :param aaf: alternative allele frequency
+    :return: minor allele frequency (MAF)
+    '''
+    if aaf > 0.5:
+        return 1-aaf
+    else:
+        return aaf
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser(
@@ -167,7 +206,21 @@ def parse_args(args=None):
         "--chrom",
         dest="filter_chrom",
         required=False,
-        help="whether to limit matches to specific chromosome of the reference",
+        help="Whether to limit matches to specific chromosome of the reference",
+    )
+    parser.add_argument(
+        "--maf_target",
+        dest="maf_filter",
+        default=0.1,
+        required=False,
+        help="Filter: Minimum minor Allele Frequency for PCA eligibility",
+    )
+    parser.add_argument(
+        "--geno_miss",
+        dest="maf_filter",
+        default=0.1,
+        required=False,
+        help="Filter: Maximum Genotype missingness for PCA eligibility",
     )
     parser.add_argument(
         "-v",
