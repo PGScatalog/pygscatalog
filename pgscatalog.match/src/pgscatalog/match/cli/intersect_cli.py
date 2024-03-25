@@ -19,7 +19,7 @@ def run_intersect():
         logger.debug("Verbose logging enabled")
 
     # Process & sort reference variants
-    logger.info("Reading & sorting REFERENCE variants: {}".format(args.reference))
+    logger.info("Reading REFERENCE variants: {}".format(args.reference))
     with xopen('reference_variants.txt', 'wt') as outf:
         outf.write('CHR:POS:A0:A1\tID_REF\tREF_REF\tIS_INDEL\tSTRANDAMB\tIS_MA_REF\n')
         ref_heap = []
@@ -35,7 +35,10 @@ def run_intersect():
 
                 IS_INDEL = (len(v['REF']) > 1) | (len(ALT) > 1)
                 STRANDAMB = (v['REF'] == allele_complement(ALT))
-                heapq.heappush(ref_heap, ([key, v['ID'], v['REF']],[IS_INDEL, STRANDAMB, IS_MA_REF]))
+                ref_heap.append(([key, v['ID'], v['REF']], [IS_INDEL, STRANDAMB, IS_MA_REF]))
+
+        logger.info("Sorting REFERENCE variants (heapify)")
+        heapq.heapify(ref_heap)
 
         # Output the sorted reference variants
         logger.info("Outputting REFERENCE variants -> reference_variants.txt")
@@ -51,7 +54,7 @@ def run_intersect():
         outf.write('CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n')
         target_heap = []
         for path in args.target:
-            logger.info("Reading & sorting TARGET variants: {}".format(path))
+            logger.info("Reading TARGET variants: {}".format(path))
             pvar = read_var_general(path, chrom=None)  # essential not to filter if it is target (messes up common line indexing)
 
             loc_afreq = path.replace('.pvar.zst', '.afreq.gz')
@@ -75,7 +78,10 @@ def run_intersect():
                     # outf.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(key, v['ID'], v['REF'], str(IS_MA_TARGET), ALT_FREQS[i],
                     #                                              F_MISS_DOSAGE))
                     MAF = AAF2MAF(ALT_FREQS[i])
-                    heapq.heappush(target_heap, ([key, v['ID'], v['REF']], [IS_MA_TARGET, MAF,F_MISS_DOSAGE]))
+                    target_heap.append(([key, v['ID'], v['REF']], [IS_MA_TARGET, MAF,F_MISS_DOSAGE]))
+
+        logger.info("Sorting TARGET variants (heapify)")
+        heapq.heapify(target_heap)
 
         # Output the sorted reference variants
         logger.info("Outputting TARGET variants -> target_variants.txt")
