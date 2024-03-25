@@ -43,6 +43,7 @@ def run_intersect():
             loc_vmiss = path.replace('.pvar.zst', '.vmiss.gz')
             vmiss = read_var_general(loc_vmiss)
 
+            ## ToDo: figure out if it needs to change to bim files
             for v, freq, miss in zip(pvar, afreq, vmiss):
                 # if v['ID'] != freq['ID'] != miss['ID']:
                 #     print(v)
