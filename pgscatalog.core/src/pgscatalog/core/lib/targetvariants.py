@@ -109,6 +109,14 @@ class TargetVariants:
     Note, A1/A2 isn't guaranteed to be ref/alt because of PLINK1 file format
     limitations. PGS Catalog libraries handle this internally, but you should be
     aware REF/ALT can be swapped by plink during VCF to bim conversion.
+
+    Some pvar files can contain a lot of comments in the header, which are ignored:
+
+    >>> pvar = TargetVariants(Config.ROOT_DIR / "tests" / "data" / "1000G.pvar")
+    >>> for variant in pvar:
+    ...     variant
+    ...     break
+    TargetVariant(chrom='1', pos=10390, ref='CCCCTAACCCCTAACCCTAACCCTAACCCTAACCCTAACCCTAA', alt='C', id='1:10390:CCCCTAACCCCTAACCCTAACCCTAACCCTAACCCTAACCCTAA:C')
     """
 
     def __init__(self, path, chrom=None):
@@ -193,7 +201,13 @@ class TargetVariants:
 def read_pvar(path):
     with xopen(path, "rt") as f:
         # pvars do have a header column and support arbitrary columns
-        reader = csv.DictReader(f, delimiter="\t")
+        for line in f:
+            if line.startswith("##"):
+                continue
+            else:
+                fieldnames = line.strip().split("\t")
+                break
+        reader = csv.DictReader(f, fieldnames=fieldnames, delimiter="\t")
         fields = {
             "#CHROM": "chrom",
             "POS": "pos",
