@@ -88,6 +88,7 @@ def run_intersect():
     # Merge matched variants on sorted files
     logger.info("Joining & outputting matched variants -> matched_variants.txt")
     n_matched = 0
+    n_PCA_ELIGIBLE = 0
     with open('matched_variants.txt', 'w') as csvfile:
         for vmatch in sorted_join_variants('reference_variants.txt', 'target_variants.txt'):
             n_matched += 1
@@ -95,20 +96,23 @@ def run_intersect():
 
             # Define variant's eligibility for PCA
             # From original implementation: ((IS_MA_REF == FALSE) && (IS_MA_TARGET == FALSE)) && (((IS_INDEL == FALSE) && (STRANDAMB == FALSE)) || ((IS_INDEL == TRUE) && (SAME_REF == TRUE)))
-            PCA_ELIGIBLE = ((vmatch['IS_MA_REF'] is False) and (vmatch['IS_MA_TARGET'] is False)) and \
-                           (((vmatch['IS_INDEL'] is False) and (vmatch['STRANDAMB'] is False)) or ((vmatch['IS_INDEL'] is True) and (vmatch['SAME_REF'] is True)))
+            PCA_ELIGIBLE = ((vmatch['IS_MA_REF'] == 'False') and (vmatch['IS_MA_TARGET'] == 'False')) and \
+                           (((vmatch['IS_INDEL'] == 'False') and (vmatch['STRANDAMB'] == 'False')) or ((vmatch['IS_INDEL'] == 'True') and (vmatch['SAME_REF'] == 'True')))
 
-            PCA_ELIGIBLE = PCA_ELIGIBLE and (vmatch['MAF'] > args.maf_filter) and (vmatch['F_MISS_DOSAGE'] < args.maf_filter)
+            PCA_ELIGIBLE = PCA_ELIGIBLE and (float(vmatch['MAF']) > args.maf_filter) and (float(vmatch['F_MISS_DOSAGE']) < args.maf_filter)
             vmatch['PCA_ELIGIBLE'] = PCA_ELIGIBLE
+            if PCA_ELIGIBLE is True:
+                n_PCA_ELIGIBLE += 1
 
             if n_matched == 1:
                 writer = csv.DictWriter(csvfile, fieldnames=vmatch.keys(), delimiter='\t')
                 writer.writeheader()
             writer.writerow(vmatch)
+    logger.info("{}/{} ({:.2f} variants are eligible for PCA".format(n_PCA_ELIGIBLE, n_matched, 100*n_PCA_ELIGIBLE/n_matched))
 
     # Output counts
     logger.info("Outputting variant counts -> intersect_counts_$.txt")
-    with open('intersect_counts_{}.txt'.format(args.chrom), 'w') as outf:
+    with open('intersect_counts_{}.txt'.format(args.filter_chrom), 'w') as outf:
         outf.write('\n'.join(map(str, [n_target, n_ref, n_matched])))
 
 
