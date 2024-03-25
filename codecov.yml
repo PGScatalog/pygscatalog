@@ -28,7 +28,7 @@ flag_management:
           target: 80%
     - name: pgscatalog.calc 
       paths: 
-      - pgscatalog.match/
+      - pgscatalog.calc/
       carryforward: true
       statuses:
         - type: project
