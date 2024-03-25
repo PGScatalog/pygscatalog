@@ -61,8 +61,12 @@ def run_intersect():
 
 def read_var_general(path, chrom=None):
     with xopen(path, "rt") as f:
-        # pvars do have a header column and support arbitrary columns
-        reader = csv.DictReader(filter(lambda row: row[:2]!='##', f), delimiter="\t") # need to remove comments of VCF-like characters
+        for line in f:
+            if line.startswith("##"):
+                continue
+            else:
+                fieldnames = line.strip().split("\t")
+        reader = csv.DictReader(f, fieldnames=fieldnames, delimiter="\t")
         if chrom is None:
             for row in reader:
                 yield row
