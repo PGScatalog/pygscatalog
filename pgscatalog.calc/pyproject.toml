@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "pgscatalog.calc"
 version = "0.1.0"
-description = ""
+description = "Libraries and applications for working with calculated polygenic scores"
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
 readme = "README.md"
 packages = [
