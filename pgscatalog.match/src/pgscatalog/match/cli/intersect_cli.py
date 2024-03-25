@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 def run_intersect():
     args = parse_args()
 
+    if args.verbose:
+        logging.getLogger("pgscatalog.core").setLevel(logging.DEBUG)
+        logging.getLogger("pgscatalog.match").setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Verbose logging enabled")
+
     # Process & sort reference variants
     logger.info("Reading & sorting REFERENCE variants: {}".format(args.reference))
     with xopen('reference_variants.txt', 'wt') as outf:
@@ -162,6 +168,13 @@ def parse_args(args=None):
         dest="filter_chrom",
         required=False,
         help="whether to limit matches to specific chromosome of the reference",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="<Optional> Extra logging information",
     )
     return parser.parse_args(args)
 
