@@ -108,7 +108,7 @@ def run_intersect():
 
     # Output counts
     logger.info("Outputting variant counts -> intersect_counts_$.txt")
-    with open('intersect_counts_{}.txt'.format(chrom), 'w') as outf:
+    with open('intersect_counts_{}.txt'.format(args.chrom), 'w') as outf:
         outf.write('\n'.join(map(str, [n_target, n_ref, n_matched])))
 
 
@@ -116,7 +116,7 @@ def read_var_general(path, chrom=None):
     with xopen(path, "rt") as f:
         # ToDo: check if this is memory inefficent
         reader = csv.DictReader(filter(lambda row: row[:2]!='##', f), delimiter="\t") # need to remove comments of VCF-like characters, might be fully in memory though
-        if (chrom == None) or (chrom == 'ALL'):
+        if (chrom is None) or (chrom == 'ALL'):
             for row in reader:
                 yield row
         else:
