@@ -211,7 +211,7 @@ def parse_args(args=None):
     parser.add_argument(
         "--maf_target",
         dest="maf_filter",
-        default=0.1,
+        default=0.05,
         required=False,
         help="Filter: Minimum minor Allele Frequency for PCA eligibility",
     )
