@@ -13,6 +13,7 @@ def run_intersect():
     args = parse_args()
 
     # Process & sort reference variants
+    logger.info("Reading & sorting REFERENCE variants: {}".format(args.reference))
     with xopen('reference_variants.txt', 'wt') as outf:
         outf.write('CHR:POS:A0:A1\tID_REF\tREF_REF\tIS_INDEL\tSTRANDAMB\tIS_MA_REF\n')
         ref_heap = []
@@ -31,6 +32,7 @@ def run_intersect():
                 heapq.heappush(ref_heap, ([key, v['ID'], v['REF']],[IS_INDEL, STRANDAMB, IS_MA_REF]))
 
         # Output the sorted reference variants
+        logger.info("Outputting REFERENCE variants -> reference_variants.txt")
         n_ref = len(ref_heap)
         for i in range(n_ref):
             popped = heapq.heappop(ref_heap)
@@ -43,6 +45,7 @@ def run_intersect():
         outf.write('CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tALT_FREQ\tF_MISS_DOSAGE\n')
         target_heap = []
         for path in args.target:
+            logger.info("Reading & sorting TARGET variants: {}".format(path))
             pvar = read_var_general(path, chrom=None)  # essential not to filter if it is target (messes up common line indexing)
 
             loc_afreq = path.replace('.pvar.zst', '.afreq.gz')
@@ -68,6 +71,7 @@ def run_intersect():
                     heapq.heappush(target_heap, ([key, v['ID'], v['REF']], [IS_MA_TARGET, ALT_FREQS[i],F_MISS_DOSAGE]))
 
         # Output the sorted reference variants
+        logger.info("Outputting TARGET variants -> target_variants.txt")
         n_target = len(target_heap)
         for i in range(n_target):
             popped = heapq.heappop(target_heap)
@@ -75,6 +79,7 @@ def run_intersect():
         del target_heap
 
     # Merge matched variants on sorted files
+    logger.info("Joining & outputting matched variants -> matched_variants.txt")
     n_matched = 0
     with open('matched_variants.txt', 'w') as csvfile:
         for vmatch in sorted_join_variants('reference_variants.txt', 'target_variants.txt'):
@@ -86,7 +91,8 @@ def run_intersect():
             writer.writerow(vmatch)
 
     # Output counts
-    with open('intersect_counts_${}.txt'.format(chrom), 'w') as outf:
+    logger.info("Outputting variant counts -> intersect_counts_$.txt")
+    with open('intersect_counts_{}.txt'.format(chrom), 'w') as outf:
         outf.write('\n'.join(map(str, [n_target, n_ref, n_matched])))
 
 
