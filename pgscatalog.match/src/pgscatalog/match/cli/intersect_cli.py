@@ -49,7 +49,6 @@ def run_intersect():
         del ref_heap
 
     # Process & sort target variants
-    # ToDo: check if it works for bim format files?
     with xopen('target_variants.txt', 'wt') as outf:
         outf.write('CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n')
         target_heap = []
@@ -130,15 +129,28 @@ def read_var_general(path, chrom=None):
     :return: row of a df as a dict
     """
     with xopen(path, "rt") as f:
-        # ToDo: check if this is memory inefficent
-        reader = csv.DictReader(filter(lambda r: r[:2] != '##', f), delimiter="\t") # need to remove comments of VCF-like characters, might be fully in memory though
-        if (chrom is None) or (chrom == 'ALL'):
-            for row in reader:
-                yield row
+        if 'bim' in path:
+            reader = csv.reader(f, delimiter="\t")
+            # yes, A1/A2 in bim isn't ref/alt
+            fields = ["#CHROM", "ID", "pos_cm", "POS", "REF", "ALT"]
+            if (chrom is None) or (chrom == 'ALL'):
+                for row in reader:
+                    yield dict(zip(fields, row, strict=True))
+            else:
+                for row in reader:
+                    row = dict(zip(fields, row, strict=True))
+                    if row['#CHROM'] == chrom:
+                        yield row
         else:
-            for row in reader:
-                if row['#CHROM'] == chrom:
+            # ToDo: check if filter is memory inefficent
+            reader = csv.DictReader(filter(lambda r: r[:2] != '##', f), delimiter="\t") # need to remove comments of VCF-like characters, might be fully in memory though
+            if (chrom is None) or (chrom == 'ALL'):
+                for row in reader:
                     yield row
+            else:
+                for row in reader:
+                    if row['#CHROM'] == chrom:
+                        yield row
 
 
 def sorted_join_variants(path_ref, path_target):
