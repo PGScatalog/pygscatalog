@@ -55,17 +55,17 @@ def run_intersect():
         target_heap = []
         for path in args.target:
             logger.info("Reading TARGET variants: {}".format(path))
-            pvar = read_var_general(path, chrom=None)  # essential not to filter if it is target (messes up common line indexing)
+            pvar = read_var_general(path, chrom=None)  # essential not to filter target (messes up common line indexing)
 
             loc_afreq = path.replace('.pvar.zst', '.afreq.gz')
-            afreq = read_var_general(loc_afreq, chrom=None)  # essential not to filter if it is target (messes up common line indexing)
+            afreq = read_var_general(loc_afreq, chrom=None)  # essential not to filter target (messes up common line indexing)
 
             loc_vmiss = path.replace('.pvar.zst', '.vmiss.gz')
-            vmiss = read_var_general(loc_vmiss, chrom=None)  # essential not to filter if it is target (messes up common line indexing)
+            vmiss = read_var_general(loc_vmiss, chrom=None)  # essential not to filter target (messes up common line indexing)
 
             for v, freq, miss in zip(pvar, afreq, vmiss):
-                # if v['ID'] != freq['ID'] != miss['ID']:
-                #     print(v)
+                if all([v['ID'], freq['ID'], miss['#ID']]) is False:
+                    raise ValueError("TARGET variant files are not sorted")
                 ALTs = v['ALT'].split(',')
                 ALT_FREQS = [float(x) for x in freq['ALT_FREQS'].split(',')]
                 F_MISS_DOSAGE = miss['F_MISS_DOSAGE']
@@ -75,10 +75,8 @@ def run_intersect():
                         key = '{}:{}:{}:{}'.format(v['#CHROM'], v['POS'], v['REF'], ALT)
                     else:
                         key = '{}:{}:{}:{}'.format(v['#CHROM'], v['POS'], ALT, v['REF'])
-                    # outf.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(key, v['ID'], v['REF'], str(IS_MA_TARGET), ALT_FREQS[i],
-                    #                                              F_MISS_DOSAGE))
-                    MAF = AAF2MAF(ALT_FREQS[i])
-                    target_heap.append(([key, v['ID'], v['REF']], [IS_MA_TARGET, MAF,F_MISS_DOSAGE]))
+                    MAF = aaf2maf(ALT_FREQS[i])
+                    target_heap.append(([key, v['ID'], v['REF']], [IS_MA_TARGET, MAF, F_MISS_DOSAGE]))
 
         logger.info("Sorting TARGET variants (heapify)")
         heapq.heapify(target_heap)
@@ -105,7 +103,8 @@ def run_intersect():
             PCA_ELIGIBLE = ((vmatch['IS_MA_REF'] == 'False') and (vmatch['IS_MA_TARGET'] == 'False')) and \
                            (((vmatch['IS_INDEL'] == 'False') and (vmatch['STRANDAMB'] == 'False')) or ((vmatch['IS_INDEL'] == 'True') and (vmatch['SAME_REF'] == 'True')))
 
-            PCA_ELIGIBLE = PCA_ELIGIBLE and (float(vmatch['MAF']) > args.maf_filter) and (float(vmatch['F_MISS_DOSAGE']) < args.maf_filter)
+            PCA_ELIGIBLE = PCA_ELIGIBLE and (float(vmatch['MAF']) > args.maf_filter) and \
+                           (float(vmatch['F_MISS_DOSAGE']) < args.vmiss_filter)
             vmatch['PCA_ELIGIBLE'] = PCA_ELIGIBLE
             if PCA_ELIGIBLE is True:
                 n_PCA_ELIGIBLE += 1
@@ -114,7 +113,8 @@ def run_intersect():
                 writer = csv.DictWriter(csvfile, fieldnames=vmatch.keys(), delimiter='\t')
                 writer.writeheader()
             writer.writerow(vmatch)
-    logger.info("{}/{} ({:.2f} variants are eligible for PCA".format(n_PCA_ELIGIBLE, n_matched, 100*n_PCA_ELIGIBLE/n_matched))
+    logger.info("{}/{} ({:.2f}%) variants are eligible for PCA".format(n_PCA_ELIGIBLE, n_matched,
+                                                                       100*n_PCA_ELIGIBLE/n_matched))
 
     # Output counts
     logger.info("Outputting variant counts -> intersect_counts_$.txt")
@@ -123,9 +123,15 @@ def run_intersect():
 
 
 def read_var_general(path, chrom=None):
+    """
+    General function for reading variant files from plink2 outputs
+    :param path: path to variant file
+    :param chrom: filter to specific chromosome
+    :return: row of a df as a dict
+    """
     with xopen(path, "rt") as f:
         # ToDo: check if this is memory inefficent
-        reader = csv.DictReader(filter(lambda row: row[:2]!='##', f), delimiter="\t") # need to remove comments of VCF-like characters, might be fully in memory though
+        reader = csv.DictReader(filter(lambda r: r[:2] != '##', f), delimiter="\t") # need to remove comments of VCF-like characters, might be fully in memory though
         if (chrom is None) or (chrom == 'ALL'):
             for row in reader:
                 yield row
@@ -135,9 +141,9 @@ def read_var_general(path, chrom=None):
                     yield row
 
 
-def sorted_join_variants(reffile, targetfile):
-    f1_iter = read_var_general(reffile)
-    f2_iter = read_var_general(targetfile)
+def sorted_join_variants(path_ref, path_target):
+    f1_iter = read_var_general(path_ref)
+    f2_iter = read_var_general(path_target)
 
     prev_key1 = None  # Initialize previous key for file 1
     prev_key2 = None  # Initialize previous key for file 2
@@ -172,23 +178,25 @@ def sorted_join_variants(reffile, targetfile):
 
 
 def allele_complement(s):
-    '''
+    """
     Complement alleles
     :param s: allele to be complemented
     :return: complement
-    '''
+    """
     return s.replace("A", "V").replace("T", "X").replace("C", "Y").replace("G", "Z").replace("V", "T").replace("X", "A").replace("Y", "G").replace("Z", "C")
 
-def AAF2MAF(aaf):
-    '''
+
+def aaf2maf(aaf):
+    """
     Convert alternative allele frequency (AAF) to minor allele frequency (MAF)
     :param aaf: alternative allele frequency
     :return: minor allele frequency (MAF)
-    '''
+    """
     if aaf > 0.5:
         return 1-aaf
     else:
         return aaf
+
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser(
@@ -227,7 +235,7 @@ def parse_args(args=None):
     )
     parser.add_argument(
         "--geno_miss",
-        dest="maf_filter",
+        dest="vmiss_filter",
         default=0.1,
         required=False,
         help="Filter: Maximum Genotype missingness for PCA eligibility",
