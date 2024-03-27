@@ -26,10 +26,10 @@ def run_intersect():
 
     # Process & sort reference variants
     logger.info("Reading REFERENCE variants: {}".format(args.reference))
-    with xopen(outdir / "reference_variants.txt", "wt") as outf:
+    with open(outdir / "reference_variants.txt", "wt") as outf:
         outf.write("CHR:POS:A0:A1\tID_REF\tREF_REF\tIS_INDEL\tSTRANDAMB\tIS_MA_REF\n")
         ref_heap = []
-        ref_pvar = read_var_general(args.reference, chrom=args.filter_chrom)
+        ref_pvar = read_var_general(outdir / args.reference, chrom=args.filter_chrom)
         for v in ref_pvar:
             ALTs = v["ALT"].split(",")
             IS_MA_REF = len(ALTs) > 1
@@ -112,7 +112,7 @@ def run_intersect():
     n_PCA_ELIGIBLE = 0
     with open(outdir / "matched_variants.txt", "w") as csvfile:
         for vmatch in sorted_join_variants(
-            "reference_variants.txt", "target_variants.txt"
+            outdir / "reference_variants.txt", outdir / "target_variants.txt"
         ):
             n_matched += 1
             vmatch["SAME_REF"] = vmatch["REF_REF"] == vmatch["REF_REF"]
@@ -163,7 +163,7 @@ def read_var_general(path, chrom=None):
     :return: row of a df as a dict
     """
     with xopen(path, "rt") as f:
-        if "bim" in path:
+        if "bim" in pathlib.Path(path).name:
             reader = csv.reader(f, delimiter="\t")
             # yes, A1/A2 in bim isn't ref/alt
             fields = ["#CHROM", "ID", "pos_cm", "POS", "REF", "ALT"]
