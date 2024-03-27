@@ -15,7 +15,7 @@ def run_intersect():
     args = parse_args()
     outdir = pathlib.Path(args.outdir)
 
-    if not outdir.exists():
+    if not outdir.is_dir():
         raise NotADirectoryError
 
     if args.verbose:
