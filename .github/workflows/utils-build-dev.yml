@@ -21,9 +21,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -42,7 +39,6 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          context: "{{defaultContext}}:pgscatalog.utils"
           push: true
           platforms: "linux/amd64,linux/arm64"
           tags: ${{ env.DOCKER_REGISTRY }}/pgscatalog-utils:dev
