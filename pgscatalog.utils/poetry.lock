@@ -119,13 +119,13 @@ files = [
 
 [[package]]
 name = "httpcore"
-version = "1.0.4"
+version = "1.0.5"
 description = "A minimal low-level HTTP client."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "httpcore-1.0.4-py3-none-any.whl", hash = "sha256:ac418c1db41bade2ad53ae2f3834a3a0f5ae76b56cf5aa497d2d033384fc7d73"},
-    {file = "httpcore-1.0.4.tar.gz", hash = "sha256:cb2839ccfcba0d2d3c1131d3c3e26dfc327326fbe7a5dc0dbfe9f6c9151bb022"},
+    {file = "httpcore-1.0.5-py3-none-any.whl", hash = "sha256:421f18bac248b25d310f3cacd198d55b8e6125c107797b609ff9b7a6ba7991b5"},
+    {file = "httpcore-1.0.5.tar.gz", hash = "sha256:34a38e2f9291467ee3b44e89dd52615370e152954ba21721378a87b2960f7a61"},
 ]
 
 [package.dependencies]
@@ -136,7 +136,7 @@ h11 = ">=0.13,<0.15"
 asyncio = ["anyio (>=4.0,<5.0)"]
 http2 = ["h2 (>=3,<5)"]
 socks = ["socksio (==1.*)"]
-trio = ["trio (>=0.22.0,<0.25.0)"]
+trio = ["trio (>=0.22.0,<0.26.0)"]
 
 [[package]]
 name = "httpx"
@@ -360,7 +360,7 @@ description = "Libraries and applications for working with calculated polygenic 
 optional = false
 python-versions = "^3.11"
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 numpy = "^1.26.4"
@@ -381,7 +381,7 @@ description = "Core tools for working with polygenic scores (PGS) and the PGS Ca
 optional = false
 python-versions = "^3.11"
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 httpx = "^0.26.0"
@@ -404,7 +404,7 @@ description = "Tools for matching variants in PGS scoring files and target varia
 optional = false
 python-versions = "^3.11"
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 "pgscatalog.core" = "^0.1.0"
@@ -846,4 +846,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "ade941ad8472602a00c9b53c706938ac33b25a2daf87401338ec6b9ab15c854e"
+content-hash = "8091d82d9f8fe84c06ccf023972e8bc07a8101105e99ac4649c72505d5d63f17"
