@@ -176,17 +176,20 @@ def read_var_general(path, chrom=None):
                     if row["#CHROM"] == chrom:
                         yield row
         else:
-            # ToDo: check if filter is memory inefficent
-            reader = csv.DictReader(
-                filter(lambda r: r[:2] != "##", f), delimiter="\t"
-            )  # need to remove comments of VCF-like characters, might be fully in memory though
-            if (chrom is None) or (chrom == "ALL"):
-                for row in reader:
-                    yield row
-            else:
-                for row in reader:
-                    if row["#CHROM"] == chrom:
-                        yield row
+            fields = None
+            for row in f:
+                if row.startswith('##'):
+                    continue
+                else:
+                    row = row.strip().split('\t')
+                    if fields is None:
+                        fields = row
+                    else:
+                        row = dict(zip(fields, row, strict=True))
+                        if (chrom is None) or (chrom == "ALL"):
+                            yield row
+                        elif row["#CHROM"] == chrom:
+                            yield row
 
 
 def sorted_join_variants(path_ref, path_target):
