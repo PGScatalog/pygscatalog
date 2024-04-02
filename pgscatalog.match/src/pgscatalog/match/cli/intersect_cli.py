@@ -6,6 +6,7 @@ from xopen import xopen
 import csv
 import textwrap
 import heapq
+import tempfile
 
 
 logger = logging.getLogger(__name__)
@@ -18,19 +19,22 @@ def run_intersect():
     if not outdir.is_dir():
         raise NotADirectoryError
 
+    tmpdir = tempfile.mkdtemp()
+
     if args.verbose:
         logging.getLogger("pgscatalog.core").setLevel(logging.DEBUG)
         logging.getLogger("pgscatalog.match").setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
         logger.debug("Verbose logging enabled")
 
-    # Process & sort reference variants
-    logger.info("Reading REFERENCE variants: {}".format(args.reference))
-    with open(outdir / "reference_variants.txt", "wt") as outf:
-        outf.write("CHR:POS:A0:A1\tID_REF\tREF_REF\tIS_INDEL\tSTRANDAMB\tIS_MA_REF\n")
+        # Process & sort reference variants
+        count_var_r = 0
+        o_tmp_r = []
+        logger.info("Reading REFERENCE variants: {}".format(args.reference))
         ref_heap = []
         ref_pvar = read_var_general(outdir / args.reference, chrom=args.filter_chrom)
         for v in ref_pvar:
+            count_var_r += 1
             ALTs = v["ALT"].split(",")
             IS_MA_REF = len(ALTs) > 1
             for i, ALT in enumerate(ALTs):
@@ -45,22 +49,40 @@ def run_intersect():
                     ([key, v["ID"], v["REF"]], [IS_INDEL, STRANDAMB, IS_MA_REF])
                 )
 
-        logger.info("Sorting REFERENCE variants (heapify)")
-        heapq.heapify(ref_heap)
+            if count_var_r % 500000 == 0:
+                heapq.heapify(ref_heap)
+                tmppath = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
+                with open(tmppath.name, "wt") as outf:
+                    o_tmp_r.append(tmppath.name)
+                    outf.write("CHR:POS:A0:A1\tID_REF\tREF_REF\tIS_INDEL\tSTRANDAMB\tIS_MA_REF\n")
+                    for i in range(len(ref_heap)):
+                        popped = heapq.heappop(ref_heap)
+                        outf.write("\t".join([str(x) for x in popped[0] + popped[1]]) + "\n")
+                ref_heap = []
+                logger.info("Processed {} REFERENCE variants".format(count_var_r))
 
-        # Output the sorted reference variants
-        logger.info("Outputting REFERENCE variants -> reference_variants.txt")
-        n_ref = len(ref_heap)
-        for i in range(n_ref):
-            popped = heapq.heappop(ref_heap)
-            outf.write("\t".join([str(x) for x in popped[0] + popped[1]]) + "\n")
-        del ref_heap
+        if len(ref_heap) > 0:
+            heapq.heapify(ref_heap)
+            tmppath = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
+            with open(tmppath.name, "wt") as outf:
+                o_tmp_r.append(tmppath.name)
+                outf.write("CHR:POS:A0:A1\tID_REF\tREF_REF\tIS_INDEL\tSTRANDAMB\tIS_MA_REF\n")
+                for i in range(len(ref_heap)):
+                    popped = heapq.heappop(ref_heap)
+                    outf.write("\t".join([str(x) for x in popped[0] + popped[1]]) + "\n")
+            del ref_heap
+            logger.info("Processed {} REFERENCE variants".format(count_var_r))
 
-    # Process & sort target variants
-    with xopen(outdir / "target_variants.txt", "wt") as outf:
-        outf.write(
-            "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n"
-        )
+        logger.info("Outputting REFERNCE variants -> reference_variants.txt.gz")
+        with xopen(outdir / "reference_variants.txt.gz", "wt") as outf:
+            outf.write("CHR:POS:A0:A1\tID_REF\tREF_REF\tIS_INDEL\tSTRANDAMB\tIS_MA_REF\n")
+            for v in heapq.merge(*[read_var_general(x) for x in o_tmp_r],
+                                 key=lambda v: (v['CHR:POS:A0:A1'], v['ID_REF'], v['REF_REF'])):
+                outf.write('\t'.join(v.values()) + '\n')
+
+        # Process & sort target variants
+        count_var_t = 0
+        o_tmp_t = []
         target_heap = []
         for path in args.target:
             logger.info("Reading TARGET variants: {}".format(path))
@@ -81,6 +103,7 @@ def run_intersect():
             for v, freq, miss in zip(pvar, afreq, vmiss):
                 if all([v["ID"], freq["ID"], miss["#ID"]]) is False:
                     raise ValueError("TARGET variant files are not sorted")
+                count_var_t += 1
                 ALTs = v["ALT"].split(",")
                 ALT_FREQS = [float(x) for x in freq["ALT_FREQS"].split(",")]
                 F_MISS_DOSAGE = miss["F_MISS_DOSAGE"]
@@ -95,64 +118,95 @@ def run_intersect():
                         ([key, v["ID"], v["REF"]], [IS_MA_TARGET, MAF, F_MISS_DOSAGE])
                     )
 
-        logger.info("Sorting TARGET variants (heapify)")
-        heapq.heapify(target_heap)
+                if count_var_t % 500000 == 0:
+                    heapq.heapify(target_heap)
+                    tmppath = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
+                    with open(tmppath.name, "wt") as outf:
+                        o_tmp_t.append(tmppath.name)
+                        outf.write(
+                            "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n"
+                        )
+                        for i in range(len(target_heap)):
+                            popped = heapq.heappop(target_heap)
+                            outf.write("\t".join([str(x) for x in popped[0] + popped[1]]) + "\n")
+                    target_heap = []
+                    logger.info("Processed {} TARGET variants".format(count_var_t))
 
-        # Output the sorted reference variants
-        logger.info("Outputting TARGET variants -> target_variants.txt")
-        n_target = len(target_heap)
-        for i in range(n_target):
-            popped = heapq.heappop(target_heap)
-            outf.write("\t".join([str(x) for x in popped[0] + popped[1]]) + "\n")
-        del target_heap
-
-    # Merge matched variants on sorted files
-    logger.info("Joining & outputting matched variants -> matched_variants.txt")
-    n_matched = 0
-    n_PCA_ELIGIBLE = 0
-    with open(outdir / "matched_variants.txt", "w") as csvfile:
-        for vmatch in sorted_join_variants(
-            outdir / "reference_variants.txt", outdir / "target_variants.txt"
-        ):
-            n_matched += 1
-            vmatch["SAME_REF"] = vmatch["REF_REF"] == vmatch["REF_REF"]
-
-            # Define variant's eligibility for PCA
-            # From original implementation: ((IS_MA_REF == FALSE) && (IS_MA_TARGET == FALSE)) && (((IS_INDEL == FALSE) && (STRANDAMB == FALSE)) || ((IS_INDEL == TRUE) && (SAME_REF == TRUE)))
-            PCA_ELIGIBLE = (
-                (vmatch["IS_MA_REF"] == "False") and (vmatch["IS_MA_TARGET"] == "False")
-            ) and (
-                ((vmatch["IS_INDEL"] == "False") and (vmatch["STRANDAMB"] == "False"))
-                or ((vmatch["IS_INDEL"] == "True") and (vmatch["SAME_REF"] == "True"))
-            )
-
-            PCA_ELIGIBLE = (
-                PCA_ELIGIBLE
-                and (float(vmatch["MAF"]) > args.maf_filter)
-                and (float(vmatch["F_MISS_DOSAGE"]) < args.vmiss_filter)
-            )
-            vmatch["PCA_ELIGIBLE"] = PCA_ELIGIBLE
-            if PCA_ELIGIBLE is True:
-                n_PCA_ELIGIBLE += 1
-
-            if n_matched == 1:
-                writer = csv.DictWriter(
-                    csvfile, fieldnames=vmatch.keys(), delimiter="\t"
+        if len(target_heap) > 0:
+            heapq.heapify(target_heap)
+            tmppath = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
+            with open(tmppath.name, "wt") as outf:
+                o_tmp_t.append(tmppath.name)
+                outf.write(
+                    "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n"
                 )
-                writer.writeheader()
-            writer.writerow(vmatch)
-    logger.info(
-        "{}/{} ({:.2f}%) variants are eligible for PCA".format(
-            n_PCA_ELIGIBLE, n_matched, 100 * n_PCA_ELIGIBLE / n_matched
-        )
-    )
+                for i in range(len(target_heap)):
+                    popped = heapq.heappop(target_heap)
+                    outf.write("\t".join([str(x) for x in popped[0] + popped[1]]) + "\n")
+            del target_heap
+            logger.info("Processed {} TARGET variants".format(count_var_t))
 
-    # Output counts
-    logger.info("Outputting variant counts -> intersect_counts_$.txt")
-    with open(
-        outdir / "intersect_counts_{}.txt".format(args.filter_chrom), "w"
-    ) as outf:
-        outf.write("\n".join(map(str, [n_target, n_ref, n_matched])))
+        logger.info("Outputting TARGET variants -> target_variants.txt.gz")
+        with xopen(outdir / "target_variants.txt.gz", "wt") as outf:
+            outf.write(
+                "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n"
+            )
+            for v in heapq.merge(*[read_var_general(x) for x in o_tmp_t],
+                                 key=lambda v: (v['CHR:POS:A0:A1'], v['ID_TARGET'], v['REF_TARGET'])):
+                outf.write('\t'.join(v.values()) + '\n')
+
+        # Merge matched variants on sorted files
+        logger.info("Joining & outputting matched variants -> matched_variants.txt")
+        n_matched = 0
+        n_PCA_ELIGIBLE = 0
+        with xopen(outdir / "matched_variants.txt.gz", "w") as csvfile:
+            for vmatch in sorted_join_variants(
+                    outdir / "reference_variants.txt.gz", outdir / "target_variants.txt.gz"
+            ):
+                n_matched += 1
+                vmatch["SAME_REF"] = vmatch["REF_REF"] == vmatch["REF_REF"]
+
+                # Define variant's eligibility for PCA
+                # From original implementation: ((IS_MA_REF == FALSE) && (IS_MA_TARGET == FALSE)) && (((IS_INDEL == FALSE) && (STRANDAMB == FALSE)) || ((IS_INDEL == TRUE) && (SAME_REF == TRUE)))
+                PCA_ELIGIBLE = (
+                                       (vmatch["IS_MA_REF"] == "False") and (vmatch["IS_MA_TARGET"] == "False")
+                               ) and (
+                                       ((vmatch["IS_INDEL"] == "False") and (vmatch["STRANDAMB"] == "False"))
+                                       or ((vmatch["IS_INDEL"] == "True") and (vmatch["SAME_REF"] == "True"))
+                               )
+
+                PCA_ELIGIBLE = (
+                        PCA_ELIGIBLE
+                        and (float(vmatch["MAF"]) > args.maf_filter)
+                        and (float(vmatch["F_MISS_DOSAGE"]) < args.vmiss_filter)
+                )
+                vmatch["PCA_ELIGIBLE"] = PCA_ELIGIBLE
+                if PCA_ELIGIBLE is True:
+                    n_PCA_ELIGIBLE += 1
+
+                if n_matched == 1:
+                    writer = csv.DictWriter(
+                        csvfile, fieldnames=vmatch.keys(), delimiter="\t"
+                    )
+                    writer.writeheader()
+                writer.writerow(vmatch)
+        logger.info(
+            "{}/{} ({:.2f}%) of TARGET variants matched the REFERENCE data".format(
+                n_matched, count_var_t, 100 * n_matched / count_var_t
+            )
+        )
+        logger.info(
+            "{}/{} ({:.2f}%) of matched variants are eligible for PCA".format(
+                n_PCA_ELIGIBLE, n_matched, 100 * n_PCA_ELIGIBLE / n_matched
+            )
+        )
+
+        # Output counts
+        logger.info("Outputting variant counts -> intersect_counts_{}.txt".format(args.filter_chrom))
+        with open(
+                outdir / "intersect_counts_{}.txt".format(args.filter_chrom), "w"
+        ) as outf:
+            outf.write("\n".join(map(str, [count_var_t, count_var_r, n_matched])))
 
 
 def read_var_general(path, chrom=None):
@@ -177,20 +231,28 @@ def read_var_general(path, chrom=None):
                         yield row
         else:
             fields = None
-            for row in f:
-                if row.startswith('##'):
-                    continue
-                else:
-                    row = row.strip().split('\t')
-                    if fields is None:
-                        fields = row
+            if (chrom is None) or (chrom == "ALL"):
+                for row in f:
+                    if row.startswith('##'):
+                        continue
                     else:
-                        row = dict(zip(fields, row, strict=True))
-                        if (chrom is None) or (chrom == "ALL"):
-                            yield row
-                        elif row["#CHROM"] == chrom:
-                            yield row
-
+                        row = row.strip().split('\t')
+                        if fields is None:
+                            fields = row
+                        else:
+                            yield dict(zip(fields, row, strict=True))
+            else:
+                for row in f:
+                    if row.startswith('##'):
+                        continue
+                    else:
+                        row = row.strip().split('\t')
+                        if fields is None:
+                            fields = row
+                        else:
+                            row = dict(zip(fields, row, strict=True))
+                            if row["#CHROM"] == chrom:
+                                yield row
 
 def sorted_join_variants(path_ref, path_target):
     f1_iter = read_var_general(path_ref)
