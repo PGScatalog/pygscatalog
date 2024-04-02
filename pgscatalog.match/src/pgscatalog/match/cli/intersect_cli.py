@@ -156,7 +156,7 @@ def run_intersect():
                 outf.write('\t'.join(v.values()) + '\n')
 
         # Merge matched variants on sorted files
-        logger.info("Joining & outputting matched variants -> matched_variants.txt")
+        logger.info("Joining & outputting matched variants -> matched_variants.txt.gz")
         n_matched = 0
         n_PCA_ELIGIBLE = 0
         with xopen(outdir / "matched_variants.txt.gz", "w") as csvfile:

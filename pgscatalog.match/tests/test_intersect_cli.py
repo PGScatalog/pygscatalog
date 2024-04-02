@@ -1,5 +1,6 @@
 import itertools
 import os
+import gzip
 from unittest.mock import patch
 
 from pgscatalog.match.cli.intersect_cli import run_intersect
@@ -47,20 +48,20 @@ def test_intersect_cli(tmp_path_factory, ref, target, afreq, vmiss):
 
     assert sorted(os.listdir(outdir)) == [
         "intersect_counts_None.txt",
-        "matched_variants.txt",
-        "reference_variants.txt",
-        "target_variants.txt",
+        "matched_variants.txt.gz",
+        "reference_variants.txt.gz",
+        "target_variants.txt.gz",
     ]
 
     # header + 100 variants
-    with open(outdir / "target_variants.txt") as f:
+    with gzip.open(outdir / "target_variants.txt.gz") as f:
         assert sum(1 for _ in f) == 101
 
-    with open(outdir / "reference_variants.txt") as f:
+    with gzip.open(outdir / "reference_variants.txt.gz") as f:
         # included 100 extra variants in reference that won't intersect intentionally
         assert sum(1 for _ in f) == 201
 
-    with open(outdir / "matched_variants.txt") as f:
+    with gzip.open(outdir / "matched_variants.txt.gz") as f:
         assert sum(1 for _ in f) == 101
 
     with open(outdir / "intersect_counts_None.txt") as f:
