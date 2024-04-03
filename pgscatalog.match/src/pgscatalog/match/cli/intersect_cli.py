@@ -339,7 +339,7 @@ def parse_args(args=None):
         dest="target",
         required=True,
         nargs="+",
-        help="<Required> A list of paths of target genomic variants (.bim/pvar format)",
+        help="<Required> A list of paths of target genomic variants (.bim/pvar format). The .afreq and .vmiss files are also required for these files.",
     )
     parser.add_argument(
         "-c",
@@ -378,16 +378,16 @@ def parse_args(args=None):
 def _description_text() -> str:
     return textwrap.dedent(
         """\
-    PLACEHOLDER
+    Program to find matched variants (same strand) between a set of reference and target data .pvar/bim files. This 
+    also uses the .afreq and .vmiss files to evaluate whether the variants in the TARGET are suitable for inclusion in
+    a PCA analysis, while also filtering on strand ambiguity and multi-allelic/INDEL status. 
    """
     )
 
 
 def _epilog_text() -> str:
     return textwrap.dedent(
-        """\
-    PLACEHOLDER
-    """
+        """"""
     )
 
 
