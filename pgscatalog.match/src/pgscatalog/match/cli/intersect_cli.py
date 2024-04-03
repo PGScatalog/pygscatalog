@@ -351,6 +351,7 @@ def parse_args(args=None):
         "--maf_target",
         dest="maf_filter",
         default=0.05,
+        type=float,
         required=False,
         help="Filter: Minimum minor Allele Frequency for PCA eligibility",
     )
@@ -358,6 +359,7 @@ def parse_args(args=None):
         "--geno_miss",
         dest="vmiss_filter",
         default=0.1,
+        type=float,
         required=False,
         help="Filter: Maximum Genotype missingness for PCA eligibility",
     )
