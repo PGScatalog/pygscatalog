@@ -113,9 +113,8 @@ def run_intersect():
                         key = "{}:{}:{}:{}".format(v["#CHROM"], v["POS"], v["REF"], ALT)
                     else:
                         key = "{}:{}:{}:{}".format(v["#CHROM"], v["POS"], ALT, v["REF"])
-                    MAF = aaf2maf(ALT_FREQS[i])
                     target_heap.append(
-                        ([key, v["ID"], v["REF"]], [IS_MA_TARGET, MAF, F_MISS_DOSAGE])
+                        ([key, v["ID"], v["REF"]], [IS_MA_TARGET, ALT_FREQS[i], F_MISS_DOSAGE])
                     )
 
                 if count_var_t % 500000 == 0:
@@ -124,7 +123,7 @@ def run_intersect():
                     with open(tmppath.name, "wt") as outf:
                         o_tmp_t.append(tmppath.name)
                         outf.write(
-                            "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n"
+                            "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tAAF\tF_MISS_DOSAGE\n"
                         )
                         for i in range(len(target_heap)):
                             popped = heapq.heappop(target_heap)
@@ -138,7 +137,7 @@ def run_intersect():
             with open(tmppath.name, "wt") as outf:
                 o_tmp_t.append(tmppath.name)
                 outf.write(
-                    "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n"
+                    "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tAAF\tF_MISS_DOSAGE\n"
                 )
                 for i in range(len(target_heap)):
                     popped = heapq.heappop(target_heap)
@@ -149,7 +148,7 @@ def run_intersect():
         logger.info("Outputting TARGET variants -> target_variants.txt.gz")
         with xopen(outdir / "target_variants.txt.gz", "wt") as outf:
             outf.write(
-                "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tMAF\tF_MISS_DOSAGE\n"
+                "CHR:POS:A0:A1\tID_TARGET\tREF_TARGET\tIS_MA_TARGET\tAAF\tF_MISS_DOSAGE\n"
             )
             for v in heapq.merge(*[read_var_general(x) for x in o_tmp_t],
                                  key=lambda v: (v['CHR:POS:A0:A1'], v['ID_TARGET'], v['REF_TARGET'])):
@@ -177,7 +176,7 @@ def run_intersect():
 
                 PCA_ELIGIBLE = (
                         PCA_ELIGIBLE
-                        and (float(vmatch["MAF"]) > args.maf_filter)
+                        and (aaf2maf(float(vmatch["AAF"])) > args.maf_filter)
                         and (float(vmatch["F_MISS_DOSAGE"]) < args.vmiss_filter)
                 )
                 vmatch["PCA_ELIGIBLE"] = PCA_ELIGIBLE
