@@ -1,5 +1,4 @@
 import argparse
-import concurrent.futures
 import json
 import logging
 import pathlib
@@ -7,9 +6,9 @@ import sys
 import textwrap
 
 from tqdm import tqdm
-from ..lib import GenomeBuild, ScoringFile
+from pgscatalog.core import GenomeBuild, ScoringFile
 
-from ._combine import normalise, get_variant_log, TextFileWriter
+from pgscatalog.core.cli._combine import get_variant_log, TextFileWriter
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ def run():
             compress_output = False
 
     paths = list(set(args.scorefiles))  # unique paths only
-    scoring_files = [ScoringFile(x) for x in paths]
+    scoring_files = sorted([ScoringFile(x) for x in paths], key=lambda x: x.pgs_id)
     target_build = GenomeBuild.from_string(args.target_build)
 
     for x in scoring_files:
@@ -62,26 +61,15 @@ def run():
     else:
         liftover_kwargs = {"liftover": False}
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = []
-        for scorefile in scoring_files:
-            logger.info(f"Submitting {scorefile!r} for execution")
-            futures.append(
-                executor.submit(
-                    normalise,
-                    scorefile,
-                    drop_missing=args.drop_missing,
-                    **liftover_kwargs,
-                )
-            )
-        # TODO: do this I/O asynchronously
-        for future in tqdm(
-            concurrent.futures.as_completed(futures), total=len(futures)
-        ):
-            writer = TextFileWriter(compress=compress_output, filename=out_path)
-            normalised_score = future.result()
-            writer.write(normalised_score)
-            variant_log.append(get_variant_log(normalised_score))
+    for scorefile in tqdm(scoring_files, total=len(scoring_files)):
+        logger.info(f"Processing {scorefile.pgs_id}")
+        normalised_score = scorefile.normalise(
+            drop_missing=args.drop_missing, **liftover_kwargs
+        )
+        # TODO: go back to concurrent execution + write to multiple files
+        writer = TextFileWriter(compress=compress_output, filename=out_path)
+        writer.write(normalised_score)
+        variant_log.append(get_variant_log(normalised_score))
 
     score_log = []
     for sf, log in zip(scoring_files, variant_log, strict=True):
