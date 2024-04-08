@@ -63,8 +63,8 @@ def run():
 
     for scorefile in tqdm(scoring_files, total=len(scoring_files)):
         logger.info(f"Processing {scorefile.pgs_id}")
-        normalised_score = scorefile.normalise(
-            drop_missing=args.drop_missing, **liftover_kwargs
+        normalised_score = list(
+            scorefile.normalise(drop_missing=args.drop_missing, **liftover_kwargs)
         )
         # TODO: go back to concurrent execution + write to multiple files
         writer = TextFileWriter(compress=compress_output, filename=out_path)
