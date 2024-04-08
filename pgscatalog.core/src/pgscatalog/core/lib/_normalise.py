@@ -187,11 +187,15 @@ def assign_effect_type(variants):
     """
     for variant in variants:
         match (variant.is_recessive, variant.is_dominant):
-            case (None, None) | (False, False):
-                pass  # default value is additive, pass to break match and yield
-            case (False, True):
+            case (None, None) | (False, False) | (None, False) | (False, None):
+                # none is OK because is_recessive or is_dominant column may be missing
+                # default value is already set to additive, so just yield the variant
+                pass
+            case (False, True) | (None, True):
+                # none is OK because is_recessive column may be missing
                 variant.effect_type = EffectType.DOMINANT
-            case (True, False):
+            case (True, False) | (True, None):
+                # none is OK because is_dominant column may be missing
                 variant.effect_type = EffectType.RECESSIVE
             case _:
                 logger.critical(f"Bad effect type setting: {variant}")
