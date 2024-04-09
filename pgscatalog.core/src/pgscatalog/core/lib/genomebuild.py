@@ -13,6 +13,7 @@ class GenomeBuild(enum.Enum):
     GRCh38 = "GRCh38"
     # just included to handle older files, incompatible unless harmonised:
     NCBI36 = "NCBI36"  # ew
+    NCBI35 = "NCBI35"  # huh
 
     def __str__(self):
         return str(self.value)
@@ -47,5 +48,7 @@ class GenomeBuild(enum.Enum):
                 return None
             case "NCBI36" | "hg18":
                 return cls(GenomeBuild.NCBI36)
+            case "NCBI35" | "hg17":
+                return cls(GenomeBuild.NCBI35)
             case _:
                 raise ValueError(f"Can't match {build=}")

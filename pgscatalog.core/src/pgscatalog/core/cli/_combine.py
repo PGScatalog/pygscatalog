@@ -13,20 +13,6 @@ from ..lib.scorevariant import ScoreVariant
 logger = logging.getLogger(__name__)
 
 
-def normalise(
-    scoring_file, liftover=False, drop_missing=False, chain_dir=None, target_build=None
-):
-    """Normalise all rows in a scoring file"""
-    return list(
-        scoring_file.normalise(
-            liftover=liftover,
-            drop_missing=drop_missing,
-            chain_dir=chain_dir,
-            target_build=target_build,
-        )
-    )
-
-
 def get_variant_log(batch):
     # these statistics can only be generated while iterating through variants
     n_variants = collections.Counter("n_variants" for item in batch)
