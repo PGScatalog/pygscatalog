@@ -1,5 +1,6 @@
 """This module contains classes that compose a ScoreVariant: a variant in a PGS
 Catalog Scoring File."""
+
 from enum import Enum
 from typing import Optional
 

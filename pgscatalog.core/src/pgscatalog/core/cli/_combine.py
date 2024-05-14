@@ -1,6 +1,7 @@
-""" This module contains functions useful for normalising scoring files into a
+"""This module contains functions useful for normalising scoring files into a
 standardised format, combining them, and calculating some statistics. Only really
 useful for the CLI, not good for importing elsewhere."""
+
 import collections
 import csv
 import functools

@@ -1,4 +1,4 @@
-""" This module managers global package configuration"""
+"""This module managers global package configuration"""
 
 import importlib.metadata
 import pathlib

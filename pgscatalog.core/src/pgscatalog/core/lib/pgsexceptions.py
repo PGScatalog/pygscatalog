@@ -1,4 +1,4 @@
-""" This module defines a custom PGS exception hierarchy.
+"""This module defines a custom PGS exception hierarchy.
 
 This module overrides sys.excepthook. Uncaught exceptions are intercepted,
 and ``sys.exit()`` is called with a custom code. This can be helpful to debug
@@ -43,6 +43,7 @@ The hierarchy:
     - SamplesheetFormatError
 
 """
+
 import sys
 from types import MappingProxyType
 

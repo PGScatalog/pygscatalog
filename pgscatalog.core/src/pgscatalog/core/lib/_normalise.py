@@ -1,4 +1,4 @@
-""" This module contains a data processing pipeline to format ScoreVariants in a
+"""This module contains a data processing pipeline to format ScoreVariants in a
 standard way. Each step in the data processing pipeline is a generator that operates
 on a list of ScoreVariants and yields updated ScoreVariants. This makes it easy to
 plug in extra steps where needed, and lazily works on millions of objects."""

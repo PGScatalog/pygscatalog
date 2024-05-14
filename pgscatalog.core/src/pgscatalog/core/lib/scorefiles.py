@@ -1,6 +1,7 @@
-""" This module contains classes to compose and contain a ``ScoringFile``: a file
+"""This module contains classes to compose and contain a ``ScoringFile``: a file
 in the PGS Catalog that contains a list of genetic variants and their effect weights.
 Scoring files are used to calculate PGS for new target genomes."""
+
 import csv
 import itertools
 import logging
