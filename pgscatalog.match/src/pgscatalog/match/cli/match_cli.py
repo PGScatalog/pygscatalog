@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 
 def _exit(cleanup):
     if cleanup:
-        shutil.rmtree(Config.TMPDIR)
-        shutil.rmtree(Config.MATCHTMP)
+        if Config.TMPDIR and Config.TMPDIR.exists():
+            shutil.rmtree(Config.TMPDIR)
+        if Config.MATCHTMP and Config.MATCHTMP.exists():
+            shutil.rmtree(Config.MATCHTMP)
 
 
 def run_match():
