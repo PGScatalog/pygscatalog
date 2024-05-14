@@ -18,3 +18,5 @@ __all__ = [
     "PlinkScoreFiles",
     "match_variants",
 ]
+
+__version__ = "0.1.1"
