@@ -105,6 +105,12 @@ def test_strict_match(tmp_path_factory, good_scorefile, good_variants):
         with patch("sys.argv", flargs):
             run_match()
 
+    assert (outdir / "test_log.csv.gz").exists()
+    assert (outdir / "test_summary.csv").exists()
+    assert not (outdir / "test_ALL_recessive_0.scorefile.gz").exists()
+    assert not (outdir / "test_ALL_dominant_0.scorefile.gz").exists()
+    assert not (outdir / "test_ALL_additive_0.scorefile.gz").exists()
+
 
 def test_match_fail(tmp_path_factory, bad_scorefile, good_variants):
     """Test trying to match when no variants intersect"""

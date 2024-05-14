@@ -6,6 +6,8 @@ It expects Config class attributes to be set up before being called
 import gzip
 import itertools
 
+from pgscatalog.core import MatchRateError
+
 from ..lib.plinkscorefiles import PlinkScoreFiles
 
 from ._config import Config
@@ -13,31 +15,36 @@ from ._config import Config
 
 def write_matches(matchresults, score_df):
     """Write matchresults out to scoring files and logs"""
-    match (Config.SPLIT, Config.COMBINED):
-        case (True, True):
-            # requires extra work: first write split
-            outfs = matchresults.write_scorefiles(
-                directory=Config.OUTDIR,
-                split=True,
-                score_df=score_df,
-                min_overlap=Config.MIN_OVERLAP,
-                **Config.MATCH_PARAMS,
-            )
-            # now re-combine without recomputing matches
-            PlinkScoreFiles(*list(itertools.chain(*outfs))).merge(Config.OUTDIR)
-        case (True, False) | (False, True):
-            # split parameter can handle this case OK
-            _ = matchresults.write_scorefiles(
-                directory=Config.OUTDIR,
-                split=Config.SPLIT,
-                score_df=score_df,
-                min_overlap=Config.MIN_OVERLAP,
-                **Config.MATCH_PARAMS,
-            )
-        case _:
-            raise ValueError
-
-    write_log(matchresults=matchresults, score_df=score_df)
+    try:
+        match (Config.SPLIT, Config.COMBINED):
+            case (True, True):
+                # requires extra work: first write split
+                outfs = matchresults.write_scorefiles(
+                    directory=Config.OUTDIR,
+                    split=True,
+                    score_df=score_df,
+                    min_overlap=Config.MIN_OVERLAP,
+                    **Config.MATCH_PARAMS,
+                )
+                # now re-combine without recomputing matches
+                PlinkScoreFiles(*list(itertools.chain(*outfs))).merge(Config.OUTDIR)
+            case (True, False) | (False, True):
+                # split parameter can handle this case OK
+                _ = matchresults.write_scorefiles(
+                    directory=Config.OUTDIR,
+                    split=Config.SPLIT,
+                    score_df=score_df,
+                    min_overlap=Config.MIN_OVERLAP,
+                    **Config.MATCH_PARAMS,
+                )
+            case _:
+                raise ValueError
+    except MatchRateError as e:
+        # write logs in case of errors
+        write_log(matchresults=matchresults, score_df=score_df)
+        raise e
+    else:
+        write_log(matchresults=matchresults, score_df=score_df)
 
     # returns labelled and filtered data for checking after merging
     return matchresults.df
