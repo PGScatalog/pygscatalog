@@ -73,12 +73,11 @@ def test_only_match(tmp_path_factory, good_scorefile, good_variants):
     ]
     flargs = list(itertools.chain(*args))
 
-    with pytest.raises(SystemExit):
-        with patch("sys.argv", flargs):
-            run_match()
+    with patch("sys.argv", flargs):
+        run_match()
 
     # arrow IPC files have been written
-    assert len(os.listdir(outdir / "matchtmp")) == 1
+    assert "0.ipc.zst" in os.listdir(outdir)
 
 
 def test_strict_match(tmp_path_factory, good_scorefile, good_variants):

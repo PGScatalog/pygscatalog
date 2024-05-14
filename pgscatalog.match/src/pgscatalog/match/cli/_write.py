@@ -13,9 +13,6 @@ from ._config import Config
 
 def write_matches(matchresults, score_df):
     """Write matchresults out to scoring files and logs"""
-    # write logs first, in case exceptions are raised when writing out scoring files
-    write_log(matchresults=matchresults, score_df=score_df)
-
     match (Config.SPLIT, Config.COMBINED):
         case (True, True):
             # requires extra work: first write split
@@ -39,6 +36,8 @@ def write_matches(matchresults, score_df):
             )
         case _:
             raise ValueError
+
+    write_log(matchresults=matchresults, score_df=score_df)
 
     # returns labelled and filtered data for checking after merging
     return matchresults.df
