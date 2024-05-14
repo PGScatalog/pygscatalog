@@ -1,5 +1,6 @@
-""" This module contains the PlinkScoreFiles class, which represents one or more
+"""This module contains the PlinkScoreFiles class, which represents one or more
 scoring files ready to be used with plink2 --score"""
+
 import collections.abc
 import gzip
 import io

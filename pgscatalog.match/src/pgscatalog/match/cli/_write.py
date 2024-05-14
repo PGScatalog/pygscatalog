@@ -1,7 +1,8 @@
-""" This module contains internal functions for writing match results to scoring files and logs
+"""This module contains internal functions for writing match results to scoring files and logs
 
 It expects Config class attributes to be set up before being called
 """
+
 import gzip
 import itertools
 

@@ -1,6 +1,7 @@
-""" This module contains internal classes that store matched variants and format them
+"""This module contains internal classes that store matched variants and format them
 to be compatible with plink2 --score
 """
+
 import collections.abc
 import gzip
 import pathlib

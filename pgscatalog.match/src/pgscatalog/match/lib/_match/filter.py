@@ -1,4 +1,5 @@
-""" This module contains functions to filter match candidates and report overall match rates"""
+"""This module contains functions to filter match candidates and report overall match rates"""
+
 import logging
 
 import polars as pl

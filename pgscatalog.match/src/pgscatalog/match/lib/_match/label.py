@@ -1,4 +1,4 @@
-""" This module labels match candidates with various flag columns, with the aim of
+"""This module labels match candidates with various flag columns, with the aim of
 producing a final set of best match candidates (one maximum for each variant).
 
 These operations are all quite data-framey and involve calculating a horizontal
