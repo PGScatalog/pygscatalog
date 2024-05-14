@@ -20,3 +20,5 @@ __all__ = [
     "AdjustArguments",
     "AdjustResults",
 ]
+
+__version__ = "0.1.1"
