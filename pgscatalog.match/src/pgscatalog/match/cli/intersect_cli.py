@@ -32,7 +32,7 @@ def run_intersect():
     o_tmp_r = []
     logger.info("Reading REFERENCE variants: {}".format(args.reference))
     ref_heap = []
-    ref_pvar = read_var_general(outdir / args.reference, chrom=args.filter_chrom)
+    ref_pvar = read_var_general(args.reference, chrom=args.filter_chrom)
     for v in ref_pvar:
         count_var_r += 1
         ALTs = v["ALT"].split(",")
