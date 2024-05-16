@@ -1,3 +1,4 @@
+import csv
 import itertools
 import os
 from unittest.mock import patch
@@ -20,6 +21,49 @@ def bad_scorefile(request):
 @pytest.fixture(scope="module")
 def good_variants(request):
     return request.path.parent / "data" / "good_match.pvar"
+
+
+@pytest.fixture(scope="module")
+def multiallelic_variants(request):
+    return request.path.parent / "data" / "multiallelic.pvar"
+
+
+def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):
+    outdir = tmp_path_factory.mktemp("outdir")
+
+    args = [
+        (
+            "pgscatalog-match",
+            "-d",
+            "test",
+            "-s",
+            str(good_scorefile),
+            "-t",
+            str(multiallelic_variants),
+            "--outdir",
+            str(outdir),
+            "--keep_multiallelic",
+            "--min_overlap",
+            "0.75",
+        )
+    ]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run_match()
+
+    assert (outdir / "test_summary.csv").exists()
+
+    # test multiallelic matches happened
+    with open(outdir / "test_summary.csv") as f:
+        reader = csv.DictReader(f)
+        log = list(reader)
+
+    assert any({"is_multiallelic": "true"}.items() <= x.items() for x in log)
+    assert (outdir / "test_log.csv.gz").exists()
+    assert (outdir / "test_ALL_recessive_0.scorefile.gz").exists()
+    assert (outdir / "test_ALL_dominant_0.scorefile.gz").exists()
+    assert (outdir / "test_ALL_additive_0.scorefile.gz").exists()
 
 
 def test_match(tmp_path_factory, good_scorefile, good_variants):
