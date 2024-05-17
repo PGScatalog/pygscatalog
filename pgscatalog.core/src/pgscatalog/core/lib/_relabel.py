@@ -17,7 +17,7 @@ def _read_map(in_map, col_from, col_to):
     mapping = {}
     logger.debug(f"Reading map {in_map}")
     with xopen(in_map) as map_f:
-        reader = csv.DictReader(map_f, delimiter=" ")
+        reader = csv.DictReader(map_f, delimiter="\t")
         for line in reader:
             mapping[line[col_from]] = line[col_to]
 
