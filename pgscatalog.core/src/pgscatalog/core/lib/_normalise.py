@@ -211,7 +211,7 @@ def remap_harmonised(variants, harmonised, target_build):
     Perhaps authors submitted rsID and effect allele originally:
 
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "hm_chr": 1, "hm_pos": 100, "hm_inferOtherAllele": "A"})
-    >>> list(remap_harmonised([variant], harmonised=True)) # doctest: +ELLIPSIS
+    >>> list(remap_harmonised([variant], harmonised=True, target_build=GenomeBuild.GRCh38)) # doctest: +ELLIPSIS
     [ScoreVariant(...,chr_name=1,chr_position=100,...other_allele='A'...)]
     """
     if harmonised:

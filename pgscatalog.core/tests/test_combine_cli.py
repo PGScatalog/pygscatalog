@@ -99,7 +99,8 @@ def test_combine_score_harmonised(
         csv_reader = csv.DictReader(f, delimiter="\t")
         results = list(csv_reader)
 
-    pgs = collections.Counter([x["accession"] for x in results])
+    # split to remove harmonisation suffix hmPOS_GRCh3X
+    pgs = collections.Counter([x["accession"].split("_")[0] for x in results])
     assert pgs == n_variants
     assert all([expected_fields == tuple(variant.keys()) for variant in results])
 
