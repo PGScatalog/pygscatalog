@@ -39,7 +39,7 @@ def normalise(
     else:
         variants = scoring_file.variants
 
-    variants = remap_harmonised(variants, scoring_file.harmonised)
+    variants = remap_harmonised(variants, scoring_file.harmonised, target_build)
     variants = check_bad_variant(variants, drop_missing)
 
     if drop_missing:
@@ -203,7 +203,7 @@ def assign_effect_type(variants):
         yield variant
 
 
-def remap_harmonised(variants, harmonised):
+def remap_harmonised(variants, harmonised, target_build):
     """
     Overwrite key attributes with harmonised data, if available.
 
@@ -223,6 +223,8 @@ def remap_harmonised(variants, harmonised):
             variant.chr_position = variant.hm_pos
             if variant.other_allele is None:
                 variant.other_allele = variant.hm_inferOtherAllele
+            # update the accession to reflect the harmonised data
+            variant.accession = f"{variant.accession}_hmPOS_{str(target_build)}"
             yield variant
     else:
         for variant in variants:

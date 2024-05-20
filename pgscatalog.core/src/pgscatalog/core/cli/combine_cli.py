@@ -56,7 +56,6 @@ def run():
         liftover_kwargs = {
             "liftover": True,
             "chain_dir": chain_dir,
-            "target_build": target_build,
         }
     else:
         liftover_kwargs = {"liftover": False}
@@ -64,7 +63,11 @@ def run():
     for scorefile in tqdm(scoring_files, total=len(scoring_files)):
         logger.info(f"Processing {scorefile.pgs_id}")
         normalised_score = list(
-            scorefile.normalise(drop_missing=args.drop_missing, **liftover_kwargs)
+            scorefile.normalise(
+                drop_missing=args.drop_missing,
+                **liftover_kwargs,
+                target_build=target_build,
+            )
         )
         # TODO: go back to concurrent execution + write to multiple files
         writer = TextFileWriter(compress=compress_output, filename=out_path)
