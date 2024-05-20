@@ -14,7 +14,12 @@ def scorefiles(request):
     return glob.glob(str(basedir / "hgdp*.zst"))
 
 
-def test_split_aggregate(tmp_path_factory, scorefiles):
+@pytest.fixture(scope="module")
+def expected_output_columns():
+    return ["sampleset", "IID", "DENOM", "PGS", "SUM", "AVG"]
+
+
+def test_split_aggregate(tmp_path_factory, scorefiles, expected_output_columns):
     """Test aggregating HGDP PGS01229"""
     outdir = tmp_path_factory.mktemp("outdir")
 
@@ -29,11 +34,11 @@ def test_split_aggregate(tmp_path_factory, scorefiles):
     outf = list(outdir.glob("*.txt.gz"))
     assert [x.name for x in outf] == ["hgdp_pgs.txt.gz"]
     outdf = pd.read_csv(outf[0], sep="\t")
-    assert list(outdf.columns) == ["sampleset", "IID", "DENOM", "PGS", "SUM"]
-    assert outdf.shape == (929, 5)
+    assert list(outdf.columns) == expected_output_columns
+    assert outdf.shape == (929, len(expected_output_columns))
 
 
-def test_nosplit_aggregate(tmp_path_factory, scorefiles):
+def test_nosplit_aggregate(tmp_path_factory, scorefiles, expected_output_columns):
     """Test aggregating HGDP PGS01229 without splitting per sampleset"""
     outdir = tmp_path_factory.mktemp("outdir")
 
@@ -55,5 +60,5 @@ def test_nosplit_aggregate(tmp_path_factory, scorefiles):
     outf = list(outdir.glob("*.txt.gz"))
     assert [x.name for x in outf] == ["aggregated_scores.txt.gz"]
     outdf = pd.read_csv(outf[0], sep="\t")
-    assert list(outdf.columns) == ["sampleset", "IID", "DENOM", "PGS", "SUM"]
-    assert outdf.shape == (929, 5)
+    assert list(outdf.columns) == expected_output_columns
+    assert outdf.shape == (929, len(expected_output_columns))
