@@ -41,6 +41,12 @@ def run_merge():
     Config.SPLIT = args.split
     Config.COMBINED = args.combined
 
+    # parameters that control how the best match candidate is chosen
+    # missing parameters will be set to defaults specified in matchlib
+    Config.MATCH_PARAMS = {
+        k: v for k in Config.MATCH_KWARGS if (v := getattr(args, k)) is not None
+    }
+
     with ScoringFileFrame(
         path=Config.SCOREFILE,
         chrom=None,  # when merging, scoring files can't be filtered
