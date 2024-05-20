@@ -315,7 +315,7 @@ def _label_filter(df: pl.LazyFrame, filter_IDs: pathlib.Path) -> pl.LazyFrame:
         )
         df = df.with_columns(pl.col("ID").is_in(filt_series).alias("match_IDs"))
         return df.with_columns(
-            pl.when(pl.col("match_IDs"))
+            pl.when(~pl.col("match_IDs"))
             .then(True)
             .otherwise(pl.col("exclude"))
             .alias("exclude")

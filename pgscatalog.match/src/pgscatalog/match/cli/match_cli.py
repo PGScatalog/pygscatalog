@@ -113,6 +113,7 @@ def run_match():
         else:
             matchresults = MatchResults(*matchresults)
             _ = write_matches(matchresults=matchresults, score_df=score_df)
+    logger.info("finished matching :)")
 
 
 def get_match_candidates(target, score_df, chrom, dataset, **kwargs):
