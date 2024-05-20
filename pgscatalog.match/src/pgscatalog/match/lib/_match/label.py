@@ -10,6 +10,7 @@ import logging
 import pathlib
 
 import polars as pl
+from xopen import xopen
 
 from .preprocess import complement_valid_alleles
 
@@ -305,7 +306,7 @@ def _label_flips(df: pl.LazyFrame, skip_flip: bool) -> pl.LazyFrame:
 def _label_filter(df: pl.LazyFrame, filter_IDs: pathlib.Path) -> pl.LazyFrame:
     if filter_IDs is not None:
         logger.debug("Reading filter file (variant IDs)")
-        with open(filter_IDs, "r") as f:
+        with xopen(filter_IDs, "r") as f:
             filt_series = pl.Series([line.strip() for line in f], dtype=pl.Utf8)
 
         nIDs = len(filt_series)
