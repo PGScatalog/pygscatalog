@@ -83,6 +83,10 @@ class PlinkFrames(collections.abc.Sequence):
         plinkframes = []
         for effect_type, dataframes in effect_types.items():
             for i, df in enumerate(dataframes):
-                plinkframes.append(PlinkFrame(effect_type=effect_type, n=i, df=df))
+                df = df.collect()
+                if not df.is_empty():
+                    plinkframes.append(
+                        PlinkFrame(effect_type=effect_type, n=i, df=df.lazy())
+                    )
 
         return cls(*plinkframes)
