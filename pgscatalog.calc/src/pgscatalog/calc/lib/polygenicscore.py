@@ -383,15 +383,29 @@ class PolygenicScore:
     def write(self, outdir, split=False, melt=True):
         """Write PGS to a compressed TSV"""
         outdir = pathlib.Path(outdir)
-        for chunk in self:
-            if melt:
-                chunk = _melt(chunk, "SUM")
+        for i, chunk in enumerate(self):
+            chunk = PolygenicScore(df=chunk, sampleset=self.sampleset)
 
+            if melt:
+                logger.info(f"Melting chunk {i}")
+                chunk = chunk.melt()
+            else:
+                logger.info(f"Preparing chunk {i}")
+                # don't do anything, just materialise the df generator
+                chunk = pd.concat(chunk.df, axis=0)
+
+            logger.info(f"Writing chunk {i}")
             if split:
+                if i == 0:
+                    logger.info("Writing results split by sampleset")
+
                 for sampleset, group in chunk.groupby("sampleset"):
                     fout = outdir / f"{sampleset}_pgs.txt.gz"
                     chunk.to_csv(fout, sep="\t", compression="gzip", mode="a")
             else:
+                if i == 0:
+                    logger.info("Writing combined results (aggregated_scores.txt.gz)")
+
                 fout = outdir / "aggregated_scores.txt.gz"
                 chunk.to_csv(fout, sep="\t", compression="gzip", mode="a")
 
