@@ -49,9 +49,10 @@ def run_match():
     if not Config.OUTDIR.exists():
         raise FileNotFoundError(f"{Config.OUTDIR} does not exist")
 
-    if clean := Config.CLEANUP:
+    atexit.register(_exit, cleanup=Config.CLEANUP)
+
+    if Config.CLEANUP:
         logger.info("--cleanup set (default), temporary files will be deleted")
-        atexit.register(_exit, cleanup=clean)
     else:
         logger.info("--no-cleanup set, temporary files won't be deleted")
 
