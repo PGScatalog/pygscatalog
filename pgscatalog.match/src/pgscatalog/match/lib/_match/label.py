@@ -7,6 +7,7 @@ in an exclude column.
 """
 
 import logging
+import pathlib
 
 import polars as pl
 
@@ -301,13 +302,17 @@ def _label_flips(df: pl.LazyFrame, skip_flip: bool) -> pl.LazyFrame:
         return df.with_columns(match_IDs=pl.lit("NA"))
 
 
-def _label_filter(df: pl.LazyFrame, filter_IDs: list) -> pl.LazyFrame:
+def _label_filter(df: pl.LazyFrame, filter_IDs: pathlib.Path) -> pl.LazyFrame:
     if filter_IDs is not None:
-        nIDs = len(filter_IDs)
+        logger.debug("Reading filter file (variant IDs)")
+        with open(filter_IDs, "r") as f:
+            filt_series = pl.Series([line.strip() for line in f], dtype=pl.Utf8)
+
+        nIDs = len(filt_series)
         logger.debug(
             "Excluding variants that are not in ID list (read {} IDs)".format(nIDs)
         )
-        df = df.with_columns(pl.col("ID").is_in(filter_IDs).alias("match_IDs"))
+        df = df.with_columns(pl.col("ID").is_in(filt_series).alias("match_IDs"))
         return df.with_columns(
             pl.when(pl.col("match_IDs"))
             .then(True)
@@ -315,4 +320,5 @@ def _label_filter(df: pl.LazyFrame, filter_IDs: list) -> pl.LazyFrame:
             .alias("exclude")
         )
     else:
+        logger.info("--filter_IDs not set, skipping filtering")
         return df
