@@ -427,7 +427,9 @@ class PolygenicScore:
         """Melt dataframe from wide format to long format"""
         sum_df = _melt(pd.concat(self.df, axis=0), value_name="SUM")
         avg_df = _melt(self.average(), value_name="AVG")
-        return pd.concat([sum_df, avg_df.AVG], axis=1)
+        df = pd.concat([sum_df, avg_df.AVG], axis=1)
+        # melted chunks need a consistent column order
+        return df[["PGS", "SUM", "DENOM", "AVG"]]
 
 
 def _select_agg_cols(cols):
