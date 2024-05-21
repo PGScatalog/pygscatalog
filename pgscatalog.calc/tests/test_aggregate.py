@@ -16,7 +16,7 @@ def scorefiles(request):
 
 @pytest.fixture(scope="module")
 def expected_output_columns():
-    return ["sampleset", "IID", "DENOM", "PGS", "SUM", "AVG"]
+    return ["sampleset", "IID", "PGS", "SUM", "DENOM", "AVG"]
 
 
 def test_split_aggregate(tmp_path_factory, scorefiles, expected_output_columns):
