@@ -355,65 +355,59 @@ xml = ["lxml (>=4.9.2)"]
 
 [[package]]
 name = "pgscatalog-calc"
-version = "0.1.0"
+version = "0.1.1"
 description = "Libraries and applications for working with calculated polygenic scores"
 optional = false
-python-versions = "^3.11"
-files = []
-develop = false
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "pgscatalog_calc-0.1.1-py3-none-any.whl", hash = "sha256:c24ed1a9a26e31252c6c34a568d83983c5fbb79e9d5a578b2ca1fc46b0bad112"},
+    {file = "pgscatalog_calc-0.1.1.tar.gz", hash = "sha256:c91d62ae0ec888f55b8c3765133bea9e324d4b2bc30db2480bf30ab352665045"},
+]
 
 [package.dependencies]
-numpy = "^1.26.4"
-pandas = "^2.2.0"
-"pgscatalog.core" = "^0.1.0"
-pyarrow = "^15.0.0"
-scikit-learn = "^1.4.0"
-scipy = "^1.12.0"
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.calc"
+numpy = ">=1.26.4,<2.0.0"
+pandas = ">=2.2.0,<3.0.0"
+"pgscatalog.core" = ">=0.1.0,<0.2.0"
+pyarrow = ">=15.0.0,<16.0.0"
+scikit-learn = ">=1.4.0,<2.0.0"
+scipy = ">=1.12.0,<2.0.0"
 
 [[package]]
 name = "pgscatalog-core"
-version = "0.1.1"
+version = "0.1.2"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
-python-versions = "^3.11"
-files = []
-develop = false
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "pgscatalog_core-0.1.2-py3-none-any.whl", hash = "sha256:45bd0f2d807ae47efc4fbe59e49e43cd30be999ccdf893135cb6fbae2aad3228"},
+    {file = "pgscatalog_core-0.1.2.tar.gz", hash = "sha256:3a7428a4a78642f87f1a9da140a9e7e47e1b9c98100834c7c1033481f535e3bf"},
+]
 
 [package.dependencies]
-httpx = "^0.26.0"
-pyliftover = "^0.4"
-tenacity = "^8.2.3"
-tqdm = "^4.66.1"
-xopen = {version = "^1.8.0", extras = ["zstd"]}
+httpx = ">=0.26.0,<0.27.0"
+pyliftover = ">=0.4,<0.5"
+tenacity = ">=8.2.3,<9.0.0"
+tqdm = ">=4.66.1,<5.0.0"
+xopen = {version = ">=1.8.0,<2.0.0", extras = ["zstd"]}
 
 [package.extras]
 pyarrow = ["pyarrow (>=15.0.0,<16.0.0)"]
 
-[package.source]
-type = "directory"
-url = "../pgscatalog.core"
-
 [[package]]
 name = "pgscatalog-match"
-version = "0.1.0"
+version = "0.1.1"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 optional = false
-python-versions = "^3.11"
-files = []
-develop = false
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "pgscatalog_match-0.1.1-py3-none-any.whl", hash = "sha256:c72dce6e12b271b4ebe620a2e462088b4267cb6e59114b74072f23b2af780fc9"},
+    {file = "pgscatalog_match-0.1.1.tar.gz", hash = "sha256:4c81f73dedc08a18c6bc0b5be965d29045e39399f7b889ff18334ac5742da037"},
+]
 
 [package.dependencies]
-"pgscatalog.core" = "^0.1.0"
-polars = "^0.20.5"
-pyarrow = "^15.0.0"
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.match"
+"pgscatalog.core" = ">=0.1.0,<0.2.0"
+polars = ">=0.20.5,<0.21.0"
+pyarrow = ">=15.0.0,<16.0.0"
 
 [[package]]
 name = "polars"
@@ -847,4 +841,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "8091d82d9f8fe84c06ccf023972e8bc07a8101105e99ac4649c72505d5d63f17"
+content-hash = "d1ff38e16d7c61e2dcdfc31f62a8919f06f5710a02fc92177f6c02662e475c95"
