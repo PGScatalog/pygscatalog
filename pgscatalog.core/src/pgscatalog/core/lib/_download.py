@@ -1,6 +1,7 @@
-""" This module contains functions that simplify downloading data from the PGS Catalog.
+"""This module contains functions that simplify downloading data from the PGS Catalog.
 HTTPS download is preferred, with FTP fallback available.
 """
+
 import hashlib
 import logging
 import os

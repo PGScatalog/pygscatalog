@@ -256,12 +256,6 @@ class MatchResults(collections.abc.Sequence):
         if not self._filtered:
             _ = self.filter(score_df=score_df, min_overlap=min_overlap)
 
-        if not all(x[1] for x in self.filter_summary.iter_rows()):
-            logger.warning(f"{self.filter_summary}")
-            raise MatchRateError(
-                f"All scores fail to meet match threshold {min_overlap}"
-            )
-
         # a summary log contains up to one variant (the best match) for each variant
         # in the scoring file
         self.summary_log = make_summary_log(
@@ -282,6 +276,17 @@ class MatchResults(collections.abc.Sequence):
 
         # collect after joining in check_log_count (can't join df and lazy df)
         self.summary_log = self.summary_log.collect()
+
+        # error at the end, to allow logs to be generated
+        if not all(x[1] for x in self.filter_summary.iter_rows()):
+            logger.warning(f"{self.filter_summary}")
+            [
+                x.unlink() for xs in outfs for x in xs
+            ]  # don't provide dodgy scoring files
+            raise MatchRateError(
+                f"All scores fail to meet match threshold {min_overlap}"
+            )
+
         return outfs
 
     def full_variant_log(self, score_df, **kwargs):

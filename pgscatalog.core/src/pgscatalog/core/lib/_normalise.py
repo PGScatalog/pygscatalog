@@ -1,4 +1,4 @@
-""" This module contains a data processing pipeline to format ScoreVariants in a
+"""This module contains a data processing pipeline to format ScoreVariants in a
 standard way. Each step in the data processing pipeline is a generator that operates
 on a list of ScoreVariants and yields updated ScoreVariants. This makes it easy to
 plug in extra steps where needed, and lazily works on millions of objects."""
@@ -39,7 +39,7 @@ def normalise(
     else:
         variants = scoring_file.variants
 
-    variants = remap_harmonised(variants, scoring_file.harmonised)
+    variants = remap_harmonised(variants, scoring_file.harmonised, target_build)
     variants = check_bad_variant(variants, drop_missing)
 
     if drop_missing:
@@ -203,7 +203,7 @@ def assign_effect_type(variants):
         yield variant
 
 
-def remap_harmonised(variants, harmonised):
+def remap_harmonised(variants, harmonised, target_build):
     """
     Overwrite key attributes with harmonised data, if available.
 
@@ -211,7 +211,7 @@ def remap_harmonised(variants, harmonised):
     Perhaps authors submitted rsID and effect allele originally:
 
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "hm_chr": 1, "hm_pos": 100, "hm_inferOtherAllele": "A"})
-    >>> list(remap_harmonised([variant], harmonised=True)) # doctest: +ELLIPSIS
+    >>> list(remap_harmonised([variant], harmonised=True, target_build=GenomeBuild.GRCh38)) # doctest: +ELLIPSIS
     [ScoreVariant(...,chr_name=1,chr_position=100,...other_allele='A'...)]
     """
     if harmonised:
@@ -223,6 +223,8 @@ def remap_harmonised(variants, harmonised):
             variant.chr_position = variant.hm_pos
             if variant.other_allele is None:
                 variant.other_allele = variant.hm_inferOtherAllele
+            # update the accession to reflect the harmonised data
+            variant.accession = f"{variant.accession}_hmPOS_{str(target_build)}"
             yield variant
     else:
         for variant in variants:

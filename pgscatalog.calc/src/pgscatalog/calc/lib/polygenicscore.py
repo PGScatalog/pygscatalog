@@ -383,15 +383,29 @@ class PolygenicScore:
     def write(self, outdir, split=False, melt=True):
         """Write PGS to a compressed TSV"""
         outdir = pathlib.Path(outdir)
-        for chunk in self:
-            if melt:
-                chunk = _melt(chunk, "SUM")
+        for i, chunk in enumerate(self):
+            chunk = PolygenicScore(df=chunk, sampleset=self.sampleset)
 
+            if melt:
+                logger.info(f"Melting chunk {i}")
+                chunk = chunk.melt()
+            else:
+                logger.info(f"Preparing chunk {i}")
+                # don't do anything, just materialise the df generator
+                chunk = pd.concat(chunk.df, axis=0)
+
+            logger.info(f"Writing chunk {i}")
             if split:
+                if i == 0:
+                    logger.info("Writing results split by sampleset")
+
                 for sampleset, group in chunk.groupby("sampleset"):
                     fout = outdir / f"{sampleset}_pgs.txt.gz"
                     chunk.to_csv(fout, sep="\t", compression="gzip", mode="a")
             else:
+                if i == 0:
+                    logger.info("Writing combined results (aggregated_scores.txt.gz)")
+
                 fout = outdir / "aggregated_scores.txt.gz"
                 chunk.to_csv(fout, sep="\t", compression="gzip", mode="a")
 
@@ -413,7 +427,9 @@ class PolygenicScore:
         """Melt dataframe from wide format to long format"""
         sum_df = _melt(pd.concat(self.df, axis=0), value_name="SUM")
         avg_df = _melt(self.average(), value_name="AVG")
-        return pd.concat([sum_df, avg_df.AVG], axis=1)
+        df = pd.concat([sum_df, avg_df.AVG], axis=1)
+        # melted chunks need a consistent column order
+        return df[["PGS", "SUM", "DENOM", "AVG"]]
 
 
 def _select_agg_cols(cols):

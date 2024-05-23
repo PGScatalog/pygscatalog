@@ -73,3 +73,5 @@ __all__ = [
     "relabel",
     "relabel_write",
 ]
+
+__version__ = "0.1.2"

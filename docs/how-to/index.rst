@@ -10,5 +10,6 @@ These guides describe how to use pygscatalog CLI applications.
    guides/download
    guides/combine
    guides/match
+   guides/intersect
    guides/aggregate
    guides/ancestry

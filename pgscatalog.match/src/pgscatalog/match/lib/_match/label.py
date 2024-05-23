@@ -1,4 +1,4 @@
-""" This module labels match candidates with various flag columns, with the aim of
+"""This module labels match candidates with various flag columns, with the aim of
 producing a final set of best match candidates (one maximum for each variant).
 
 These operations are all quite data-framey and involve calculating a horizontal
@@ -7,8 +7,10 @@ in an exclude column.
 """
 
 import logging
+import pathlib
 
 import polars as pl
+from xopen import xopen
 
 from .preprocess import complement_valid_alleles
 
@@ -301,18 +303,23 @@ def _label_flips(df: pl.LazyFrame, skip_flip: bool) -> pl.LazyFrame:
         return df.with_columns(match_IDs=pl.lit("NA"))
 
 
-def _label_filter(df: pl.LazyFrame, filter_IDs: list) -> pl.LazyFrame:
+def _label_filter(df: pl.LazyFrame, filter_IDs: pathlib.Path) -> pl.LazyFrame:
     if filter_IDs is not None:
-        nIDs = len(filter_IDs)
+        logger.debug("Reading filter file (variant IDs)")
+        with xopen(filter_IDs, "r") as f:
+            filt_series = pl.Series([line.strip() for line in f], dtype=pl.Utf8)
+
+        nIDs = len(filt_series)
         logger.debug(
             "Excluding variants that are not in ID list (read {} IDs)".format(nIDs)
         )
-        df = df.with_columns(pl.col("ID").is_in(filter_IDs).alias("match_IDs"))
+        df = df.with_columns(pl.col("ID").is_in(filt_series).alias("match_IDs"))
         return df.with_columns(
-            pl.when(pl.col("match_IDs"))
+            pl.when(~pl.col("match_IDs"))
             .then(True)
             .otherwise(pl.col("exclude"))
             .alias("exclude")
         )
     else:
+        logger.info("--filter_IDs not set, skipping filtering")
         return df

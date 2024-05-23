@@ -1,4 +1,5 @@
-""" Classes and functions related to the PGS Catalog API """
+"""Classes and functions related to the PGS Catalog API"""
+
 import enum
 import logging
 

@@ -1,5 +1,6 @@
 """This module contains functions for reading data from PGS Catalog files.
-These functions aren't really meant to be imported outside corelib """
+These functions aren't really meant to be imported outside corelib"""
+
 import logging
 import pathlib
 

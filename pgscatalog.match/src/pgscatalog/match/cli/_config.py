@@ -1,4 +1,4 @@
-""" This module contains a simple class that stores CLI configuration as class attributes """
+"""This module contains a simple class that stores CLI configuration as class attributes"""
 
 
 class Config:

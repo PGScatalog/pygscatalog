@@ -1,6 +1,7 @@
-""" This module contains classes to work with target variants. When a scoring file is
+"""This module contains classes to work with target variants. When a scoring file is
 being reused to calculate scores for new genotypes, the new genotypes are target
 genomes."""
+
 import enum
 import csv
 import itertools

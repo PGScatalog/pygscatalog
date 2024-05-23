@@ -1,5 +1,6 @@
-""" This module contains the PlinkScoreFiles class, which represents one or more
+"""This module contains the PlinkScoreFiles class, which represents one or more
 scoring files ready to be used with plink2 --score"""
+
 import collections.abc
 import gzip
 import io
@@ -13,7 +14,7 @@ class PlinkScoreFiles(collections.abc.Sequence):
     """Represents a sequence of scoring files files written by :class:`MatchResults`"""
 
     def __init__(self, *elements):
-        self._elements = [pathlib.Path(x) for x in list(elements)]
+        self._elements = [pathlib.Path(x) for x in sorted(list(elements))]
 
     def __len__(self):
         return len(self._elements)

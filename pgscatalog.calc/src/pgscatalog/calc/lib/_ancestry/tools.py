@@ -339,10 +339,10 @@ def pgs_adjust(
         results_models = {}
 
         # Check that PGS has variance (e.g. not all 0)
-        if 0 in [np.var(results_ref[sum_col]), np.var(results_target[sum_col])]:
+        if np.var(results_ref[sum_col]) == 0:
             scorecols_drop.add(c_pgs)
             logger.warning(
-                "Skipping adjustment: {} has 0 variance in PGS SUM".format(c_pgs)
+                "Skipping adjustment: {} has 0 variance in PGS SUM [REFERENCE]".format(c_pgs)
             )
 
     # Report PGS values with respect to distribution of PGS in the most similar reference population

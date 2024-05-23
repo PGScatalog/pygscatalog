@@ -1,6 +1,8 @@
 import argparse
+import atexit
 import logging
 import pathlib
+import shutil
 
 from ._config import Config
 from ._write import write_matches
@@ -10,6 +12,14 @@ from ..lib import ScoringFileFrame, MatchResult, MatchResults
 import polars as pl
 
 logger = logging.getLogger(__name__)
+
+
+def _exit(cleanup):
+    if cleanup:
+        if Config.TMPDIR and Config.TMPDIR.exists():
+            shutil.rmtree(Config.TMPDIR)
+        if Config.MATCHTMP and Config.MATCHTMP.exists():
+            shutil.rmtree(Config.MATCHTMP)
 
 
 def run_merge():
@@ -22,12 +32,19 @@ def run_merge():
         logger.debug("Verbose logging enabled")
 
     Config.DATASET = args.dataset
-    Config.CLEANUP = False
+    Config.CLEANUP = args.cleanup
     Config.OUTDIR = pathlib.Path(args.outdir)
     Config.SCOREFILE = pathlib.Path(args.scorefile)
 
     if not Config.OUTDIR.exists():
         raise FileNotFoundError(f"{Config.OUTDIR} does not exist")
+
+    atexit.register(_exit, cleanup=Config.CLEANUP)
+
+    if Config.CLEANUP:
+        logger.info("--cleanup set (default), temporary files will be deleted")
+    else:
+        logger.info("--no-cleanup set, temporary files won't be deleted")
 
     Config.TMPDIR = Config.OUTDIR / "tmp"
     Config.TMPDIR.mkdir(exist_ok=False)
@@ -52,6 +69,7 @@ def run_merge():
         )
         matchdf = write_matches(matchresults=matchresults, score_df=score_df)
         _check_duplicate_vars(matchdf)
+    logger.info("finished merging :)")
 
 
 def _check_duplicate_vars(matches):
@@ -144,6 +162,9 @@ def parse_args(args=None):
         dest="verbose",
         action="store_true",
         help="<Optional> Extra logging information",
+    )
+    parser.add_argument(
+        "--cleanup", dest="cleanup", default=True, action=argparse.BooleanOptionalAction
     )
     # variant matching arguments -------------------------------------------------------
     parser.add_argument(

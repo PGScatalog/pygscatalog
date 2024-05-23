@@ -2,6 +2,7 @@ import argparse
 import atexit
 import logging
 import pathlib
+import shutil
 import sys
 import tempfile
 import textwrap
@@ -24,12 +25,13 @@ logger = logging.getLogger(__name__)
 
 def _exit(cleanup):
     if cleanup:
-        # should already be emptied by context managers
-        Config.TMPDIR.rmdir()
+        if Config.TMPDIR and Config.TMPDIR.exists():
+            shutil.rmtree(Config.TMPDIR)
+        if Config.MATCHTMP and Config.MATCHTMP.exists():
+            shutil.rmtree(Config.MATCHTMP)
 
 
 def run_match():
-    atexit.register(_exit, cleanup=Config.CLEANUP)
     args = parse_args()
 
     if args.verbose:
@@ -39,13 +41,20 @@ def run_match():
         logger.debug("Verbose logging enabled")
 
     Config.DATASET = args.dataset
-    Config.CLEANUP = False
+    Config.CLEANUP = args.cleanup
     Config.OUTDIR = pathlib.Path(args.outdir)
 
     Config.SCOREFILE = pathlib.Path(args.scorefile)
 
     if not Config.OUTDIR.exists():
         raise FileNotFoundError(f"{Config.OUTDIR} does not exist")
+
+    atexit.register(_exit, cleanup=Config.CLEANUP)
+
+    if Config.CLEANUP:
+        logger.info("--cleanup set (default), temporary files will be deleted")
+    else:
+        logger.info("--no-cleanup set, temporary files won't be deleted")
 
     Config.MATCHTMP = Config.OUTDIR / "matchtmp"
     Config.MATCHTMP.mkdir(exist_ok=False)
@@ -91,14 +100,21 @@ def run_match():
             )
 
         if args.only_match:
+            for i, match in enumerate(matchresults):
+                ipc_path = pathlib.Path(match.ipc_path)
+                out_path = Config.OUTDIR / f"{i}.ipc.zst"
+                logger.info(f"Renaming {ipc_path} to {out_path}")
+                ipc_path.rename(out_path)
+
             logger.warning("--only_match set, exiting with grace and aplomb")
             logger.warning(
                 f"You'll need to combine match candidates using the Arrow IPC files in {Config.OUTDIR}"
             )
-            sys.exit()
+            return
         else:
             matchresults = MatchResults(*matchresults)
             _ = write_matches(matchresults=matchresults, score_df=score_df)
+    logger.info("finished matching :)")
 
 
 def get_match_candidates(target, score_df, chrom, dataset, **kwargs):
@@ -192,6 +208,9 @@ def parse_args(args=None):
         dest="verbose",
         action="store_true",
         help="<Optional> Extra logging information",
+    )
+    parser.add_argument(
+        "--cleanup", dest="cleanup", default=True, action=argparse.BooleanOptionalAction
     )
     # variant matching arguments -------------------------------------------------------
     parser.add_argument(

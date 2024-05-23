@@ -48,6 +48,8 @@ def pivot_score(df: pl.DataFrame) -> pl.DataFrame:
     Multiple scores are OK too:
     ID | effect_allele | weight_1 | ... | weight_n
     """
+    # fill_null: value = 0 not strategy = "zero"
+    # we always handle effect weights as strings because we never modify them
     return (
         df.pivot(
             index=["ID", "matched_effect_allele", "effect_type"],
@@ -55,7 +57,7 @@ def pivot_score(df: pl.DataFrame) -> pl.DataFrame:
             columns="accession",
         )
         .rename({"matched_effect_allele": "effect_allele"})
-        .fill_null(strategy="zero")
+        .fill_null(value="0")
         .drop("effect_type")
     )
 
