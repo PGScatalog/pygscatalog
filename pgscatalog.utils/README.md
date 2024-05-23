@@ -9,6 +9,7 @@ This convenience package bundles every PGS Catalog application, including:
 | `pgscatalog-relabel`         | Relabel values in a column based on values in a column in another file | [README](pgscatalog.core/README.md)                                                 |
 | `pgscatalog-match`           | Match structured scoring file to variants in target genomes            | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/match.html)     |
 | `pgscatalog-matchmerge`      | Merge variant match results, useful on larger datasets                 | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/match.html)     |
+| `pgscatalog-intersect`       | Match variants across two different variant information files (e.g. reference & target genomes) | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/intersect.html) |
 | `pgscatalog-aggregate`       | Aggregate calculated PGS split across multiple files                   | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/aggregate.html) |
 | `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry               | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/ancestry.html)  |
 
