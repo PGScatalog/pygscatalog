@@ -372,9 +372,6 @@ tenacity = "^8.2.3"
 tqdm = "^4.66.1"
 xopen = {version = "^1.8.0", extras = ["zstd"]}
 
-[package.extras]
-pyarrow = ["pyarrow (>=15.0.0,<16.0.0)"]
-
 [package.source]
 type = "directory"
 url = "../pgscatalog.core"
