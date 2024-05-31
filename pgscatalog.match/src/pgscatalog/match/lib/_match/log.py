@@ -38,7 +38,7 @@ def make_summary_log(
     best_matches: pl.LazyFrame = match_candidates.filter(pl.col("best_match"))
 
     return (
-        scorefile.join(best_matches, on=["row_nr", "accession"], how="outer")
+        scorefile.join(best_matches, on=["row_nr", "accession"], how="full")
         .with_columns(
             pl.col("match_status").fill_null(value="unmatched"), dataset=pl.lit(dataset)
         )  # fill in unmatched variants
@@ -133,7 +133,7 @@ def _join_match_candidates(
     logger.debug("Joining all match candidates against input scoring file")
     # make a raw log with all match candidates included
     raw_log = (
-        scorefile.join(matches, on=["row_nr", "accession"], how="outer")
+        scorefile.join(matches, on=["row_nr", "accession"], how="full")
         .with_columns(pl.lit(dataset).alias("dataset").cast(pl.Categorical))
         .select(pl.exclude("^.*_right$"))
     ).with_columns(pl.col("match_status").fill_null("unmatched"))
