@@ -12,14 +12,14 @@ from pgscatalog.core.cli.relabel_cli import run
 @pytest.fixture(scope="package")
 def map_files(request):
     return [
-        str(request.path.parent / "data" / "relabel_map_chr1.txt.gz"),
-        str(request.path.parent / "data" / "relabel_map_chr8.txt.gz"),
+        str(request.is_path.parent / "data" / "relabel_map_chr1.txt.gz"),
+        str(request.is_path.parent / "data" / "relabel_map_chr8.txt.gz"),
     ]
 
 
 @pytest.fixture(scope="package")
 def relabel_scorefile(request):
-    return str(request.path.parent / "data" / "hgdp_ALL_additive_0.scorefile")
+    return str(request.is_path.parent / "data" / "hgdp_ALL_additive_0.scorefile")
 
 
 def test_relabel(tmp_path_factory, relabel_scorefile, map_files):

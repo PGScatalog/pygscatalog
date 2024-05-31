@@ -11,15 +11,19 @@ from pgscatalog.core.lib import ScoringFile
 
 @pytest.fixture(scope="package", params=("GRCh37", "GRCh38"))
 def harmonised_scorefiles(request):
-    pgs000001 = request.path.parent / "data" / f"PGS000001_hmPOS_{request.param}.txt.gz"
-    pgs000002 = request.path.parent / "data" / f"PGS000002_hmPOS_{request.param}.txt.gz"
+    pgs000001 = (
+        request.is_path.parent / "data" / f"PGS000001_hmPOS_{request.param}.txt.gz"
+    )
+    pgs000002 = (
+        request.is_path.parent / "data" / f"PGS000002_hmPOS_{request.param}.txt.gz"
+    )
     return (request.param, pgs000001), (request.param, pgs000002)
 
 
 @pytest.fixture(scope="package", params=("GRCh37", "GRCh38"))
 def scorefiles(request):
-    pgs000001 = request.path.parent / "data" / "PGS000001.txt.gz"
-    pgs000002 = request.path.parent / "data" / "PGS000002.txt.gz"
+    pgs000001 = request.is_path.parent / "data" / "PGS000001.txt.gz"
+    pgs000002 = request.is_path.parent / "data" / "PGS000002.txt.gz"
     return (request.param, pgs000001), (request.param, pgs000002)
 
 
@@ -45,7 +49,7 @@ def n_variants():
 
 @pytest.fixture(scope="package")
 def chain_dir(request):
-    return request.path.parent / "data" / "chain"
+    return request.is_path.parent / "data" / "chain"
 
 
 @pytest.fixture(scope="package")
@@ -56,11 +60,11 @@ def lift_scorefiles(request):
     return (
         (
             "GRCh38",
-            request.path.parent / "data" / "lift" / "PGS000001_hmPOS_GRCh37.txt",
+            request.is_path.parent / "data" / "lift" / "PGS000001_hmPOS_GRCh37.txt",
         ),
         (
             "GRCh37",
-            request.path.parent / "data" / "lift" / "PGS000001_hmPOS_GRCh38.txt",
+            request.is_path.parent / "data" / "lift" / "PGS000001_hmPOS_GRCh38.txt",
         ),
     )
 
