@@ -9,19 +9,20 @@ WORKDIR /app
 
 RUN pip install poetry
 
-COPY . .
+COPY pgscatalog.core /app/pgscatalog.core
+
+COPY pgscatalog.calc /app/pgscatalog.calc
+
+COPY pgscatalog.match /app/pgscatalog.match
+
+COPY pgscatalog.utils /app/pgscatalog.utils
 
 WORKDIR /app/pgscatalog.utils
 
 RUN poetry install --no-root && rm -rf $POETRY_CACHE_DIR
 
-FROM python:3.11-slim-bullseye
-
-ENV VIRTUAL_ENV=/app/pgscatalog.utils/.venv \
-    PATH="/app/pgscatalog.utils/.venv/bin:$PATH"
-    
-COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
-    
 RUN apt-get update && apt-get install -y procps && rm -rf /var/lib/apt/lists/*
 
-ENV PATH="/venv/bin:${PATH}"
+ENV PATH="/app/pgscatalog.utils/.venv/bin:$PATH"
+
+
