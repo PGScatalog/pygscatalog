@@ -39,17 +39,17 @@ class ScoringFileFrame:
     Using a context manager is important to prepare a polars dataframe:
 
     >>> with x as arrow:
-    ...     assert os.path.exists(x.arrowpath.name)
+    ...     assert all(os.path.exists(x) for x in x.arrowpaths)
     ...     arrow.collect().shape
     (154, 11)
-    >>> assert not os.path.exists(x.arrowpath.name)  # all cleaned up
+    >>> assert not any(os.path.exists(x) for x in x.arrowpaths)  # all cleaned up
 
     >>> from .variantframe import VariantFrame
     >>> path = Config.ROOT_DIR.parent / "pgscatalog.core" / "tests" / "data" / "hapnest.bim"
     >>> target = VariantFrame(path, dataset="hapnest")
     >>> with target as target_df, x as score_df:
     ...     match_variants(score_df=score_df, target_df=target_df, target=target)  # doctest: +ELLIPSIS
-    MatchResult(dataset=hapnest, matchresult=[<LazyFrame [16 cols...
+    MatchResult(dataset=hapnest, matchresult=[<LazyFrame ...
     """
 
     def __init__(self, path, chrom=None, cleanup=True, tmpdir=None):
@@ -59,7 +59,7 @@ class ScoringFileFrame:
         self._cleanup = cleanup
         self._tmpdir = tmpdir
         self._loosed = False
-        self.arrowpath = None
+        self.arrowpaths = None
 
     def __enter__(self):
         """Use a context manager to create arrow IPC files and return a lazyframe"""
@@ -68,17 +68,16 @@ class ScoringFileFrame:
 
         if not self._loosed:
             logger.debug(f"Converting {self!r} to feather format")
-            self.arrowpath = loose(
-                record_batches=self.scoringfile.to_pa_recordbatch(),
-                schema=self.scoringfile.pa_schema(),
+            self.arrowpaths = loose(
+                self.scoringfile,
                 tmpdir=self._tmpdir,
             )
             self._loosed = True
             logger.debug(f"{self!r} feather conversion complete")
 
-        if self.arrowpath is not None:
+        if self.arrowpaths is not None:
             score_df = (
-                pl.scan_ipc(self.arrowpath.name)
+                pl.scan_ipc(self.arrowpaths)
                 .pipe(
                     complement_valid_alleles,
                     flip_cols=["effect_allele", "other_allele"],
@@ -107,7 +106,7 @@ class ScoringFileFrame:
     def __exit__(self, *args, **kwargs):
         """Optionally clean up the arrow IPC files"""
         if self._cleanup:
-            os.unlink(self.arrowpath.name)
+            [os.unlink(x) for x in self.arrowpaths]
             self._loosed = False
         pl.disable_string_cache()
 
@@ -126,4 +125,4 @@ class ScoringFileFrame:
                 "Try calling inside a with: statement"
             )
 
-        shutil.copyfile(self.arrowpath, destination)
+        shutil.copyfile(self.arrowpaths, destination)

@@ -55,12 +55,12 @@ def _encode_match_priority(df: pl.LazyFrame) -> pl.LazyFrame:
         df.with_columns(
             # set false best match to not_best
             match_priority=pl.col("best_match").map_elements(
-                lambda x: {None: 0, True: 1, False: 3}[x]
+                lambda x: {None: 0, True: 1, False: 3}[x], return_dtype=pl.UInt8
             )
         )
         .with_columns(
             excluded_match_priority=pl.col("exclude").map_elements(
-                lambda x: {None: 0, True: 2, False: 0}[x]
+                lambda x: {None: 0, True: 2, False: 0}[x], return_dtype=pl.UInt8
             )
         )
         .with_columns(
@@ -71,7 +71,8 @@ def _encode_match_priority(df: pl.LazyFrame) -> pl.LazyFrame:
             .map_elements(
                 lambda x: {0: "unmatched", 1: "matched", 2: "excluded", 3: "not_best"}[
                     x
-                ]
+                ],
+                return_dtype=pl.String,
             )
             .cast(pl.Categorical)
         )

@@ -3,7 +3,7 @@ from .catalogapi import ScoreQueryResult, CatalogQuery, CatalogCategory
 from .scorefiles import ScoringFiles, ScoringFile, NormalisedScoringFile
 from .scorevariant import ScoreVariant, EffectType
 from .genomebuild import GenomeBuild
-from .targetvariants import TargetVariants, TargetVariant
+from .targetvariants import TargetVariants, TargetVariant, TargetType
 from ._relabel import RelabelArgs, relabel, relabel_write
 from .pgsexceptions import (
     BasePGSException,
@@ -53,6 +53,7 @@ __all__ = [
     "CatalogCategory",
     "TargetVariant",
     "TargetVariants",
+    "TargetType",
     "NormalisedScoringFile",
     "EffectType",
     "RelabelArgs",

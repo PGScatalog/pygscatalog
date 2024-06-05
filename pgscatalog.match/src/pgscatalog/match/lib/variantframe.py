@@ -42,23 +42,21 @@ class VariantFrame:
         self._cleanup = cleanup
         self._tmpdir = tmpdir
         self._loosed = False
-        self.arrowpath = None
+        self.arrowpaths = None
 
     def __enter__(self):
-        if not self._loosed:
-            # convert to arrow files
-            self.arrowpath = loose(
-                record_batches=self.variants.to_pa_recordbatch(),
-                schema=self.variants.pa_schema(),
-                tmpdir=self._tmpdir,
-            )
-            self._loosed = True
-
         # set up global string cache for categorical variables
         pl.enable_string_cache()
 
+        if not self._loosed:
+            logger.debug(f"Converting {self!r} to feather format")
+            # convert to arrow files
+            self.arrowpaths = loose(self.variants, tmpdir=self._tmpdir)
+            self._loosed = True
+            logger.debug(f"{self!r} feather conversion complete")
+
         target_df = (
-            pl.scan_ipc(self.arrowpath.name)
+            pl.scan_ipc(self.arrowpaths)
             .pipe(filter_target)
             .pipe(annotate_multiallelic)
             .with_columns(
@@ -74,7 +72,7 @@ class VariantFrame:
 
     def __exit__(self, *args, **kwargs):
         if self._cleanup:
-            os.unlink(self.arrowpath.name)
+            [os.unlink(x) for x in self.arrowpaths]
             self._loosed = False
         pl.disable_string_cache()
 
@@ -97,4 +95,4 @@ class VariantFrame:
                 "Try calling inside a with: statement"
             )
 
-        shutil.copyfile(self.arrowpath, destination)
+        shutil.copyfile(self.arrowpaths, destination)
