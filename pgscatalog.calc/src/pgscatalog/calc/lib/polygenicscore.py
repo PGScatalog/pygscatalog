@@ -295,75 +295,55 @@ class PolygenicScore:
     >>> aggregated_score.write(splitoutd, split=True)
     >>> sorted(os.listdir(splitoutd), key = lambda x: x.split("_")[0])
     ['test_pgs.txt.gz']
+
+    If a sampleset can't be inferred from argument or path, error:
+    >>> PolygenicScore()
+    Traceback (most recent call last):
+    ...
+    TypeError: Missing sampleset
     """
 
     def __init__(self, *, path=None, df=None, sampleset=None):
-        match (path, df):
-            case (None, None):
-                raise ValueError("init with path or df")
-            case _ if path is not None and df is not None:
-                raise ValueError("choose one to init: path or df")
-            case _:
-                pass
+        try:
+            self._path = pathlib.Path(path)
+        except TypeError:
+            self._path = None
 
         try:
-            self.path = pathlib.Path(path)
-        except TypeError:
-            self.path = None
-
-        if sampleset is None:
-            self.sampleset = path.stem.split("_")[0]
-        else:
+            if sampleset is None:
+                # infer missing sampleset from path
+                self.sampleset = path.stem.split("_")[0]
+            else:
+                self.sampleset = sampleset
+        except AttributeError:
             self.sampleset = sampleset
+        finally:
+            if self.sampleset is None:
+                raise TypeError("Missing sampleset")
 
         self._chunksize = 50000
-
-        if df is not None:
-            # big df is an in-memory pandas df
-            self._bigdf = df
-        else:
-            self._bigdf = None
-            self._df = None
+        self._df = df
 
     def __repr__(self):
         return f"{type(self).__name__}(sampleset={repr(self.sampleset)}, path={repr(self.path)})"
 
-    def __iter__(self):
-        yield from self.df
-
     def __add__(self, other):
         if isinstance(other, PolygenicScore):
-            dfs = []
-            for df1, df2 in zip(self, other, strict=True):
-                sumdf = df1.add(df2, fill_value=0)
-                dfs.append(sumdf)
-            return PolygenicScore(sampleset=self.sampleset, df=pd.concat(dfs, axis=0))
+            sumdf = self.df.add(other.df, fill_value=0)
+            return PolygenicScore(sampleset=self.sampleset, df=sumdf)
         else:
             return NotImplemented
 
     @property
     def df(self):
-        """A generator that yields dataframe chunks."""
-        if self.path is not None:
-            self._df = self.lazy_read()
-        elif self._bigdf is not None:
-            # a fake generator
-            self._df = (x for x in [self._bigdf])
+        if self._df is None:
+            self._df = self.read()
+
         return self._df
 
-    def lazy_read(self):
-        """Lazily read a PGS in chunks"""
-        if self.path is None:
-            raise ValueError("Missing path")
-
-        for chunk in pd.read_csv(
-            self.path, chunksize=self._chunksize, sep="\t", converters={"IID": str}
-        ):
-            df = chunk.assign(sampleset=self.sampleset).set_index(["sampleset", "#IID"])
-
-            df.index.names = ["sampleset", "IID"]
-            df = df[_select_agg_cols(df.columns)]
-            yield df
+    @property
+    def path(self):
+        return self._path
 
     def read(self):
         """Eagerly load a PGS into a pandas dataframe"""
@@ -380,56 +360,44 @@ class PolygenicScore:
         df = df[_select_agg_cols(df.columns)]
         return df
 
-    def write(self, outdir, split=False, melt=True):
-        """Write PGS to a compressed TSV"""
-        outdir = pathlib.Path(outdir)
-        for i, chunk in enumerate(self):
-            chunk = PolygenicScore(df=chunk, sampleset=self.sampleset)
-
-            if melt:
-                logger.info(f"Melting chunk {i}")
-                chunk = chunk.melt()
-            else:
-                logger.info(f"Preparing chunk {i}")
-                # don't do anything, just materialise the df generator
-                chunk = pd.concat(chunk.df, axis=0)
-
-            logger.info(f"Writing chunk {i}")
-            if split:
-                if i == 0:
-                    logger.info("Writing results split by sampleset")
-
-                for sampleset, group in chunk.groupby("sampleset"):
-                    fout = outdir / f"{sampleset}_pgs.txt.gz"
-                    chunk.to_csv(fout, sep="\t", compression="gzip", mode="a")
-            else:
-                if i == 0:
-                    logger.info("Writing combined results (aggregated_scores.txt.gz)")
-
-                fout = outdir / "aggregated_scores.txt.gz"
-                chunk.to_csv(fout, sep="\t", compression="gzip", mode="a")
-
     def average(self):
-        """Recalculate average.
-
-        This is an eager operation, and immediately returns a dataframe
-        """
-        chunk_list = []
-        for chunk in self:
-            avgs = chunk.filter(regex="SUM$")
-            avgs = avgs.divide(chunk.DENOM, axis=0)
-            avgs.insert(0, "DENOM", chunk.DENOM)
-            avgs.columns = avgs.columns.str.replace("_SUM", "_AVG")
-            chunk_list.append(avgs)
-        return pd.concat(chunk_list, axis=0)
+        """Recalculate average."""
+        df = self.df
+        avgs = df.filter(regex="SUM$")
+        avgs = avgs.divide(df.DENOM, axis=0)
+        avgs.insert(0, "DENOM", df.DENOM)
+        avgs.columns = avgs.columns.str.replace("_SUM", "_AVG")
+        return avgs
 
     def melt(self):
         """Melt dataframe from wide format to long format"""
-        sum_df = _melt(pd.concat(self.df, axis=0), value_name="SUM")
+        sum_df = _melt(self.df, value_name="SUM")
         avg_df = _melt(self.average(), value_name="AVG")
         df = pd.concat([sum_df, avg_df.AVG], axis=1)
         # melted chunks need a consistent column order
         return df[["PGS", "SUM", "DENOM", "AVG"]]
+
+    def write(self, outdir, split=False, melt=True):
+        """Write PGS to a compressed TSV"""
+        outdir = pathlib.Path(outdir)
+
+        if melt:
+            logger.info("Melting before write to TSV")
+            df = self.melt()
+        else:
+            logger.info("Writing wide format to TSV")
+            df = self.df
+
+        if split:
+            logger.info("Writing results split by sampleset")
+
+            for sampleset, group in df.groupby("sampleset"):
+                fout = outdir / f"{sampleset}_pgs.txt.gz"
+                df.to_csv(fout, sep="\t", compression="gzip", mode="a")
+        else:
+            logger.info("Writing combined results (aggregated_scores.txt.gz)")
+            fout = outdir / "aggregated_scores.txt.gz"
+            df.to_csv(fout, sep="\t", compression="gzip", mode="a")
 
 
 def _select_agg_cols(cols):
