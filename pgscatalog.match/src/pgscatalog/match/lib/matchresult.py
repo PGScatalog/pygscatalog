@@ -272,6 +272,7 @@ class MatchResults(collections.abc.Sequence):
             _ = self.label(**kwargs)  # self.df gets updated
 
         if not self._filtered:
+            # score_df = original scoring file variants
             _ = self.filter(score_df=score_df, min_overlap=min_overlap)
 
         # a summary log contains up to one variant (the best match) for each variant
@@ -296,12 +297,20 @@ class MatchResults(collections.abc.Sequence):
         self.summary_log = self.summary_log.collect()
 
         # error at the end, to allow logs to be generated
-        if not all(x[1] for x in self.filter_summary.iter_rows()):
-            logger.warning(f"{self.filter_summary}")
-            [
-                x.unlink() for xs in outfs for x in xs
-            ]  # don't provide dodgy scoring files
-            raise MatchRateError(
+        for x in self.filter_summary.iter_rows():
+            try:
+                if not x[1]:
+                    raise MatchRateError("Fails matching")
+            except MatchRateError:
+                # we reported the exception, but it's fine
+                logger.warning(f"Score {x[0]} matching failed with match rate {x[2]}")
+                continue
+            else:
+                logger.info(f"Score {x[0]} matching passed with match rate {x[2]}")
+
+        # unless everything is bad!
+        if not any(x[1] for x in self.filter_summary.iter_rows()):
+            raise ZeroMatchesError(
                 f"All scores fail to meet match threshold {min_overlap}"
             )
 

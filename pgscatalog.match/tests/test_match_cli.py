@@ -4,7 +4,7 @@ import os
 from unittest.mock import patch
 import pytest
 
-from pgscatalog.core import ZeroMatchesError, MatchRateError
+from pgscatalog.core import ZeroMatchesError
 from pgscatalog.match.cli.match_cli import run_match
 
 
@@ -124,8 +124,11 @@ def test_only_match(tmp_path_factory, good_scorefile, good_variants):
     assert "0.ipc.zst" in os.listdir(outdir)
 
 
-def test_strict_match(tmp_path_factory, good_scorefile, good_variants):
-    """Test matching well with extremely strict overlap to trigger a MatchRateError"""
+def test_stringent_match(tmp_path_factory, good_scorefile, good_variants):
+    """Test matching well with stringent match rate.
+
+    Some scores pass, some fail, but the application exits successfully.
+    """
     outdir = tmp_path_factory.mktemp("outdir")
 
     args = [
@@ -140,20 +143,26 @@ def test_strict_match(tmp_path_factory, good_scorefile, good_variants):
             "--outdir",
             str(outdir),
             "--min_overlap",
-            "1.0",
+            "0.9",
         )
     ]
     flargs = list(itertools.chain(*args))
 
-    with pytest.raises(MatchRateError):
-        with patch("sys.argv", flargs):
-            run_match()
+    with patch("sys.argv", flargs):
+        run_match()
 
     assert (outdir / "test_log.csv.gz").exists()
     assert (outdir / "test_summary.csv").exists()
-    assert not (outdir / "test_ALL_recessive_0.scorefile.gz").exists()
-    assert not (outdir / "test_ALL_dominant_0.scorefile.gz").exists()
-    assert not (outdir / "test_ALL_additive_0.scorefile.gz").exists()
+
+    with open(outdir / "test_summary.csv") as f:
+        summary = list(csv.DictReader(f))
+        # at least one score fails matching
+        assert any([x["score_pass"] == "false" for x in summary])
+        # and at least one score passes matching
+        assert any([x["score_pass"] == "true" for x in summary])
+
+    # but scoring files are still written because at least one score passed
+    assert (outdir / "test_ALL_additive_0.scorefile.gz").exists()
 
 
 def test_match_fail(tmp_path_factory, bad_scorefile, good_variants):
