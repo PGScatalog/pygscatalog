@@ -5,13 +5,17 @@ import collections.abc
 import gzip
 import io
 import itertools
+import logging
 import pathlib
 
 import polars as pl
 
 
+logger = logging.getLogger(__name__)
+
+
 class PlinkScoreFiles(collections.abc.Sequence):
-    """Represents a sequence of scoring files files written by :class:`MatchResults`"""
+    """Represents a sequence of scoring files written by :class:`MatchResults`"""
 
     def __init__(self, *elements):
         self._elements = [pathlib.Path(x) for x in sorted(list(elements))]
@@ -64,19 +68,28 @@ class PlinkScoreFiles(collections.abc.Sequence):
             if dataset not in x.stem:
                 raise ValueError(f"Invalid dataset: {dataset} and {x.stem}")
 
-        def keyfunc(path):
+        def effect_type_sort(path):
+            """Sort by effect type and n"""
             return path.stem.split("_")[2:]
 
-        sorted_paths = sorted(self._elements, key=keyfunc)
+        def chrom_sort(path):
+            try:
+                return int(path.name.split("_")[1])
+            except ValueError:
+                return path.name.split("_")[1]
 
-        for k, g in itertools.groupby(sorted_paths, key=keyfunc):
+        sorted_paths = sorted(self._elements, key=effect_type_sort)
+
+        for k, g in itertools.groupby(sorted_paths, key=effect_type_sort):
+            logger.info(f"Writing combined scoring file {k}")
             # multi-chrom -> ALL
             fout = "_".join([dataset, "ALL", *k]) + ".gz"
-            paths = list(g)
+            paths = sorted(list(g), key=chrom_sort)
             # infer_schema_length: read all columns as utf8 to simplify joining
-            df = pl.concat(
-                pl.read_csv(x, separator="\t", infer_schema_length=0) for x in paths
-            ).fill_null(value="0")
+            dfs = (pl.read_csv(x, separator="\t", infer_schema_length=0) for x in paths)
+            # diagonal concat is important to handle different column sets across dfs
+            df = pl.concat(dfs, how="diagonal").fill_null(value="0")
+
             with gzip.open(pathlib.Path(directory) / fout, "wb") as gcsv:
                 outf = io.TextIOWrapper(gcsv)
                 df.write_csv(outf, separator="\t")
