@@ -10,6 +10,7 @@ import pathlib
 
 import polars as pl
 
+from pgscatalog.core import chrom_keyfunc, effect_type_keyfunc
 
 logger = logging.getLogger(__name__)
 
@@ -68,28 +69,32 @@ class PlinkScoreFiles(collections.abc.Sequence):
             if dataset not in x.stem:
                 raise ValueError(f"Invalid dataset: {dataset} and {x.stem}")
 
-        def effect_type_sort(path):
-            """Sort by effect type and n"""
-            return path.stem.split("_")[2:]
+        sorted_paths = sorted(self._elements, key=effect_type_keyfunc())
 
-        def chrom_sort(path):
-            try:
-                return int(path.name.split("_")[1])
-            except ValueError:
-                return path.name.split("_")[1]
-
-        sorted_paths = sorted(self._elements, key=effect_type_sort)
-
-        for k, g in itertools.groupby(sorted_paths, key=effect_type_sort):
+        for k, g in itertools.groupby(sorted_paths, key=effect_type_keyfunc()):
             logger.info(f"Writing combined scoring file {k}")
+
+            # tidy up keys to create the output file name
+            # keyfunc returns:
+            # (('additive',), ('', 0.0, 'scorefile'))
+            # need: [additive, 0]
+            keys = (x for x in (itertools.chain(*k)) if x != "")
+            keys = list(str(int(x)) if isinstance(x, float) else x for x in keys)
+            keys.pop()  # drop scorefile
+
             # multi-chrom -> ALL
-            fout = "_".join([dataset, "ALL", *k]) + ".gz"
-            paths = sorted(list(g), key=chrom_sort)
+            fout = "_".join([dataset, "ALL", *keys]) + ".scorefile.gz"
+            paths = sorted(list(g), key=chrom_keyfunc())
+
             # infer_schema_length: read all columns as utf8 to simplify joining
             dfs = (pl.read_csv(x, separator="\t", infer_schema_length=0) for x in paths)
             # diagonal concat is important to handle different column sets across dfs
             df = pl.concat(dfs, how="diagonal").fill_null(value="0")
+            logger.info("Score files combined successfully")
 
-            with gzip.open(pathlib.Path(directory) / fout, "wb") as gcsv:
+            with gzip.open(
+                pathlib.Path(directory) / fout, "wb", compresslevel=6
+            ) as gcsv:
+                logger.info(f"Writing out to {fout}")
                 outf = io.TextIOWrapper(gcsv)
                 df.write_csv(outf, separator="\t")

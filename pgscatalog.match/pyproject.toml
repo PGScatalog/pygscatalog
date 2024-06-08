@@ -10,7 +10,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-polars = "^0.20.5"
+polars = "0.20.30"
 pyarrow = "^15.0.0"
 "pgscatalog.core" = {path = "../pgscatalog.core", develop = true}
 
