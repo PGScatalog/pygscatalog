@@ -325,7 +325,11 @@ class PolygenicScore:
         self._df = df
 
     def __repr__(self):
-        return f"{type(self).__name__}(sampleset={repr(self.sampleset)}, path={repr(self.path)})"
+        if self.path is None:
+            path = repr("(in-memory)")
+        else:
+            path = repr(self.path)
+        return f"{type(self).__name__}(sampleset={repr(self.sampleset)}, path={path})"
 
     def __add__(self, other):
         if isinstance(other, PolygenicScore):
@@ -365,7 +369,7 @@ class PolygenicScore:
         df = self.df
         avgs = df.filter(regex="SUM$")
         avgs = avgs.divide(df.DENOM, axis=0)
-        avgs.insert(0, "DENOM", df.DENOM)
+        avgs = pd.concat([df["DENOM"], avgs], axis=1)
         avgs.columns = avgs.columns.str.replace("_SUM", "_AVG")
         return avgs
 

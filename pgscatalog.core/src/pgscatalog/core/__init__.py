@@ -34,6 +34,8 @@ from .lib import (
     RelabelArgs,
     relabel,
     relabel_write,
+    effect_type_keyfunc,
+    chrom_keyfunc,
 )
 
 log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"
@@ -74,6 +76,8 @@ __all__ = [
     "RelabelArgs",
     "relabel",
     "relabel_write",
+    "effect_type_keyfunc",
+    "chrom_keyfunc",
 ]
 
 __version__ = "0.1.2"
