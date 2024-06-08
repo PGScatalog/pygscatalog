@@ -312,6 +312,21 @@ files = [
 ]
 
 [[package]]
+name = "natsort"
+version = "8.4.0"
+description = "Simple yet flexible natural sorting in Python."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "natsort-8.4.0-py3-none-any.whl", hash = "sha256:4732914fb471f56b5cce04d7bae6f164a592c7712e1c85f9ef585e197299521c"},
+    {file = "natsort-8.4.0.tar.gz", hash = "sha256:45312c4a0e5507593da193dedd04abb1469253b601ecaf63445ad80f0a1ea581"},
+]
+
+[package.extras]
+fast = ["fastnumbers (>=2.0.0)"]
+icu = ["PyICU (>=1.0.0)"]
+
+[[package]]
 name = "numpy"
 version = "1.26.4"
 description = "Fundamental package for array computing in Python"
@@ -444,21 +459,21 @@ name = "pgscatalog-core"
 version = "0.1.2"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
-python-versions = "<4.0,>=3.11"
-files = [
-    {file = "pgscatalog_core-0.1.2-py3-none-any.whl", hash = "sha256:45bd0f2d807ae47efc4fbe59e49e43cd30be999ccdf893135cb6fbae2aad3228"},
-    {file = "pgscatalog_core-0.1.2.tar.gz", hash = "sha256:3a7428a4a78642f87f1a9da140a9e7e47e1b9c98100834c7c1033481f535e3bf"},
-]
+python-versions = "^3.11"
+files = []
+develop = true
 
 [package.dependencies]
-httpx = ">=0.26.0,<0.27.0"
-pyliftover = ">=0.4,<0.5"
-tenacity = ">=8.2.3,<9.0.0"
-tqdm = ">=4.66.1,<5.0.0"
-xopen = {version = ">=1.8.0,<2.0.0", extras = ["zstd"]}
+httpx = "^0.26.0"
+natsort = "^8.4.0"
+pyliftover = "^0.4"
+tenacity = "^8.2.3"
+tqdm = "^4.66.1"
+xopen = {version = "^1.8.0", extras = ["zstd"]}
 
-[package.extras]
-pyarrow = ["pyarrow (>=15.0.0,<16.0.0)"]
+[package.source]
+type = "directory"
+url = "../pgscatalog.core"
 
 [[package]]
 name = "pluggy"
@@ -910,4 +925,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "5a862d272f92f569f8c623d773e32bc032a5ce16f3e65de341806fbb0b5767c9"
+content-hash = "129e98096e082467bf990f3d02ffa8d9c1a34328d3992672c1d235db1075539c"

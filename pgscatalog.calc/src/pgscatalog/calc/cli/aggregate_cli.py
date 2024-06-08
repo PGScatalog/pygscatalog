@@ -2,10 +2,10 @@ import argparse
 import logging
 import pathlib
 import textwrap
-import operator
-import functools
+from collections import deque
 
-from ..lib.polygenicscore import PolygenicScore
+from ..lib import PolygenicScore
+from pgscatalog.core import chrom_keyfunc
 
 logger = logging.getLogger(__name__)
 
@@ -21,15 +21,41 @@ def run_aggregate():
 
     if args.verbose:
         logger.setLevel(logging.INFO)
+        logging.getLogger("pgscatalog.core").setLevel(logging.INFO)
+        logging.getLogger("pgscatalog.calc").setLevel(logging.INFO)
 
     if not (outdir := pathlib.Path(args.outdir)).exists():
         raise FileNotFoundError(f"--outdir {outdir.name} doesn't exist")
 
-    score_paths = [pathlib.Path(x) for x in args.scores]
-    pgs = [PolygenicScore(path=x) for x in score_paths]
-    # call __add__ a lot
-    aggregated = functools.reduce(operator.add, pgs)
+    score_paths = sorted([pathlib.Path(x) for x in args.scores], key=chrom_keyfunc())
+    # dfs are only read into memory after accessing them explicitly e.g. pgs[0].df
+    pgs = deque(PolygenicScore(path=x) for x in score_paths)
+
+    observed_columns = set()
+    aggregated = None
+
+    while pgs:
+        x = pgs.popleft()  # to remove dfs from memory during iteration
+        if aggregated is None:
+            logger.info(f"Initialising aggregation with {x}")
+            aggregated = x
+        else:
+            logger.info(f"Adding {x}")
+            aggregated += x
+        observed_columns.update(set(x.df.columns))
+
+    if (dfcols := set(aggregated.df.columns)) != observed_columns:
+        raise ValueError(
+            f"Missing columns in aggregated file!. "
+            f"Observed: {observed_columns}. "
+            f"In aggregated: {dfcols}"
+        )
+    else:
+        logger.info("Aggregated columns match observed columns")
+
+    logger.info("Aggregation finished! Writing to a file")
     aggregated.write(outdir=args.outdir, split=args.split)
+    logger.info("all done. bye :)")
 
 
 def _description_text() -> str:

@@ -333,6 +333,7 @@ class PolygenicScore:
 
     def __add__(self, other):
         if isinstance(other, PolygenicScore):
+            logger.info(f"Doing element-wise addition: {self} + {other}")
             sumdf = self.df.add(other.df, fill_value=0)
             return PolygenicScore(sampleset=self.sampleset, df=sumdf)
         else:
