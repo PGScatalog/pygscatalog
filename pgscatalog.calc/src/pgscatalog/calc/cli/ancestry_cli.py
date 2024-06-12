@@ -20,6 +20,8 @@ def run_ancestry():
 
     if args.verbose:
         logger.setLevel(logging.INFO)
+        logging.getLogger("pgscatalog.core").setLevel(logging.INFO)
+        logging.getLogger("pgscatalog.calc").setLevel(logging.INFO)
         logger.info("Starting ancestry adjustment")
         logger.info("Verbose mode enabled")
 
