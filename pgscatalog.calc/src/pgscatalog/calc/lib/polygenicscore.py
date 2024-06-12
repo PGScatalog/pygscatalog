@@ -274,12 +274,17 @@ class PolygenicScore:
 
     >>> aggregated_score = pgs1 + pgs2
     >>> aggregated_score  # doctest: +ELLIPSIS
-    PolygenicScore(sampleset='test', path=None)
+    PolygenicScore(sampleset='test', path='(in-memory)')
 
     Once a score has been fully aggregated it can be helpful to recalculate an average:
 
-    >>> reprlib.repr(aggregated_score.average().to_dict())  # doctest: +ELLIPSIS
-    "{'DENOM': {('test', 'HG00096'): 3128, ('test', 'HG00097'): 3128, ('test', 'HG00099'): 3128, ('test', 'HG00100'): 3128, ...}, 'PGS001229_22_AVG': {('test', 'HG00096'): 0.0003484782608695652, ('test', 'HG00097'): 0.00043120268542199493, ('test', 'HG00099'): 0.0004074616368286445, ('test', 'HG00100'): 0.0005523938618925831, ...}}"
+    >>> aggregated_score.average()
+    >>> aggregated_score.df  # doctest: +ELLIPSIS,+NORMALIZE_WHITESPACE
+                                PGS       SUM  DENOM       AVG
+    sampleset IID
+    test      HG00096  PGS001229_22  1.090040   3128  0.000348
+              HG00097  PGS001229_22  1.348802   3128  0.000431
+    ...
 
     Scores can be written to a TSV file:
 
@@ -321,14 +326,19 @@ class PolygenicScore:
             if self.sampleset is None:
                 raise TypeError("Missing sampleset")
 
-        self._chunksize = 50000
         self._df = df
+        self._melted = False
 
     def __repr__(self):
-        return f"{type(self).__name__}(sampleset={repr(self.sampleset)}, path={repr(self.path)})"
+        if self.path is None:
+            path = repr("(in-memory)")
+        else:
+            path = repr(self.path)
+        return f"{type(self).__name__}(sampleset={repr(self.sampleset)}, path={path})"
 
     def __add__(self, other):
         if isinstance(other, PolygenicScore):
+            logger.info(f"Doing element-wise addition: {self} + {other}")
             sumdf = self.df.add(other.df, fill_value=0)
             return PolygenicScore(sampleset=self.sampleset, df=sumdf)
         else:
@@ -361,32 +371,38 @@ class PolygenicScore:
         return df
 
     def average(self):
-        """Recalculate average."""
+        """Update the dataframe with a recalculated average."""
+        logger.info("Recalculating average")
+        if not self._melted:
+            self.melt()
+
         df = self.df
-        avgs = df.filter(regex="SUM$")
-        avgs = avgs.divide(df.DENOM, axis=0)
-        avgs.insert(0, "DENOM", df.DENOM)
-        avgs.columns = avgs.columns.str.replace("_SUM", "_AVG")
-        return avgs
+        df["AVG"] = df.SUM / df.DENOM
+        self._df = df
 
     def melt(self):
-        """Melt dataframe from wide format to long format"""
-        sum_df = _melt(self.df, value_name="SUM")
-        avg_df = _melt(self.average(), value_name="AVG")
-        df = pd.concat([sum_df, avg_df.AVG], axis=1)
+        """Update the dataframe with a melted version (wide format to long format)"""
+        logger.info("Melting dataframe from wide to long format")
+        df = self.df.melt(
+            id_vars=["DENOM"],
+            value_name="SUM",
+            var_name="PGS",
+            ignore_index=False,
+        )
+        # e.g. PGS000822_SUM -> PGS000822
+        df["PGS"] = df["PGS"].str.replace("_SUM", "")
         # melted chunks need a consistent column order
-        return df[["PGS", "SUM", "DENOM", "AVG"]]
+        self._df = df[["PGS", "SUM", "DENOM"]]
+        self._melted = True
 
-    def write(self, outdir, split=False, melt=True):
+    def write(self, outdir, split=False):
         """Write PGS to a compressed TSV"""
         outdir = pathlib.Path(outdir)
 
-        if melt:
-            logger.info("Melting before write to TSV")
-            df = self.melt()
-        else:
-            logger.info("Writing wide format to TSV")
-            df = self.df
+        if not self._melted:
+            self.melt()
+
+        df = self.df
 
         if split:
             logger.info("Writing results split by sampleset")
@@ -408,15 +424,3 @@ def _select_agg_cols(cols):
         for x in cols
         if (x.endswith("_SUM") and (x != "NAMED_ALLELE_DOSAGE_SUM")) or (x in keep_cols)
     ]
-
-
-def _melt(df, value_name):
-    df = df.melt(
-        id_vars=["DENOM"],
-        value_name=value_name,
-        var_name="PGS",
-        ignore_index=False,
-    )
-    # e.g. PGS000822_SUM -> PGS000822
-    df["PGS"] = df["PGS"].str.replace(f"_{value_name}", "")
-    return df

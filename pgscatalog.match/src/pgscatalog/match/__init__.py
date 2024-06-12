@@ -1,9 +1,9 @@
 import logging
 
-from .lib.variantframe import VariantFrame
-from .lib.scoringfileframe import ScoringFileFrame, match_variants
-from .lib.matchresult import MatchResult, MatchResults
-from .lib.plinkscorefiles import PlinkScoreFiles
+from .lib import VariantFrame
+from .lib import ScoringFileFrame, match_variants
+from .lib import MatchResult, MatchResults
+from .lib import PlinkScoreFiles
 
 
 log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"

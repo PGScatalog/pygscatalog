@@ -287,6 +287,7 @@ class MatchResults(collections.abc.Sequence):
         # double check log count vs scoring file variant count
         self._log_OK = check_log_count(scorefile=score_df, summary_log=self.summary_log)
 
+        # will be empty if no scores pass match threshold, so nothing gets written
         plink = PlinkFrames.from_matchresult(self.df)
         outfs = []
         for frame in plink:

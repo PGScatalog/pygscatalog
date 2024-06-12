@@ -21,6 +21,7 @@ tenacity = "^8.2.3"
 pyliftover = "^0.4"
 xopen = {version = "^1.8.0", extras = ["zstd"]}
 tqdm = "^4.66.1"
+natsort = "^8.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"

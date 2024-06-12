@@ -143,3 +143,6 @@ def test_strict_merge(tmp_path_factory, good_scorefile, match_ipc):
     with pytest.raises(ZeroMatchesError):
         with patch("sys.argv", flargs):
             run_merge()
+
+    # don't write any scoring files
+    assert glob(str(outdir / "*scorefile.gz")) == []
