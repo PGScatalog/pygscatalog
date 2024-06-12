@@ -4,7 +4,7 @@ import pytest
 
 from glob import glob
 
-from pgscatalog.core import MatchRateError
+from pgscatalog.core import ZeroMatchesError
 from pgscatalog.match.cli.merge_cli import run_merge
 
 
@@ -120,7 +120,7 @@ def test_splitcombine_output(tmp_path_factory, good_scorefile, match_ipc):
 
 
 def test_strict_merge(tmp_path_factory, good_scorefile, match_ipc):
-    """Test merging with extremely strict overlap to trigger a MatchRateError"""
+    """Test merging with extremely strict overlap to trigger a ZeroMatchesError"""
     outdir = tmp_path_factory.mktemp("outdir")
 
     args = [
@@ -140,6 +140,9 @@ def test_strict_merge(tmp_path_factory, good_scorefile, match_ipc):
     ]
     flargs = list(itertools.chain(*args))
 
-    with pytest.raises(MatchRateError):
+    with pytest.raises(ZeroMatchesError):
         with patch("sys.argv", flargs):
             run_merge()
+
+    # don't write any scoring files
+    assert glob(str(outdir / "*scorefile.gz")) == []

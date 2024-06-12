@@ -4,19 +4,9 @@ genomes."""
 
 import enum
 import csv
-import itertools
 import pathlib
 
 from xopen import xopen
-
-from ._config import Config
-
-try:
-    import pyarrow as pa
-except ImportError:
-    PYARROW_AVAILABLE = False
-else:
-    PYARROW_AVAILABLE = True
 
 
 class TargetVariant:
@@ -156,50 +146,10 @@ class TargetVariants:
             case _:
                 raise ValueError
 
-    def pa_schema(self):
-        """Return a pyarrow schema used when writing object to files"""
-        if not PYARROW_AVAILABLE:
-            raise ImportError("pyarrow is not available")
-
-        return pa.schema(
-            [
-                pa.field("#CHROM", pa.string()),
-                pa.field("POS", pa.uint64()),
-                pa.field("ID", pa.string()),
-                pa.field("REF", pa.string()),
-                pa.field("ALT", pa.string()),
-            ]
-        )
-
-    def to_pa_recordbatch(self):
-        """Yields an iterator of pyarrow RecordBatches"""
-        if not PYARROW_AVAILABLE:
-            raise ImportError("pyarrow is not available")
-
-        # accessing the property returns a fresh generator
-        # don't want an infinite loop
-        variants = self.variants
-
-        while True:
-            batch = list(itertools.islice(variants, Config.TARGET_BATCH_SIZE))
-            if not batch:
-                break
-
-            # being careful to batch here, because these files can be big
-            _chrom, _pos, _id, _ref, _alt = zip(
-                *((x.chrom, x.pos, x.id, x.ref, x.alt) for x in batch), strict=True
-            )
-            chroms = pa.array(_chrom, type=pa.string())
-            positions = pa.array(_pos, type=pa.uint64())
-            ids = pa.array(_id, type=pa.string())
-            refs = pa.array(_ref, type=pa.string())
-            alts = pa.array(_alt, type=pa.string())
-            yield pa.RecordBatch.from_arrays(
-                [chroms, positions, ids, refs, alts], schema=self.pa_schema()
-            )
-
 
 def read_pvar(path):
+    """Read plink2 pvar variant information files using python core library"""
+
     with xopen(path, "rt") as f:
         # pvars do have a header column and support arbitrary columns
         for line in f:
@@ -221,6 +171,7 @@ def read_pvar(path):
 
 
 def read_bim(path):
+    """Read plink1 bim variant information files using python core library"""
     with xopen(path, "rt") as f:
         # bims don't have header column
         reader = csv.reader(f, delimiter="\t")

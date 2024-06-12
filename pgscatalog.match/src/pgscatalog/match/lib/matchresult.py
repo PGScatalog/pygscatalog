@@ -151,8 +151,26 @@ class MatchResults(collections.abc.Sequence):
     An important part of matching variants is reporting a log to see how well you're reproducing a PGS in the new target genomes:
 
     >>> with scorefile as score_df:
-    ...     MatchResults(x).full_variant_log(score_df)  # +ELLIPSIS
-    <LazyFrame [23 cols, {"row_nr": UInt64 … "dataset": Categorical(ordering='physical')}] at ...>
+    ...     MatchResults(x).full_variant_log(score_df).fetch()  # +ELLIPSIS
+    shape: (155, 23)
+    ┌────────┬───────────┬──────────┬────────────┬───┬────────────┬───────────┬────────────┬───────────┐
+    │ row_nr ┆ accession ┆ chr_name ┆ chr_positi ┆ … ┆ duplicate_ ┆ match_IDs ┆ match_stat ┆ dataset   │
+    │ ---    ┆ ---       ┆ ---      ┆ on         ┆   ┆ ID         ┆ ---       ┆ us         ┆ ---       │
+    │ u64    ┆ cat       ┆ cat      ┆ ---        ┆   ┆ ---        ┆ str       ┆ ---        ┆ cat       │
+    │        ┆           ┆          ┆ u64        ┆   ┆ bool       ┆           ┆ cat        ┆           │
+    ╞════════╪═══════════╪══════════╪════════════╪═══╪════════════╪═══════════╪════════════╪═══════════╡
+    │ 0      ┆ PGS000002 ┆ 11       ┆ 69331418   ┆ … ┆ null       ┆ null      ┆ unmatched  ┆ goodmatch │
+    │ 1      ┆ PGS000002 ┆ 11       ┆ 69379161   ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
+    │ 2      ┆ PGS000002 ┆ 11       ┆ 69331642   ┆ … ┆ null       ┆ null      ┆ unmatched  ┆ goodmatch │
+    │ 3      ┆ PGS000002 ┆ 5        ┆ 1282319    ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
+    │ 4      ┆ PGS000002 ┆ 5        ┆ 1279790    ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
+    │ …      ┆ …         ┆ …        ┆ …          ┆ … ┆ …          ┆ …         ┆ …          ┆ …         │
+    │ 72     ┆ PGS000001 ┆ 22       ┆ 40876234   ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
+    │ 73     ┆ PGS000001 ┆ 1        ┆ 204518842  ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
+    │ 74     ┆ PGS000001 ┆ 1        ┆ 202187176  ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
+    │ 75     ┆ PGS000001 ┆ 2        ┆ 19320803   ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
+    │ 76     ┆ PGS000001 ┆ 16       ┆ 53855291   ┆ … ┆ null       ┆ null      ┆ unmatched  ┆ goodmatch │
+    └────────┴───────────┴──────────┴────────────┴───┴────────────┴───────────┴────────────┴───────────┘
     """
 
     def __init__(self, *elements):
@@ -254,6 +272,7 @@ class MatchResults(collections.abc.Sequence):
             _ = self.label(**kwargs)  # self.df gets updated
 
         if not self._filtered:
+            # score_df = original scoring file variants
             _ = self.filter(score_df=score_df, min_overlap=min_overlap)
 
         # a summary log contains up to one variant (the best match) for each variant
@@ -268,6 +287,7 @@ class MatchResults(collections.abc.Sequence):
         # double check log count vs scoring file variant count
         self._log_OK = check_log_count(scorefile=score_df, summary_log=self.summary_log)
 
+        # will be empty if no scores pass match threshold, so nothing gets written
         plink = PlinkFrames.from_matchresult(self.df)
         outfs = []
         for frame in plink:
@@ -278,12 +298,20 @@ class MatchResults(collections.abc.Sequence):
         self.summary_log = self.summary_log.collect()
 
         # error at the end, to allow logs to be generated
-        if not all(x[1] for x in self.filter_summary.iter_rows()):
-            logger.warning(f"{self.filter_summary}")
-            [
-                x.unlink() for xs in outfs for x in xs
-            ]  # don't provide dodgy scoring files
-            raise MatchRateError(
+        for x in self.filter_summary.iter_rows():
+            try:
+                if not x[1]:
+                    raise MatchRateError("Fails matching")
+            except MatchRateError:
+                # we reported the exception, but it's fine
+                logger.warning(f"Score {x[0]} matching failed with match rate {x[2]}")
+                continue
+            else:
+                logger.info(f"Score {x[0]} matching passed with match rate {x[2]}")
+
+        # unless everything is bad!
+        if not any(x[1] for x in self.filter_summary.iter_rows()):
+            raise ZeroMatchesError(
                 f"All scores fail to meet match threshold {min_overlap}"
             )
 

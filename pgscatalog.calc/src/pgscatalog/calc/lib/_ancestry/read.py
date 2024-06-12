@@ -87,8 +87,8 @@ def read_pgs(loc_aggscore):
         index_col=["sampleset", "IID"],
         converters={"IID": str},
         header=0,
-    ).pivot(columns=["PGS"], values=["SUM", "AVG"])
-    # join column levels ({PGS}_{VALUE})
-    df.columns = [f"{j}_{i}" for i, j in df.columns]
+    ).pivot(columns=["PGS"], values=["SUM"])
+    # rename to PGS only
+    df.columns = [f"{j}" for i, j in df.columns]
 
     return df

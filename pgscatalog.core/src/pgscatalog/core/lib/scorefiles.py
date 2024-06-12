@@ -9,13 +9,6 @@ import pathlib
 
 from xopen import xopen
 
-try:
-    import pyarrow as pa
-except ImportError:
-    PYARROW_AVAILABLE = False
-else:
-    PYARROW_AVAILABLE = True
-
 from .scorevariant import ScoreVariant
 from .genomebuild import GenomeBuild
 from .catalogapi import ScoreQueryResult, CatalogQuery
@@ -781,14 +774,6 @@ class NormalisedScoringFile:
     ...     i
     ...     break
     ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',...
-
-    >>> for x in test.to_pa_recordbatch():  # doctest: +ELLIPSIS
-    ...     x
-    ...     break
-    pyarrow.RecordBatch
-    chr_name: string
-    ...
-    row_nr: [0,1,2,3,4,5,6,7,8,9,...,67,68,69,70,71,72,73,74,75,76]
     """
 
     def __init__(self, path):
@@ -796,9 +781,11 @@ class NormalisedScoringFile:
             with xopen(path):
                 pass
         except TypeError:
-            self.path = False
+            self.is_path = False
+            self.path = str(path)
         else:
-            self.path = True
+            self.is_path = True
+            self.path = path
         finally:
             # either a ScoringFile or a path to a combined file
             self._scoringfile = path
@@ -808,7 +795,7 @@ class NormalisedScoringFile:
 
     @property
     def variants(self):
-        if self.path:
+        if self.is_path:
             # get a fresh generator from the file
             self._variants = _read_normalised_rows(self._scoringfile)
         else:
@@ -818,68 +805,9 @@ class NormalisedScoringFile:
         return self._variants
 
     def __repr__(self):
-        if self.path:
+        if self.is_path:
             x = f"{repr(str(self._scoringfile))}"
         else:
             x = f"{repr(self._scoringfile)}"
 
         return f"{type(self).__name__}({x})"
-
-    def pa_schema(self):
-        """Return a pyarrow schema used when writing object to files"""
-        if not PYARROW_AVAILABLE:
-            raise ImportError("pyarrow is not available")
-
-        return pa.schema(
-            [
-                pa.field("chr_name", pa.string()),
-                pa.field("chr_position", pa.uint64()),
-                pa.field("effect_allele", pa.string()),
-                pa.field("other_allele", pa.string()),
-                pa.field("effect_weight", pa.string()),
-                pa.field("effect_type", pa.string()),
-                pa.field("is_duplicated", pa.bool_()),
-                pa.field("accession", pa.string()),
-                pa.field("row_nr", pa.uint64()),
-            ]
-        )
-
-    def to_pa_recordbatch(self):
-        """Yields an iterator of pyarrow RecordBatches"""
-        if not PYARROW_AVAILABLE:
-            raise ImportError("pyarrow is not available")
-
-        # accessing the property returns a fresh generator
-        # don't want an infinite loop
-        variants = self.variants
-
-        while True:
-            batch = list(itertools.islice(variants, Config.TARGET_BATCH_SIZE))
-            if not batch:
-                break
-
-            _chrom, _pos, _ea, _oa, _ew, _et, _dup, _acc, _rownr = zip(
-                *(
-                    (
-                        x.chr_name,
-                        x.chr_position,
-                        str(x.effect_allele),
-                        x.other_allele,
-                        x.effect_weight,
-                        str(x.effect_type),
-                        x.is_duplicated,
-                        x.accession,
-                        x.row_nr,
-                    )
-                    for x in batch
-                ),
-                strict=True,
-            )
-
-            # convert truthy strings to bools
-            _dup = (True if x == "True" else False for x in _dup)
-
-            yield pa.RecordBatch.from_arrays(
-                [_chrom, _pos, _ea, _oa, _ew, _et, _dup, _acc, _rownr],
-                schema=self.pa_schema(),
-            )

@@ -9,7 +9,7 @@ import textwrap
 
 import polars as pl
 
-from ..lib import (
+from .. import (
     VariantFrame,
     ScoringFileFrame,
     match_variants,
