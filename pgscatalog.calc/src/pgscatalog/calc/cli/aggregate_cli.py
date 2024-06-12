@@ -3,6 +3,7 @@ import logging
 import pathlib
 import textwrap
 from collections import deque
+from typing import Optional
 
 from ..lib import PolygenicScore
 from pgscatalog.core import chrom_keyfunc
@@ -32,18 +33,21 @@ def run_aggregate():
     pgs = deque(PolygenicScore(path=x) for x in score_paths)
 
     observed_columns = set()
-    aggregated = None
+    aggregated: Optional[PolygenicScore] = None
 
+    # first, use PolygenicScore's __add__ method, which implements df.add(fill_value=0)
     while pgs:
-        x = pgs.popleft()  # to remove dfs from memory during iteration
+        # popleft ensures that dfs are removed from memory after each aggregation
+        score: PolygenicScore = pgs.popleft()
         if aggregated is None:
-            logger.info(f"Initialising aggregation with {x}")
-            aggregated = x
+            logger.info(f"Initialising aggregation with {score}")
+            aggregated: PolygenicScore = score
         else:
-            logger.info(f"Adding {x}")
-            aggregated += x
-        observed_columns.update(set(x.df.columns))
+            logger.info(f"Adding {score}")
+            aggregated += score
+        observed_columns.update(set(score.df.columns))
 
+    # check to make sure that every column we saw in the dataframes is in the output
     if (dfcols := set(aggregated.df.columns)) != observed_columns:
         raise ValueError(
             f"Missing columns in aggregated file!. "
@@ -52,6 +56,12 @@ def run_aggregate():
         )
     else:
         logger.info("Aggregated columns match observed columns")
+
+    # next, melt the plink2 scoring files from wide (many columns) format to long format
+    aggregated.melt()
+
+    # recalculate PGS average using aggregated SUM and DENOM
+    aggregated.average()
 
     logger.info("Aggregation finished! Writing to a file")
     aggregated.write(outdir=args.outdir, split=args.split)
