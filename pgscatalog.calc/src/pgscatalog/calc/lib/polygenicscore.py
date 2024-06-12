@@ -274,7 +274,7 @@ class PolygenicScore:
 
     >>> aggregated_score = pgs1 + pgs2
     >>> aggregated_score  # doctest: +ELLIPSIS
-    PolygenicScore(sampleset='test', path=None)
+    PolygenicScore(sampleset='test', path='(in-memory)')
 
     Once a score has been fully aggregated it can be helpful to recalculate an average:
 
