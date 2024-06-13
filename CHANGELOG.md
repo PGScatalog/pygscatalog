@@ -1,5 +1,9 @@
 ## 2024-06-13
 
+Minor release [pgscatalog-utils-1.1.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.1.0)
+
+* Bump dependencies to latest
+
 Minor release [pgscatalog-match-0.2.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.2.0)
 
 * Improve performance when reading target genomes and scoring files https://github.com/PGScatalog/pygscatalog/issues/20
