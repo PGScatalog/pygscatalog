@@ -237,6 +237,21 @@ files = [
 ]
 
 [[package]]
+name = "natsort"
+version = "8.4.0"
+description = "Simple yet flexible natural sorting in Python."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "natsort-8.4.0-py3-none-any.whl", hash = "sha256:4732914fb471f56b5cce04d7bae6f164a592c7712e1c85f9ef585e197299521c"},
+    {file = "natsort-8.4.0.tar.gz", hash = "sha256:45312c4a0e5507593da193dedd04abb1469253b601ecaf63445ad80f0a1ea581"},
+]
+
+[package.extras]
+fast = ["fastnumbers (>=2.0.0)"]
+icu = ["PyICU (>=1.0.0)"]
+
+[[package]]
 name = "numpy"
 version = "1.26.4"
 description = "Fundamental package for array computing in Python"
@@ -358,76 +373,68 @@ name = "pgscatalog-calc"
 version = "0.2.0"
 description = "Libraries and applications for working with calculated polygenic scores"
 optional = false
-python-versions = "^3.11"
-files = []
-develop = true
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "pgscatalog_calc-0.2.0-py3-none-any.whl", hash = "sha256:a01aceb34bb21c7d3d66299b4f51eb13cc31da06db4414aa0c1b87e09907ec74"},
+    {file = "pgscatalog_calc-0.2.0.tar.gz", hash = "sha256:7eb6d9dbf51ea78fd4b447dfc2f10d7b8cd43c98baaf1317afa60c397ea4a487"},
+]
 
 [package.dependencies]
-numpy = "^1.26.4"
-pandas = "^2.2.0"
-"pgscatalog.core" = "^0.1.0"
-pyarrow = "^15.0.0"
-scikit-learn = "^1.4.0"
-scipy = "^1.12.0"
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.calc"
+numpy = ">=1.26.4,<2.0.0"
+pandas = ">=2.2.0,<3.0.0"
+"pgscatalog.core" = ">=0.2.0,<0.3.0"
+pyarrow = ">=15.0.0,<16.0.0"
+scikit-learn = ">=1.4.0,<2.0.0"
+scipy = ">=1.12.0,<2.0.0"
 
 [[package]]
 name = "pgscatalog-core"
-version = "0.1.2"
+version = "0.2.0"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
-python-versions = "^3.11"
-files = []
-develop = true
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "pgscatalog_core-0.2.0-py3-none-any.whl", hash = "sha256:4b9e0f81f353cd1e62d9a672bf1329a42b9e9418a7c501fbb173ec0195b9d880"},
+    {file = "pgscatalog_core-0.2.0.tar.gz", hash = "sha256:1e14738f5f15fb067faa9cc321623e4269d6f505eb95d26f2b5ae9686e5bfb5e"},
+]
 
 [package.dependencies]
-httpx = "^0.26.0"
-pyliftover = "^0.4"
-tenacity = "^8.2.3"
-tqdm = "^4.66.1"
-xopen = {version = "^1.8.0", extras = ["zstd"]}
-
-[package.extras]
-pyarrow = ["pyarrow (>=15.0.0,<16.0.0)"]
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.core"
+httpx = ">=0.26.0,<0.27.0"
+natsort = ">=8.4.0,<9.0.0"
+pyliftover = ">=0.4,<0.5"
+tenacity = ">=8.2.3,<9.0.0"
+tqdm = ">=4.66.1,<5.0.0"
+xopen = {version = ">=1.8.0,<2.0.0", extras = ["zstd"]}
 
 [[package]]
 name = "pgscatalog-match"
-version = "0.1.1"
+version = "0.2.0"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 optional = false
-python-versions = "^3.11"
-files = []
-develop = true
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "pgscatalog_match-0.2.0-py3-none-any.whl", hash = "sha256:1d51b52882b814c7c94453e274f63cfeca0168c9a5994c29a7e4090adc64bb37"},
+    {file = "pgscatalog_match-0.2.0.tar.gz", hash = "sha256:fecf52211c30b5c25aaa4e156d830bcf1e9be486f0b7666060977fd267daf057"},
+]
 
 [package.dependencies]
-"pgscatalog.core" = "^0.1.0"
-polars = "^0.20.5"
-pyarrow = "^15.0.0"
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.match"
+"pgscatalog.core" = ">=0.2.0,<0.3.0"
+polars = "0.20.30"
+pyarrow = ">=15.0.0,<16.0.0"
 
 [[package]]
 name = "polars"
-version = "0.20.31"
+version = "0.20.30"
 description = "Blazingly fast DataFrame library"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "polars-0.20.31-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:86454ade5ed302bbf87f145cfcb1b14f7a5765a9440e448659e1f3dba6ac4e79"},
-    {file = "polars-0.20.31-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:67f2fe842262b7e1b9371edad21b760f6734d28b74c78dda88dff1bf031b9499"},
-    {file = "polars-0.20.31-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:24b82441f93409e0e8abd6f427b029db102f02b8de328cee9a680f84b84e3736"},
-    {file = "polars-0.20.31-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:87f43bce4d41abf8c8c5658d881e4b8378e5c61010a696bfea8b4106b908e916"},
-    {file = "polars-0.20.31-cp38-abi3-win_amd64.whl", hash = "sha256:2d7567c9fd9d3b9aa93387ca9880d9e8f7acea3c0a0555c03d8c0c2f0715d43c"},
-    {file = "polars-0.20.31.tar.gz", hash = "sha256:00f62dec6bf43a4e2a5db58b99bf0e79699fe761c80ae665868eaea5168f3bbb"},
+    {file = "polars-0.20.30-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:7802cb8a6d3fa0fadf446bf19b61ef8450b81229766f1817980bc6e0b2488c03"},
+    {file = "polars-0.20.30-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:0d7278f6e12e6623c8ee6e637d866b96b69f960b358125c955ac76abeb942192"},
+    {file = "polars-0.20.30-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:510f708332a0e0d563a5bac266c11ccd12932606c7331bf28f7173cf669d0c69"},
+    {file = "polars-0.20.30-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:70d58b89cf9902fb5c3506afef76c5c2b247581d0991b082bcdc6d73d983aa2b"},
+    {file = "polars-0.20.30-cp38-abi3-win_amd64.whl", hash = "sha256:039c84f7a294aa71438048e14899d59ce005f213872e27fe6bf6ce3ae8730d7d"},
+    {file = "polars-0.20.30.tar.gz", hash = "sha256:b9fd2c6b5100caa7c26496ce17ec289cae23c2db6c41713bc52c54c76d4451ae"},
 ]
 
 [package.extras]
@@ -851,4 +858,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "b535fb452bf3901d2dffbd1eeacd6f5032157c0d88d91adb42d24b4cb3593359"
+content-hash = "ebe30628aa58a3944e644bcdee4753d55bf2fd34c6c7d3dadfa37c1230b581b5"
