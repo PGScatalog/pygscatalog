@@ -12,7 +12,7 @@ packages = [
 python = "^3.11"
 polars = "0.20.30"
 pyarrow = "^15.0.0"
-"pgscatalog.core" = {path = "../pgscatalog.core", develop = true}
+"pgscatalog.core" = "^0.2.0"
 
 [tool.poetry.scripts]
 pgscatalog-match = 'pgscatalog.match.cli.match_cli:run_match'

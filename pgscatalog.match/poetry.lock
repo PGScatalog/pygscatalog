@@ -362,35 +362,33 @@ files = [
 
 [[package]]
 name = "packaging"
-version = "24.0"
+version = "24.1"
 description = "Core utilities for Python packages"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "packaging-24.0-py3-none-any.whl", hash = "sha256:2ddfb553fdf02fb784c234c7ba6ccc288296ceabec964ad2eae3777778130bc5"},
-    {file = "packaging-24.0.tar.gz", hash = "sha256:eb82c5e3e56209074766e6885bb04b8c38a0c015d0a30036ebe7ece34c9989e9"},
+    {file = "packaging-24.1-py3-none-any.whl", hash = "sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"},
+    {file = "packaging-24.1.tar.gz", hash = "sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002"},
 ]
 
 [[package]]
 name = "pgscatalog-core"
-version = "0.1.2"
+version = "0.2.0"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
-python-versions = "^3.11"
-files = []
-develop = true
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "pgscatalog_core-0.2.0-py3-none-any.whl", hash = "sha256:4b9e0f81f353cd1e62d9a672bf1329a42b9e9418a7c501fbb173ec0195b9d880"},
+    {file = "pgscatalog_core-0.2.0.tar.gz", hash = "sha256:1e14738f5f15fb067faa9cc321623e4269d6f505eb95d26f2b5ae9686e5bfb5e"},
+]
 
 [package.dependencies]
-httpx = "^0.26.0"
-natsort = "^8.4.0"
-pyliftover = "^0.4"
-tenacity = "^8.2.3"
-tqdm = "^4.66.1"
-xopen = {version = "^1.8.0", extras = ["zstd"]}
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.core"
+httpx = ">=0.26.0,<0.27.0"
+natsort = ">=8.4.0,<9.0.0"
+pyliftover = ">=0.4,<0.5"
+tenacity = ">=8.2.3,<9.0.0"
+tqdm = ">=4.66.1,<5.0.0"
+xopen = {version = ">=1.8.0,<2.0.0", extras = ["zstd"]}
 
 [[package]]
 name = "pluggy"
@@ -736,4 +734,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "3e56c3152459fb66ba8883f066806f48504c64a53fc9fbfd061ad51d1fdbedc7"
+content-hash = "8b3b1841d96cce4ef0acf90a825bf860781dee16ec01815e13033b2fb5001c1a"

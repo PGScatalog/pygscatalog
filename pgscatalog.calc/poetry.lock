@@ -456,24 +456,22 @@ xml = ["lxml (>=4.9.2)"]
 
 [[package]]
 name = "pgscatalog-core"
-version = "0.1.2"
+version = "0.2.0"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
-python-versions = "^3.11"
-files = []
-develop = true
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "pgscatalog_core-0.2.0-py3-none-any.whl", hash = "sha256:4b9e0f81f353cd1e62d9a672bf1329a42b9e9418a7c501fbb173ec0195b9d880"},
+    {file = "pgscatalog_core-0.2.0.tar.gz", hash = "sha256:1e14738f5f15fb067faa9cc321623e4269d6f505eb95d26f2b5ae9686e5bfb5e"},
+]
 
 [package.dependencies]
-httpx = "^0.26.0"
-natsort = "^8.4.0"
-pyliftover = "^0.4"
-tenacity = "^8.2.3"
-tqdm = "^4.66.1"
-xopen = {version = "^1.8.0", extras = ["zstd"]}
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.core"
+httpx = ">=0.26.0,<0.27.0"
+natsort = ">=8.4.0,<9.0.0"
+pyliftover = ">=0.4,<0.5"
+tenacity = ">=8.2.3,<9.0.0"
+tqdm = ">=4.66.1,<5.0.0"
+xopen = {version = ">=1.8.0,<2.0.0", extras = ["zstd"]}
 
 [[package]]
 name = "pluggy"
@@ -925,4 +923,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "129e98096e082467bf990f3d02ffa8d9c1a34328d3992672c1d235db1075539c"
+content-hash = "5a2251488904b0ce787219f162a33102a3d2cad822a81cce540b4c8dee4014ed"
