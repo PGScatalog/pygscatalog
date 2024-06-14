@@ -150,27 +150,22 @@ class MatchResults(collections.abc.Sequence):
 
     An important part of matching variants is reporting a log to see how well you're reproducing a PGS in the new target genomes:
 
-    >>> with scorefile as score_df:
+    >>> with pl.Config(tbl_formatting="ASCII_MARKDOWN", tbl_hide_column_data_types=True, tbl_width_chars=120), scorefile as score_df:
     ...     MatchResults(x).full_variant_log(score_df).fetch()  # +ELLIPSIS
     shape: (155, 23)
-    ┌────────┬───────────┬──────────┬────────────┬───┬────────────┬───────────┬────────────┬───────────┐
-    │ row_nr ┆ accession ┆ chr_name ┆ chr_positi ┆ … ┆ duplicate_ ┆ match_IDs ┆ match_stat ┆ dataset   │
-    │ ---    ┆ ---       ┆ ---      ┆ on         ┆   ┆ ID         ┆ ---       ┆ us         ┆ ---       │
-    │ u64    ┆ cat       ┆ cat      ┆ ---        ┆   ┆ ---        ┆ str       ┆ ---        ┆ cat       │
-    │        ┆           ┆          ┆ u64        ┆   ┆ bool       ┆           ┆ cat        ┆           │
-    ╞════════╪═══════════╪══════════╪════════════╪═══╪════════════╪═══════════╪════════════╪═══════════╡
-    │ 0      ┆ PGS000002 ┆ 11       ┆ 69331418   ┆ … ┆ null       ┆ null      ┆ unmatched  ┆ goodmatch │
-    │ 1      ┆ PGS000002 ┆ 11       ┆ 69379161   ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
-    │ 2      ┆ PGS000002 ┆ 11       ┆ 69331642   ┆ … ┆ null       ┆ null      ┆ unmatched  ┆ goodmatch │
-    │ 3      ┆ PGS000002 ┆ 5        ┆ 1282319    ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
-    │ 4      ┆ PGS000002 ┆ 5        ┆ 1279790    ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
-    │ …      ┆ …         ┆ …        ┆ …          ┆ … ┆ …          ┆ …         ┆ …          ┆ …         │
-    │ 72     ┆ PGS000001 ┆ 22       ┆ 40876234   ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
-    │ 73     ┆ PGS000001 ┆ 1        ┆ 204518842  ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
-    │ 74     ┆ PGS000001 ┆ 1        ┆ 202187176  ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
-    │ 75     ┆ PGS000001 ┆ 2        ┆ 19320803   ┆ … ┆ false      ┆ NA        ┆ matched    ┆ goodmatch │
-    │ 76     ┆ PGS000001 ┆ 16       ┆ 53855291   ┆ … ┆ null       ┆ null      ┆ unmatched  ┆ goodmatch │
-    └────────┴───────────┴──────────┴────────────┴───┴────────────┴───────────┴────────────┴───────────┘
+    | row_nr | accession | chr_name | chr_position | … | duplicate_ID | match_IDs | match_status | dataset   |
+    |--------|-----------|----------|--------------|---|--------------|-----------|--------------|-----------|
+    | 0      | PGS000002 | 11       | 69331418     | … | null         | null      | unmatched    | goodmatch |
+    | 1      | PGS000002 | 11       | 69379161     | … | false        | NA        | matched      | goodmatch |
+    | 2      | PGS000002 | 11       | 69331642     | … | null         | null      | unmatched    | goodmatch |
+    | 3      | PGS000002 | 5        | 1282319      | … | false        | NA        | matched      | goodmatch |
+    | 4      | PGS000002 | 5        | 1279790      | … | false        | NA        | matched      | goodmatch |
+    | …      | …         | …        | …            | … | …            | …         | …            | …         |
+    | 72     | PGS000001 | 22       | 40876234     | … | false        | NA        | matched      | goodmatch |
+    | 73     | PGS000001 | 1        | 204518842    | … | false        | NA        | matched      | goodmatch |
+    | 74     | PGS000001 | 1        | 202187176    | … | false        | NA        | matched      | goodmatch |
+    | 75     | PGS000001 | 2        | 19320803     | … | false        | NA        | matched      | goodmatch |
+    | 76     | PGS000001 | 16       | 53855291     | … | null         | null      | unmatched    | goodmatch |
     """
 
     def __init__(self, *elements):

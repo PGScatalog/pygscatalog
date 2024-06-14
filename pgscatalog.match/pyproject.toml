@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pgscatalog.match"
-version = "0.2.0"
+version = "0.2.1"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
 readme = "README.md"
@@ -9,10 +9,10 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.10"
 polars = "0.20.30"
 pyarrow = "^15.0.0"
-"pgscatalog.core" = "^0.2.0"
+"pgscatalog.core" = { path="../pgscatalog.core", develop=true}
 
 [tool.poetry.scripts]
 pgscatalog-match = 'pgscatalog.match.cli.match_cli:run_match'

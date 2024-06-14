@@ -12,8 +12,10 @@ files = [
 ]
 
 [package.dependencies]
+exceptiongroup = {version = ">=1.0.2", markers = "python_version < \"3.11\""}
 idna = ">=2.8"
 sniffio = ">=1.1"
+typing-extensions = {version = ">=4.1", markers = "python_version < \"3.11\""}
 
 [package.extras]
 doc = ["Sphinx (>=7)", "packaging", "sphinx-autodoc-typehints (>=1.2.0)", "sphinx-rtd-theme"]
@@ -105,6 +107,20 @@ files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
+
+[[package]]
+name = "exceptiongroup"
+version = "1.2.1"
+description = "Backport of PEP 654 (exception groups)"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "exceptiongroup-1.2.1-py3-none-any.whl", hash = "sha256:5258b9ed329c5bbdd31a309f53cbfb0b155341807f6ff7606a1e801a891b29ad"},
+    {file = "exceptiongroup-1.2.1.tar.gz", hash = "sha256:a4785e48b045528f5bfe627b6ad554ff32def154f42372786903b7abcfe1aa16"},
+]
+
+[package.extras]
+test = ["pytest (>=6)"]
 
 [[package]]
 name = "h11"
@@ -336,6 +352,7 @@ files = [
 
 [package.dependencies]
 numpy = [
+    {version = ">=1.22.4", markers = "python_version < \"3.11\""},
     {version = ">=1.23.2", markers = "python_version == \"3.11\""},
     {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
 ]
@@ -373,54 +390,60 @@ name = "pgscatalog-calc"
 version = "0.2.0"
 description = "Libraries and applications for working with calculated polygenic scores"
 optional = false
-python-versions = "<4.0,>=3.11"
-files = [
-    {file = "pgscatalog_calc-0.2.0-py3-none-any.whl", hash = "sha256:a01aceb34bb21c7d3d66299b4f51eb13cc31da06db4414aa0c1b87e09907ec74"},
-    {file = "pgscatalog_calc-0.2.0.tar.gz", hash = "sha256:7eb6d9dbf51ea78fd4b447dfc2f10d7b8cd43c98baaf1317afa60c397ea4a487"},
-]
+python-versions = ">=3.10"
+files = []
+develop = false
 
 [package.dependencies]
-numpy = ">=1.26.4,<2.0.0"
-pandas = ">=2.2.0,<3.0.0"
-"pgscatalog.core" = ">=0.2.0,<0.3.0"
-pyarrow = ">=15.0.0,<16.0.0"
-scikit-learn = ">=1.4.0,<2.0.0"
-scipy = ">=1.12.0,<2.0.0"
+numpy = "^1.26.4"
+pandas = "^2.2.0"
+"pgscatalog.core" = {path = "../pgscatalog.core", develop = true}
+pyarrow = "^15.0.0"
+scikit-learn = "^1.4.0"
+scipy = "^1.12.0"
+
+[package.source]
+type = "directory"
+url = "../pgscatalog.calc"
 
 [[package]]
 name = "pgscatalog-core"
 version = "0.2.0"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
-python-versions = "<4.0,>=3.11"
-files = [
-    {file = "pgscatalog_core-0.2.0-py3-none-any.whl", hash = "sha256:4b9e0f81f353cd1e62d9a672bf1329a42b9e9418a7c501fbb173ec0195b9d880"},
-    {file = "pgscatalog_core-0.2.0.tar.gz", hash = "sha256:1e14738f5f15fb067faa9cc321623e4269d6f505eb95d26f2b5ae9686e5bfb5e"},
-]
+python-versions = ">=3.10"
+files = []
+develop = false
 
 [package.dependencies]
-httpx = ">=0.26.0,<0.27.0"
-natsort = ">=8.4.0,<9.0.0"
-pyliftover = ">=0.4,<0.5"
-tenacity = ">=8.2.3,<9.0.0"
-tqdm = ">=4.66.1,<5.0.0"
-xopen = {version = ">=1.8.0,<2.0.0", extras = ["zstd"]}
+httpx = "^0.26.0"
+natsort = "^8.4.0"
+pyliftover = "^0.4"
+tenacity = "^8.2.3"
+tqdm = "^4.66.1"
+xopen = {version = "^1.8.0", extras = ["zstd"]}
+
+[package.source]
+type = "directory"
+url = "../pgscatalog.core"
 
 [[package]]
 name = "pgscatalog-match"
 version = "0.2.0"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 optional = false
-python-versions = "<4.0,>=3.11"
-files = [
-    {file = "pgscatalog_match-0.2.0-py3-none-any.whl", hash = "sha256:1d51b52882b814c7c94453e274f63cfeca0168c9a5994c29a7e4090adc64bb37"},
-    {file = "pgscatalog_match-0.2.0.tar.gz", hash = "sha256:fecf52211c30b5c25aaa4e156d830bcf1e9be486f0b7666060977fd267daf057"},
-]
+python-versions = ">=3.10"
+files = []
+develop = false
 
 [package.dependencies]
-"pgscatalog.core" = ">=0.2.0,<0.3.0"
+"pgscatalog.core" = {path = "../pgscatalog.core", develop = true}
 polars = "0.20.30"
-pyarrow = ">=15.0.0,<16.0.0"
+pyarrow = "^15.0.0"
+
+[package.source]
+type = "directory"
+url = "../pgscatalog.match"
 
 [[package]]
 name = "polars"
@@ -712,6 +735,17 @@ slack = ["slack-sdk"]
 telegram = ["requests"]
 
 [[package]]
+name = "typing-extensions"
+version = "4.12.2"
+description = "Backported and Experimental Type Hints for Python 3.8+"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
+    {file = "typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"},
+]
+
+[[package]]
 name = "tzdata"
 version = "2024.1"
 description = "Provider of IANA time zone data"
@@ -857,5 +891,5 @@ cffi = ["cffi (>=1.11)"]
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.11"
-content-hash = "ebe30628aa58a3944e644bcdee4753d55bf2fd34c6c7d3dadfa37c1230b581b5"
+python-versions = ">=3.10"
+content-hash = "7e3ba987b10d21775b5d5162d0b9b84fb00fddeda6118ec602c1f8dec79dcbdb"

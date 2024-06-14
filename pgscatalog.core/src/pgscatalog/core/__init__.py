@@ -1,4 +1,5 @@
 import logging
+import importlib.metadata
 
 from .lib import (
     Config,
@@ -80,4 +81,4 @@ __all__ = [
     "chrom_keyfunc",
 ]
 
-__version__ = "0.2.0"
+__version__ = importlib.metadata.version("pgscatalog.core")

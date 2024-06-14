@@ -1,4 +1,6 @@
-__version__ = "1.1.0"
+import importlib.metadata
+
+__version__ = importlib.metadata.version("pgscatalog.utils")
 
 # intentionally empty :)
 #     |\__/,|   (`\
