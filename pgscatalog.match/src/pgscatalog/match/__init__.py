@@ -20,4 +20,4 @@ __all__ = [
     "match_variants",
 ]
 
-__version__ = importlib.metadata.version(__name__)
+__version__ = importlib.metadata.version("pgscatalog.match")

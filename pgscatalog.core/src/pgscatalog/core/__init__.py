@@ -81,4 +81,4 @@ __all__ = [
     "chrom_keyfunc",
 ]
 
-__version__ = importlib.metadata.version(__name__)
+__version__ = importlib.metadata.version("pgscatalog.core")
