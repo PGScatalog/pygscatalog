@@ -9,10 +9,10 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.10"
 polars = "0.20.30"
 pyarrow = "^15.0.0"
-"pgscatalog.core" = "^0.2.0"
+"pgscatalog.core" = { path="../pgscatalog.core", develop=true}
 
 [tool.poetry.scripts]
 pgscatalog-match = 'pgscatalog.match.cli.match_cli:run_match'

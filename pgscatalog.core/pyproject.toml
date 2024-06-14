@@ -15,7 +15,7 @@ pgscatalog-combine = 'pgscatalog.core.cli.combine_cli:run'
 pgscatalog-relabel = 'pgscatalog.core.cli.relabel_cli:run'
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.10"
 httpx = "^0.26.0"
 tenacity = "^8.2.3"
 pyliftover = "^0.4"
