@@ -1,3 +1,12 @@
+## 2024-06-14
+
+Patch releases to downgrade minimum Python version to 3.10:
+
+*  [pgscatalog-utils-1.1.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.1.1)
+*  [pgscatalog-match-0.2.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.2.1)
+*  [pgscatalog-calc-0.2.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.calc-0.2.1)
+*  [pgscatalog-core-0.2.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.core-0.2.1)
+
 ## 2024-06-13
 
 Minor release [pgscatalog-utils-1.1.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.1.0)
