@@ -1,4 +1,6 @@
-__version__ = "1.1.0"
+import importlib.metadata
+
+__version__ = importlib.metadata.version(__name__)
 
 # intentionally empty :)
 #     |\__/,|   (`\

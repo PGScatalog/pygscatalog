@@ -1,4 +1,5 @@
 import logging
+import importlib.metadata
 
 from .lib import (
     PolygenicScore,
@@ -21,4 +22,4 @@ __all__ = [
     "AdjustResults",
 ]
 
-__version__ = "0.2.0"
+__version__ = importlib.metadata.version(__name__)

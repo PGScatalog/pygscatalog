@@ -1,4 +1,5 @@
 import logging
+import importlib.metadata
 
 from .lib import VariantFrame
 from .lib import ScoringFileFrame, match_variants
@@ -19,4 +20,4 @@ __all__ = [
     "match_variants",
 ]
 
-__version__ = "0.2.0"
+__version__ = importlib.metadata.version(__name__)
