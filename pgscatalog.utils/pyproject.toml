@@ -10,10 +10,10 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-"pgscatalog.calc" = "^0.2.0"
-"pgscatalog.core" = "^0.2.0"
-"pgscatalog.match" = "^0.2.0"
+python = ">=3.10"
+"pgscatalog.calc" = {path = "../pgscatalog.calc" }
+"pgscatalog.core" = {path = "../pgscatalog.core"}
+"pgscatalog.match" = {path = "../pgscatalog.match"}
 
 [build-system]
 requires = ["poetry-core"]
