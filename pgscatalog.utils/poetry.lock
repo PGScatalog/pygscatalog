@@ -387,33 +387,31 @@ xml = ["lxml (>=4.9.2)"]
 
 [[package]]
 name = "pgscatalog-calc"
-version = "0.2.0"
+version = "0.2.1"
 description = "Libraries and applications for working with calculated polygenic scores"
 optional = false
 python-versions = ">=3.10"
-files = []
-develop = false
+files = [
+    {file = "pgscatalog_calc-0.2.1-py3-none-any.whl", hash = "sha256:32df038c47d19d60a45d5f5c5ba4bdcd1fc01bce4f41492a62857ee38bc6053d"},
+    {file = "pgscatalog_calc-0.2.1.tar.gz", hash = "sha256:66c661a2b8a1b4c46db6f0377b31077053251123b46d31b3b51d54c8ea0dd4d8"},
+]
 
 [package.dependencies]
-numpy = "^1.26.4"
-pandas = "^2.2.0"
-"pgscatalog.core" = {path = "../pgscatalog.core", develop = true}
-pyarrow = "^15.0.0"
-scikit-learn = "^1.4.0"
-scipy = "^1.12.0"
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.calc"
+numpy = ">=1.26.4,<2.0.0"
+pandas = ">=2.2.0,<3.0.0"
+"pgscatalog.core" = ">=0.2.1,<0.3.0"
+pyarrow = ">=15.0.0,<16.0.0"
+scikit-learn = ">=1.4.0,<2.0.0"
+scipy = ">=1.12.0,<2.0.0"
 
 [[package]]
 name = "pgscatalog-core"
-version = "0.2.0"
+version = "0.2.1"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
 python-versions = ">=3.10"
 files = []
-develop = false
+develop = true
 
 [package.dependencies]
 httpx = "^0.26.0"
@@ -429,21 +427,19 @@ url = "../pgscatalog.core"
 
 [[package]]
 name = "pgscatalog-match"
-version = "0.2.0"
+version = "0.2.1"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 optional = false
 python-versions = ">=3.10"
-files = []
-develop = false
+files = [
+    {file = "pgscatalog_match-0.2.1-py3-none-any.whl", hash = "sha256:ba428dcade2524b07cec23613ab07e30a0a7e6536a860695873d466bbf8f27eb"},
+    {file = "pgscatalog_match-0.2.1.tar.gz", hash = "sha256:509628df5a2819c29ff2a04f47ce8f285c672cf1a1c56db2e06db2bc6fdade04"},
+]
 
 [package.dependencies]
-"pgscatalog.core" = {path = "../pgscatalog.core", develop = true}
+"pgscatalog.core" = ">=0.2.1,<0.3.0"
 polars = "0.20.30"
-pyarrow = "^15.0.0"
-
-[package.source]
-type = "directory"
-url = "../pgscatalog.match"
+pyarrow = ">=15.0.0,<16.0.0"
 
 [[package]]
 name = "polars"
@@ -892,4 +888,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10"
-content-hash = "7e3ba987b10d21775b5d5162d0b9b84fb00fddeda6118ec602c1f8dec79dcbdb"
+content-hash = "16842623ab4c12217422632b021afd49310bc15c83d2202f86534b4a2fd2a9ac"
