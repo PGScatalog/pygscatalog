@@ -49,11 +49,11 @@ codebase (`pgscatalog_utils`_) with contributions and input from members
 of the PGS Catalog team (Samuel Lambert, Benjamin Wingfield, Aoife McMahon Laurent Gil) and Inouye lab 
 (Rodrigo Canovas, Scott Ritchie, Jingqin Wu).
 
-A manuscript describing this package and ``pgsc_calc`` pipeline is *in preparation*. In the meantime if you use the
-tool we ask you to cite the repo and the paper describing the PGS Catalog resource:
+If you use this package in your analysis, please cite:
 
-- `PGS Catalog Calculator`_ *in preparation*. PGS Catalog Team. https://github.com/PGScatalog/pgsc_calc
-- Lambert *et al.* (2021) The Polygenic Score Catalog as an open database for reproducibility and systematic evaluation.  Nature Genetics. 53:420-425 doi: `10.1038/s41588-021-00783-5`_
+    Lambert, Wingfield, `et al.` (2024) The Polygenic Score Catalog: new functionality and tools to enable FAIR research. medRxiv. doi:`10.1101/2024.05.29.24307783`_.
+
+.. _10.1101/2024.05.29.24307783: https://doi.org/10.1101/2024.05.29.24307783
 
 All of our code is open source and permissively licensed with `Apache 2`_.
 
