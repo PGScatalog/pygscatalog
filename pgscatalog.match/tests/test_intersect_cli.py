@@ -18,13 +18,18 @@ def afreq(request):
 
 
 @pytest.fixture(scope="module")
-def target(request):
+def target_pvar(request):
     return request.path.parent / "data" / "target.pvar.zst"
 
 
 @pytest.fixture(scope="module")
 def ref(request):
     return request.path.parent / "data" / "ref.pvar.zst"
+
+
+@pytest.fixture(params=["target.bim.zst", "target.pvar.zst"], scope="module")
+def target(request):
+    return request.path.parent / "data" / request.param
 
 
 def test_intersect_cli(tmp_path_factory, ref, target, afreq, vmiss):
