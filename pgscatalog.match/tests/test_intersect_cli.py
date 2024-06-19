@@ -18,11 +18,6 @@ def afreq(request):
 
 
 @pytest.fixture(scope="module")
-def target_pvar(request):
-    return request.path.parent / "data" / "target.pvar.zst"
-
-
-@pytest.fixture(scope="module")
 def ref(request):
     return request.path.parent / "data" / "ref.pvar.zst"
 
