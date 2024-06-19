@@ -1,3 +1,9 @@
+## 2024-06-19
+
+Patch release [pgscatalog-match-0.2.2](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.2.1)
+
+* Fixes `pgscatalog-intersect` with bim target input https://github.com/PGScatalog/pygscatalog/pull/25
+ 
 ## 2024-06-14
 
 Patch releases to downgrade minimum Python version to 3.10:
