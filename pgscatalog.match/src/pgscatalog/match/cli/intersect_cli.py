@@ -114,13 +114,8 @@ def run_intersect():
         )  # essential not to filter target (messes up common line indexing)
 
         for v, freq, miss in zip(pvar, afreq, vmiss):
-            try:
-                is_sorted = all([v["ID"], freq["ID"], miss["#ID"]])  # pvar input
-            except KeyError:
-                is_sorted = all([v["ID"], freq["ID"], miss["ID"]])  # bim input
-            finally:
-                if not is_sorted:
-                    raise ValueError("TARGET variant files are not sorted")
+            if not all([v["ID"], freq["ID"], miss["#ID"]]):
+                raise ValueError("TARGET variant files are not sorted")
 
             count_var_t += 1
             ALTs = v["ALT"].split(",")
