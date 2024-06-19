@@ -93,24 +93,30 @@ def run_intersect():
     o_tmp_t = []
     target_heap = []
     for path in args.target:
+        # assume inputs always have two extensions (bim.zst / pvar.zst)
+        path = pathlib.Path(path)
+        basename = path.name
+        stem = pathlib.Path(basename.split(".")[0])
+
         logger.info("Reading TARGET variants: {}".format(path))
         pvar = read_var_general(
             path, chrom=None
         )  # essential not to filter target (messes up common line indexing)
 
-        loc_afreq = path.replace(".pvar.zst", ".afreq.gz")
+        loc_afreq = path.parent / stem.with_suffix(".afreq.gz")
         afreq = read_var_general(
             loc_afreq, chrom=None
         )  # essential not to filter target (messes up common line indexing)
 
-        loc_vmiss = path.replace(".pvar.zst", ".vmiss.gz")
+        loc_vmiss = path.parent / stem.with_suffix(".vmiss.gz")
         vmiss = read_var_general(
             loc_vmiss, chrom=None
         )  # essential not to filter target (messes up common line indexing)
 
         for v, freq, miss in zip(pvar, afreq, vmiss):
-            if all([v["ID"], freq["ID"], miss["#ID"]]) is False:
+            if not all([v["ID"], freq["ID"], miss["#ID"]]):
                 raise ValueError("TARGET variant files are not sorted")
+
             count_var_t += 1
             ALTs = v["ALT"].split(",")
             ALT_FREQS = [float(x) for x in freq["ALT_FREQS"].split(",")]
