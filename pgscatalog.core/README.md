@@ -1,4 +1,4 @@
-# `pgscatalog-core`
+# `pgscatalog.core`
 
 [![Run pytest on pgscatalog.core](https://github.com/PGScatalog/pygscatalog/actions/workflows/core-pytest.yml/badge.svg)](https://github.com/PGScatalog/pygscatalog/actions/workflows/core-pytest.yml)
 [![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/core/index.html)
@@ -23,7 +23,7 @@ If you want to do automatic PGS calculation check out the [PGS Catalog Calculato
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/pgscatalog.core/README.html)
 
 ```
-$ pipx install pgscatalog-core
+$ pipx install pgscatalog.core
 ```
 
 ## Documentation
