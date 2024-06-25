@@ -21,6 +21,8 @@ Please note this package doesn't contain functionality to calculate a PGS from t
 
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/pgscatalog.calc/README.html)
 
+or [install via `pip`](https://pypi.org/project/pgscatalog.calc/):
+
 ```
 $ pipx install pgscatalog.calc
 ```
