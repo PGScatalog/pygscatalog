@@ -21,6 +21,8 @@ workflow for calculating PGS and performing common adjustments for genetic ances
 If you want an automatic method of calculating PGS, including genetic ancestry similarity estimation and PGS normalisation, 
 the workflow is the easiest method.
 
+> [!TIP]
+> If you want to use all of the applications listed below, you can install the package `pgscatalog-utils` with [pip](https://pypi.org/project/pgscatalog-utils/) or [bioconda](http://bioconda.github.io/recipes/pgscatalog-utils/README.html)
 
 | Application                  | Description                                                            | Install                         | Link                                 |
 |------------------------------|------------------------------------------------------------------------|---------------------------------|--------------------------------------|
@@ -32,9 +34,6 @@ the workflow is the easiest method.
 | `pgscatalog-intersect`       | Match variants across two different variant information files (e.g. reference & target genomes) | `pipx install pgscatalog.match` | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/intersect.html) |
 | `pgscatalog-aggregate`       | Aggregate calculated PGS split across multiple files                   | `pipx install pgscatalog.calc`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/aggregate.html)  |
 | `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry               | `pipx install pgscatalog.calc`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/ancestry.html)  |
-
-> [!TIP]
-> If you want to use all of these applications, you can install the package `pgscatalog-utils` with [pip](https://pypi.org/project/pgscatalog-utils/) or [bioconda](http://bioconda.github.io/recipes/pgscatalog-utils/README.html)
 
 ## Developer libraries
 
