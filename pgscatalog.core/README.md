@@ -22,6 +22,8 @@ If you want to do automatic PGS calculation check out the [PGS Catalog Calculato
 
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/pgscatalog.core/README.html)
 
+or [install via `pip`](https://pypi.org/project/pgscatalog.core/):
+
 ```
 $ pipx install pgscatalog.core
 ```
