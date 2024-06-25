@@ -13,6 +13,8 @@ that has been converted to namespace packages for modularity and re-use.
 
 ## User applications 
 
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/pgscatalog-utils/README.html)
+
 These CLI applications are used internally by the [PGS Catalog Calculator (`pgsc_calc`)](https://github.com/PGScatalog/pgsc_calc) 
 workflow for calculating PGS and performing common adjustments for genetic ancestry. 
 
