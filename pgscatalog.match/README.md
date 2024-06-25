@@ -1,4 +1,4 @@
-# pgscatalog-match
+# pgscatalog.match
 
 [![.github/workflows/match-pytest.yml](https://github.com/PGScatalog/pygscatalog/actions/workflows/match-pytest.yml/badge.svg?branch=main)](https://github.com/PGScatalog/pygscatalog/actions/workflows/match-pytest.yml)
 [![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/match/index.html)
@@ -14,8 +14,12 @@ If you want to do automatic PGS calculation check out the [PGS Catalog Calculato
 
 ## Installation 
 
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/pgscatalog.match/README.html)
+
+or [install via `pip`](https://pypi.org/project/pgscatalog.match/):
+
 ```
-$ pipx install pgscatalog-match
+$ pipx install pgscatalog.match
 ```
 
 ## Documentation
