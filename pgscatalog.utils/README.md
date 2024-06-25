@@ -19,8 +19,12 @@ See https://github.com/PGScatalog/pygscatalog for more details.
 
 ## Installation 
 
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/pgscatalog-utils/README.html)
+
+or [install via `pip`](https://pypi.org/project/pgscatalog-utils/):
+
 ```
-$ pip install pgscatalog-utils
+$ pipx install pgscatalog-utils
 ```
 
 ## Documentation 
