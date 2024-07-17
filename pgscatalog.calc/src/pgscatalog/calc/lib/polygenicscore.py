@@ -268,7 +268,7 @@ class PolygenicScore:
     PolygenicScore(sampleset='test', path=PosixPath('.../cineca_22_additive_0.sscore.zst'))
     >>> pgs2 = PolygenicScore(sampleset="test", path=score1)
     >>> reprlib.repr(pgs1.read().to_dict()) # doctest: +ELLIPSIS
-    "{'DENOM': {('test', 'HG00096'): 1564, ('test', 'HG00097'): 1564, ('test', 'HG00099'): 1564, ('test', 'HG00100'): 1564, ...}, 'PGS001229_22_SUM': {('test', 'HG00096'): 0.54502, ('test', 'HG00097'): 0.674401, ('test', 'HG00099'): 0.63727, ('test', 'HG00100'): 0.863944, ...}}"
+    "{'DENOM': {('test', 'HG00096', 'HG00096'): 1564, ... 'PGS001229_22_SUM': {('test', 'HG00096', 'HG00096'): 0.54502, ...
 
     It's often helpful to combine PGS that were split per chromosome or by effect type:
 
@@ -280,10 +280,10 @@ class PolygenicScore:
 
     >>> aggregated_score.average()
     >>> aggregated_score.df  # doctest: +ELLIPSIS,+NORMALIZE_WHITESPACE
-                                PGS       SUM  DENOM       AVG
-    sampleset IID
-    test      HG00096  PGS001229_22  1.090040   3128  0.000348
-              HG00097  PGS001229_22  1.348802   3128  0.000431
+                                        PGS       SUM  DENOM       AVG
+    sampleset FID     IID
+    test      HG00096 HG00096  PGS001229_22  1.090040   3128  0.000348
+              HG00097 HG00097  PGS001229_22  1.348802   3128  0.000431
     ...
 
     Scores can be written to a TSV file:
