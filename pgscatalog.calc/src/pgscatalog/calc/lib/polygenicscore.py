@@ -360,13 +360,25 @@ class PolygenicScore:
         if self.path is None:
             raise ValueError("Missing path")
 
-        df = (
-            pd.read_csv(self.path, sep="\t", converters={"IID": str})
-            .assign(sampleset=self.sampleset)
-            .set_index(["sampleset", "#IID"])
+        df = pd.read_csv(self.path, sep="\t", converters={"IID": str}).assign(
+            sampleset=self.sampleset
         )
 
-        df.index.names = ["sampleset", "IID"]
+        if "#FID" not in df.columns:
+            logger.warning("#FID column missing, setting FID == IID")
+            # if FID is missing, IID starts with a hash
+            df["#FID"] = df["#IID"]
+            df = df.set_index(["sampleset", "#FID", "#IID"])
+        elif all(df["#FID"] == 0):
+            logger.warning("All FID column values missing (0), setting FID == IID")
+            # FID column present, but missing data, IID doesn't start with a hash
+            df["#FID"] = df["IID"]
+            df = df.set_index(["sampleset", "#FID", "IID"])
+        else:
+            logger.info("#FID column detected")
+            df = df.set_index(["sampleset", "#FID", "IID"])
+
+        df.index.names = ["sampleset", "FID", "IID"]
         df = df[_select_agg_cols(df.columns)]
         return df
 
