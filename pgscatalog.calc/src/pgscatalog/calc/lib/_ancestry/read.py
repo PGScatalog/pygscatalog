@@ -19,6 +19,7 @@ def read_pcs(loc_pcs: list[str], dataset: str, loc_related_ids=None, nPCs=None):
         logger.debug("Reading PCA projection: {}".format(path))
         df = pd.read_csv(path, sep="\t", converters={"IID": str, "FID": str}, header=0)
         df["sampleset"] = dataset
+
         df.set_index(["sampleset", "FID", "IID"], inplace=True)
 
         if i == 0:

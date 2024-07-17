@@ -169,7 +169,7 @@ class AggregatedPGS:
         >>> related_path = Config.ROOT_DIR / "tests" / "data" / "ref.king.cutoff.id"
         >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "data" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "data" / "ref.psam", pop_type=PopulationType.REFERENCE, related_path=related_path)
         >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "data" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
-        >>> score_path = Config.ROOT_DIR / "tests" / "data" / "aggregated_scores.txt.gz"
+        >>> score_path = Config.ROOT_DIR / "tests" / "data" / "aggregated_scores.txt"
         >>> results = AggregatedPGS(path=score_path, target_name="hgdp").adjust(ref_pc=ref_pc, target_pc=target_pcs)
         >>> results.pgs.to_dict().keys()
         dict_keys(['SUM|PGS001229_hmPOS_GRCh38', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38', 'Z_MostSimilarPop|PGS001229_hmPOS_GRCh38', ...
