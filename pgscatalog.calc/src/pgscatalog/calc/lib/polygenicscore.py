@@ -87,7 +87,7 @@ class AdjustResults:
                     df_pgs.drop("variable", axis=1)
                     .reset_index()
                     .pivot(
-                        index=["sampleset", "IID", "PGS"],
+                        index=["sampleset", "FID", "IID", "PGS"],
                         columns="method",
                         values="value",
                     )
@@ -143,10 +143,11 @@ class AggregatedPGS:
 
     def _check_overlap(self, ref_pc, target_pc):
         """Before adjusting, there should be perfect target sample overlap"""
-        pca_ref_samples = set(ref_pc.df.index.get_level_values(1))
-        pca_target_samples = set(target_pc.df.index.get_level_values(1))
-        score_ref_samples = set(self.df.loc["reference"].index)
-        score_target_samples = set(self.df.loc[self.target_name].index)
+        # build sample IDs from (FID, IID)
+        pca_ref_samples = set((x[1], x[2]) for x in ref_pc.df.index.tolist())
+        pca_target_samples = set((x[1], x[2]) for x in target_pc.df.index.tolist())
+        score_ref_samples = set(self.df.loc["reference"].index.tolist())
+        score_target_samples = set(self.df.loc[self.target_name].index.tolist())
 
         if not pca_ref_samples.issubset(score_ref_samples):
             logger.critical(
@@ -197,8 +198,8 @@ class AggregatedPGS:
         scorecols = list(self.df.columns)
 
         # join pgs + pca data
-        target_df = target_pc.df.join(self.df.loc[self.target_name], on="IID")
-        reference_df = ref_pc.df.join(self.df.loc["reference"], on="IID")
+        target_df = target_pc.df.join(self.df.loc[self.target_name], on=["FID", "IID"])
+        reference_df = ref_pc.df.join(self.df.loc["reference"], on=["FID", "IID"])
 
         assignment_threshold_p = choose_pval_threshold(adjust_arguments)
 
