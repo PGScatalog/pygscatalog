@@ -361,9 +361,9 @@ class PolygenicScore:
         if self.path is None:
             raise ValueError("Missing path")
 
-        df = pd.read_csv(self.path, sep="\t", converters={"IID": str}).assign(
-            sampleset=self.sampleset
-        )
+        df = pd.read_csv(
+            self.path, sep="\t", converters={"FID": str, "IID": str}
+        ).assign(sampleset=self.sampleset)
 
         if "#FID" not in df.columns:
             logger.warning("#FID column missing, setting FID == IID")
