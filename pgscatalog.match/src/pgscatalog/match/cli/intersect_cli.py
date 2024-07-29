@@ -198,7 +198,7 @@ def run_intersect():
             PCA_ELIGIBLE = (
                 PCA_ELIGIBLE
                 and (aaf2maf(float(vmatch["AAF"])) >= args.maf_filter)
-                and (float(vmatch["F_MISS_DOSAGE"]) < args.vmiss_filter)
+                and (float(vmatch["F_MISS_DOSAGE"]) =< args.vmiss_filter)
             )
             vmatch["PCA_ELIGIBLE"] = PCA_ELIGIBLE
             if PCA_ELIGIBLE is True:
@@ -382,7 +382,7 @@ def parse_args(args=None):
     parser.add_argument(
         "--geno_miss",
         dest="vmiss_filter",
-        default=0.1,
+        default=1,
         type=float,
         required=False,
         help="Filter: Maximum Genotype missingness for PCA eligibility",
