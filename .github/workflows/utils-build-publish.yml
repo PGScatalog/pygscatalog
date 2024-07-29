@@ -1,9 +1,11 @@
 name: build release images
 
 on:
-  push:
-    tags:
-      - pgscatalog-utils-**
+  workflow_call:
+    inputs:
+      tag: 
+        type: string
+        required: true
 
 env:
   SINGULARITY_VERSION: "3.8.3"
@@ -34,7 +36,7 @@ jobs:
         with:
           push: true
           platforms: "linux/amd64,linux/arm64"
-          tags: ghcr.io/pgscatalog/pygscatalog:${{ github.ref_name }}
+          tags: ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}
     
 
   build_singularity_release:
@@ -65,9 +67,9 @@ jobs:
           echo "/opt/hostedtoolcache/singularity/${{ env.SINGULARITY_VERSION }}/x64/bin" >> $GITHUB_PATH
 
       - name: Build singularity image
-        run: singularity build img.sif "docker://ghcr.io/${GITHUB_REPOSITORY}:${{ github.ref_name }}"-singularity
+        run: singularity build img.sif "docker://ghcr.io/${GITHUB_REPOSITORY}:${{ inputs.tag }}"
 
       - name: Push singularity image
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | singularity remote login -u "$GITHUB_ACTOR" --password-stdin oras://ghcr.io
-          singularity push img.sif "oras://ghcr.io/${GITHUB_REPOSITORY}:${{ github.ref_name }}-singularity"
+          singularity push img.sif "oras://ghcr.io/${GITHUB_REPOSITORY}:${{ inputs.tag }}-singularity"

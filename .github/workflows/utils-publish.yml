@@ -21,6 +21,9 @@ jobs:
     permissions:
       id-token: write
       contents: write
+      
+    outputs:
+        tag: ${{ steps.package-tag.outputs.TAG_NAME }}
 
     steps:
       - name: Checkout repository
@@ -46,8 +49,9 @@ jobs:
           skip-existing: false          
 
       - name: Read package version
+        id: package-tag
         run: |
-          echo "TAG_NAME=$(poetry version | tr -s ' ' '-')" >> $GITHUB_ENV
+          echo "TAG_NAME=$(poetry version | tr -s ' ' '-')" >> "$GITHUB_OUTPUT"
         working-directory: ${{inputs.package-directory}}
 
       - name: Create tag
@@ -57,8 +61,13 @@ jobs:
               github.rest.git.createRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: 'refs/tags/${{ env.TAG_NAME }}',
+                ref: 'refs/tags/${{ steps.package-tag.outputs.TAG_NAME }}',
                 sha: context.sha
               })
        
-      
+  publish_images:
+    name: publish container images
+    uses: ./.github/workflows/utils-build-publish.yml 
+    needs: publish
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
