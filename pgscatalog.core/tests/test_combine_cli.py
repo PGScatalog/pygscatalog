@@ -9,6 +9,13 @@ from pgscatalog.core.cli.combine_cli import run
 from pgscatalog.core.lib import ScoringFile
 
 
+@pytest.fixture(scope="package")
+def custom_scorefiles(request):
+    custom1 = request.path.parent / "data" / "custom.txt"
+    custom2 = request.path.parent / "data" / "custom_no_oa.txt"
+    return custom1, custom2
+
+
 @pytest.fixture(scope="package", params=("GRCh37", "GRCh38"))
 def harmonised_scorefiles(request):
     pgs000001 = request.path.parent / "data" / f"PGS000001_hmPOS_{request.param}.txt.gz"
@@ -128,6 +135,51 @@ def test_combine_fail(tmp_path, harmonised_scorefiles):
     with pytest.raises(ValueError):
         with patch("sys.argv", flargs):
             run()
+
+
+def test_combine_custom(tmp_path, custom_scorefiles):
+    """Test combining custom scoring files (not from PGS Catalog), including a scoring file that's missing the other allele column"""
+    out_path = tmp_path / "combined.txt"
+    target_build = "GRCh37"
+
+    args = [
+        ("pgscatalog-combine", "-s"),
+        (str(x) for x in custom_scorefiles),
+        ("-o", str(out_path), "-t", target_build),
+    ]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run()
+
+    with open(out_path, mode="rt") as f:
+        csv_reader = csv.DictReader(f, delimiter="\t")
+        results = list(csv_reader)
+
+    assert results == [
+        {
+            "chr_name": "1",
+            "chr_position": "10397",
+            "effect_allele": "C",
+            "other_allele": "A",
+            "effect_weight": "-2.76E-02",
+            "effect_type": "additive",
+            "is_duplicated": "False",
+            "accession": "test",
+            "row_nr": "0",
+        },
+        {
+            "chr_name": "1",
+            "chr_position": "10397",
+            "effect_allele": "C",
+            "other_allele": "",
+            "effect_weight": "-2.76E-02",
+            "effect_type": "additive",
+            "is_duplicated": "False",
+            "accession": "test2",
+            "row_nr": "0",
+        },
+    ]
 
 
 def test_liftover(tmp_path, chain_dir, lift_scorefiles):

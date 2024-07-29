@@ -157,11 +157,14 @@ def assign_other_allele(variants):
     """
     n_dropped = 0
     for variant in variants:
-        if "/" in variant.other_allele:
-            n_dropped += 1
-            variant.other_allele = None
-
-        yield variant
+        try:
+            if "/" in variant.other_allele:
+                n_dropped += 1
+                variant.other_allele = None
+        except TypeError:
+            pass  # other allele is already missing
+        finally:
+            yield variant
 
     if n_dropped > 0:
         logger.warning(f"Multiple other_alleles detected in {n_dropped} variants")

@@ -1,0 +1,6 @@
+#pgs_id=test2
+#pgs_name=test2		
+#trait_reported=test2
+#genome_build=GRCh37			
+chr_name	chr_position	effect_allele	effect_weight
+1	10397	C	-2.76E-02
