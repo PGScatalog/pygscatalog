@@ -404,8 +404,9 @@ def _description_text() -> str:
     return textwrap.dedent(
         """\
     Program to find matched variants (same strand) between a set of reference and target data .pvar/bim files. This 
-    also uses the .afreq and .vmiss files to evaluate whether the variants in the TARGET are suitable for inclusion in
-    a PCA analysis, while also filtering on strand ambiguity and multi-allelic/INDEL status. 
+    also evaluate whether the variants in the TARGET are suitable for inclusion in  a PCA analysis (excludes strand 
+    ambiguous and multi-allelic/INDEL variants), and can also uses the .afreq and .vmiss files exclude variants with 
+    missingness and MAF filters. 
    """
     )
 
