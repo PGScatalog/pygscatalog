@@ -87,7 +87,7 @@ class AdjustResults:
                     df_pgs.drop("variable", axis=1)
                     .reset_index()
                     .pivot(
-                        index=["sampleset", "IID", "PGS"],
+                        index=["sampleset", "FID", "IID", "PGS"],
                         columns="method",
                         values="value",
                     )
@@ -143,10 +143,11 @@ class AggregatedPGS:
 
     def _check_overlap(self, ref_pc, target_pc):
         """Before adjusting, there should be perfect target sample overlap"""
-        pca_ref_samples = set(ref_pc.df.index.get_level_values(1))
-        pca_target_samples = set(target_pc.df.index.get_level_values(1))
-        score_ref_samples = set(self.df.loc["reference"].index)
-        score_target_samples = set(self.df.loc[self.target_name].index)
+        # build sample IDs from (FID, IID)
+        pca_ref_samples = set((x[1], x[2]) for x in ref_pc.df.index.tolist())
+        pca_target_samples = set((x[1], x[2]) for x in target_pc.df.index.tolist())
+        score_ref_samples = set(self.df.loc["reference"].index.tolist())
+        score_target_samples = set(self.df.loc[self.target_name].index.tolist())
 
         if not pca_ref_samples.issubset(score_ref_samples):
             logger.critical(
@@ -168,7 +169,7 @@ class AggregatedPGS:
         >>> related_path = Config.ROOT_DIR / "tests" / "data" / "ref.king.cutoff.id"
         >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "data" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "data" / "ref.psam", pop_type=PopulationType.REFERENCE, related_path=related_path)
         >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "data" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
-        >>> score_path = Config.ROOT_DIR / "tests" / "data" / "aggregated_scores.txt.gz"
+        >>> score_path = Config.ROOT_DIR / "tests" / "data" / "aggregated_scores.txt"
         >>> results = AggregatedPGS(path=score_path, target_name="hgdp").adjust(ref_pc=ref_pc, target_pc=target_pcs)
         >>> results.pgs.to_dict().keys()
         dict_keys(['SUM|PGS001229_hmPOS_GRCh38', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38', 'Z_MostSimilarPop|PGS001229_hmPOS_GRCh38', ...
@@ -197,8 +198,8 @@ class AggregatedPGS:
         scorecols = list(self.df.columns)
 
         # join pgs + pca data
-        target_df = target_pc.df.join(self.df.loc[self.target_name], on="IID")
-        reference_df = ref_pc.df.join(self.df.loc["reference"], on="IID")
+        target_df = target_pc.df.join(self.df.loc[self.target_name], on=["FID", "IID"])
+        reference_df = ref_pc.df.join(self.df.loc["reference"], on=["FID", "IID"])
 
         assignment_threshold_p = choose_pval_threshold(adjust_arguments)
 
@@ -268,7 +269,7 @@ class PolygenicScore:
     PolygenicScore(sampleset='test', path=PosixPath('.../cineca_22_additive_0.sscore.zst'))
     >>> pgs2 = PolygenicScore(sampleset="test", path=score1)
     >>> reprlib.repr(pgs1.read().to_dict()) # doctest: +ELLIPSIS
-    "{'DENOM': {('test', 'HG00096'): 1564, ('test', 'HG00097'): 1564, ('test', 'HG00099'): 1564, ('test', 'HG00100'): 1564, ...}, 'PGS001229_22_SUM': {('test', 'HG00096'): 0.54502, ('test', 'HG00097'): 0.674401, ('test', 'HG00099'): 0.63727, ('test', 'HG00100'): 0.863944, ...}}"
+    "{'DENOM': {('test', 'HG00096', 'HG00096'): 1564, ... 'PGS001229_22_SUM': {('test', 'HG00096', 'HG00096'): 0.54502, ...
 
     It's often helpful to combine PGS that were split per chromosome or by effect type:
 
@@ -280,10 +281,10 @@ class PolygenicScore:
 
     >>> aggregated_score.average()
     >>> aggregated_score.df  # doctest: +ELLIPSIS,+NORMALIZE_WHITESPACE
-                                PGS       SUM  DENOM       AVG
-    sampleset IID
-    test      HG00096  PGS001229_22  1.090040   3128  0.000348
-              HG00097  PGS001229_22  1.348802   3128  0.000431
+                                        PGS       SUM  DENOM       AVG
+    sampleset FID     IID
+    test      HG00096 HG00096  PGS001229_22  1.090040   3128  0.000348
+              HG00097 HG00097  PGS001229_22  1.348802   3128  0.000431
     ...
 
     Scores can be written to a TSV file:
@@ -356,17 +357,47 @@ class PolygenicScore:
         return self._path
 
     def read(self):
-        """Eagerly load a PGS into a pandas dataframe"""
+        """Eagerly load a PGS into a pandas dataframe
+
+        If the FID column can be missing from the input data:
+
+        >>> from ._config import Config
+        >>> from xopen import xopen
+        >>> score1 = Config.ROOT_DIR / "tests" / "data" / "cineca_22_additive_0.sscore.zst"
+        >>> with xopen(score1) as f:
+        ...     f.readline().split()
+        ['#IID', 'ALLELE_CT', 'DENOM', 'NAMED_ALLELE_DOSAGE_SUM', 'PGS001229_22_AVG', 'PGS001229_22_SUM']
+
+        Then FID is set to IID:
+
+        >>> PolygenicScore(sampleset="test", path=score1).read()  # doctest: +ELLIPSIS,+NORMALIZE_WHITESPACE
+                                    DENOM  PGS001229_22_SUM
+        sampleset FID     IID
+        test      HG00096 HG00096   1564          0.545020
+        ...
+        """
         if self.path is None:
             raise ValueError("Missing path")
 
-        df = (
-            pd.read_csv(self.path, sep="\t", converters={"IID": str})
-            .assign(sampleset=self.sampleset)
-            .set_index(["sampleset", "#IID"])
-        )
+        df = pd.read_csv(
+            self.path, sep="\t", converters={"FID": str, "IID": str}
+        ).assign(sampleset=self.sampleset)
 
-        df.index.names = ["sampleset", "IID"]
+        if "#FID" not in df.columns:
+            logger.warning("#FID column missing, setting FID == IID")
+            # if FID is missing, IID starts with a hash
+            df["#FID"] = df["#IID"]
+            df = df.set_index(["sampleset", "#FID", "#IID"])
+        elif all(df["#FID"] == 0):
+            logger.warning("All FID column values missing (0), setting FID == IID")
+            # FID column present, but missing data, IID doesn't start with a hash
+            df["#FID"] = df["IID"]
+            df = df.set_index(["sampleset", "#FID", "IID"])
+        else:
+            logger.info("#FID column detected")
+            df = df.set_index(["sampleset", "#FID", "IID"])
+
+        df.index.names = ["sampleset", "FID", "IID"]
         df = df[_select_agg_cols(df.columns)]
         return df
 

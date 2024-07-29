@@ -11,7 +11,7 @@ from pgscatalog.calc.cli.ancestry_cli import run_ancestry
 
 @pytest.fixture(scope="module")
 def scorefile(request):
-    return request.path.parent / "data" / "aggregated_scores.txt.gz"
+    return request.path.parent / "data" / "aggregated_scores.txt"
 
 
 @pytest.fixture(scope="module")
@@ -87,6 +87,7 @@ def test_ancestry(
         "Z_MostSimilarPop",
         "sampleset",
         "Z_norm1",
+        "FID",
         "IID",
         "PGS",
         "SUM",
@@ -96,6 +97,7 @@ def test_ancestry(
     assert set(popsim.columns) == {
         "RF_P_EAS",
         "PC6",
+        "FID",
         "IID",
         "PC4",
         "Unrelated",

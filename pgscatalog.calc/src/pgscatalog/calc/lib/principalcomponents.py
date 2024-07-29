@@ -29,12 +29,12 @@ class PrincipalComponents:
     >>> ref_pc
     PrincipalComponents(dataset='reference', pop_type=PopulationType.REFERENCE, pcs_path=[PosixPath('.../ref.pcs')], psam_path=PosixPath('.../ref.psam'))
     >>> ref_pc.df.to_dict()
-    {'PC1': {('reference', 'HG00096'): -23.8212, ('reference', 'HG00097'): -24.8106, ...
+    {'PC1': {('reference', 'HG00096', 'HG00096'): -23.8212, ('reference', 'HG00097', 'HG00097'): -24.8106, ...
     >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "data" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
     >>> target_pcs
     PrincipalComponents(dataset='target', pop_type=PopulationType.TARGET, pcs_path=[PosixPath('.../target.pcs')], psam_path=None)
     >>> target_pcs.df.to_dict()
-    {'PC1': {('target', 'HGDP00001'): -18.5135, ('target', 'HGDP00003'): -18.8314, ...
+    {'PC1': {('target', 'HGDP00001', 'HGDP00001'): -18.5135, ('target', 'HGDP00003', 'HGDP00003'): -18.8314, ...
     """
 
     def __init__(

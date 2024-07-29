@@ -17,9 +17,10 @@ def read_pcs(loc_pcs: list[str], dataset: str, loc_related_ids=None, nPCs=None):
 
     for i, path in enumerate(loc_pcs):
         logger.debug("Reading PCA projection: {}".format(path))
-        df = pd.read_csv(path, sep="\t", converters={"IID": str}, header=0)
+        df = pd.read_csv(path, sep="\t", converters={"IID": str, "FID": str}, header=0)
         df["sampleset"] = dataset
-        df.set_index(["sampleset", "IID"], inplace=True)
+
+        df.set_index(["sampleset", "FID", "IID"], inplace=True)
 
         if i == 0:
             logger.debug("Initialising combined DF")
@@ -84,8 +85,8 @@ def read_pgs(loc_aggscore):
     df = pd.read_csv(
         loc_aggscore,
         sep="\t",
-        index_col=["sampleset", "IID"],
-        converters={"IID": str},
+        index_col=["sampleset", "FID", "IID"],
+        converters={"IID": str, "FID": str},
         header=0,
     ).pivot(columns=["PGS"], values=["SUM"])
     # rename to PGS only
