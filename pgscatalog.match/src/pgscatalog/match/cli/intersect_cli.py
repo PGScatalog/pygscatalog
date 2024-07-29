@@ -197,7 +197,7 @@ def run_intersect():
 
             PCA_ELIGIBLE = (
                 PCA_ELIGIBLE
-                and (aaf2maf(float(vmatch["AAF"])) > args.maf_filter)
+                and (aaf2maf(float(vmatch["AAF"])) >= args.maf_filter)
                 and (float(vmatch["F_MISS_DOSAGE"]) < args.vmiss_filter)
             )
             vmatch["PCA_ELIGIBLE"] = PCA_ELIGIBLE
@@ -374,7 +374,7 @@ def parse_args(args=None):
     parser.add_argument(
         "--maf_target",
         dest="maf_filter",
-        default=0.05,
+        default=0,
         type=float,
         required=False,
         help="Filter: Minimum minor Allele Frequency for PCA eligibility",
