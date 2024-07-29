@@ -357,7 +357,25 @@ class PolygenicScore:
         return self._path
 
     def read(self):
-        """Eagerly load a PGS into a pandas dataframe"""
+        """Eagerly load a PGS into a pandas dataframe
+
+        If the FID column can be missing from the input data:
+
+        >>> from ._config import Config
+        >>> from xopen import xopen
+        >>> score1 = Config.ROOT_DIR / "tests" / "data" / "cineca_22_additive_0.sscore.zst"
+        >>> with xopen(score1) as f:
+        ...     f.readline().split()
+        ['#IID', 'ALLELE_CT', 'DENOM', 'NAMED_ALLELE_DOSAGE_SUM', 'PGS001229_22_AVG', 'PGS001229_22_SUM']
+
+        Then FID is set to IID:
+
+        >>> PolygenicScore(sampleset="test", path=score1).read()  # doctest: +ELLIPSIS,+NORMALIZE_WHITESPACE
+                                    DENOM  PGS001229_22_SUM
+        sampleset FID     IID
+        test      HG00096 HG00096   1564          0.545020
+        ...
+        """
         if self.path is None:
             raise ValueError("Missing path")
 
