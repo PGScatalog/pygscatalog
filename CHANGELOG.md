@@ -1,3 +1,21 @@
+## 2024-07-29
+
+Minor release  [pgscatalog-utils-1.2.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.2.0)
+
+* Bump dependencies to latest
+
+Patch release [pgscatalog-match-0.2.3](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.2.3)
+
+* Update `pgscatalog-intersect` PCA_ELIGIBLE filters https://github.com/PGScatalog/pygscatalog/pull/33
+   
+Patch release [pgscatalog-calc-0.2.2](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.calc-0.2.2)
+
+* Sample IDs now use FIDs if available https://github.com/PGScatalog/pygscatalog/pull/31
+
+Patch release [pgscatalog-core-0.2.2](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.core-0.2.2)
+
+* Fixes support for missing other_allele column in custom scoring files https://github.com/PGScatalog/pygscatalog/pull/30 
+   
 ## 2024-06-19
 
 Patch release [pgscatalog-match-0.2.2](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.2.1)
