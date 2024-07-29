@@ -197,8 +197,8 @@ def run_intersect():
 
             PCA_ELIGIBLE = (
                 PCA_ELIGIBLE
-                and (aaf2maf(float(vmatch["AAF"])) > args.maf_filter)
-                and (float(vmatch["F_MISS_DOSAGE"]) < args.vmiss_filter)
+                and (aaf2maf(float(vmatch["AAF"])) >= args.maf_filter)
+                and (float(vmatch["F_MISS_DOSAGE"]) <= args.vmiss_filter)
             )
             vmatch["PCA_ELIGIBLE"] = PCA_ELIGIBLE
             if PCA_ELIGIBLE is True:
@@ -374,7 +374,7 @@ def parse_args(args=None):
     parser.add_argument(
         "--maf_target",
         dest="maf_filter",
-        default=0.05,
+        default=0,
         type=float,
         required=False,
         help="Filter: Minimum minor Allele Frequency for PCA eligibility",
@@ -382,7 +382,7 @@ def parse_args(args=None):
     parser.add_argument(
         "--geno_miss",
         dest="vmiss_filter",
-        default=0.1,
+        default=1,
         type=float,
         required=False,
         help="Filter: Maximum Genotype missingness for PCA eligibility",
@@ -404,8 +404,9 @@ def _description_text() -> str:
     return textwrap.dedent(
         """\
     Program to find matched variants (same strand) between a set of reference and target data .pvar/bim files. This 
-    also uses the .afreq and .vmiss files to evaluate whether the variants in the TARGET are suitable for inclusion in
-    a PCA analysis, while also filtering on strand ambiguity and multi-allelic/INDEL status. 
+    also evaluate whether the variants in the TARGET are suitable for inclusion in  a PCA analysis (excludes strand 
+    ambiguous and multi-allelic/INDEL variants), and can also uses the .afreq and .vmiss files exclude variants with 
+    missingness and MAF filters. 
    """
     )
 
