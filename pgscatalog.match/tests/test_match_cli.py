@@ -66,8 +66,19 @@ def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):
     assert (outdir / "test_ALL_additive_0.scorefile.gz").exists()
 
 
-def test_match(tmp_path_factory, good_scorefile, good_variants):
-    """Test matching runs without errors with good data"""
+@pytest.mark.parametrize(
+    "ambiguous,multiallelic,skipflip",
+    [
+        ("--keep_ambiguous", "--keep_multiallelic", "--ignore_strand_flips"),
+        (None, None, None),
+    ],
+)
+def test_match(
+    tmp_path_factory, good_scorefile, good_variants, ambiguous, multiallelic, skipflip
+):
+    """Test matching runs without errors with good data
+
+    Parameterised to run twice: with default CLI match args and optional matching arguments"""
     outdir = tmp_path_factory.mktemp("outdir")
 
     args = [
@@ -83,9 +94,13 @@ def test_match(tmp_path_factory, good_scorefile, good_variants):
             str(outdir),
             "--min_overlap",
             "0.75",
+            ambiguous,
+            multiallelic,
+            skipflip,
         )
     ]
     flargs = list(itertools.chain(*args))
+    flargs = [x for x in flargs if x]  # drop parameterised None
 
     with patch("sys.argv", flargs):
         run_match()
