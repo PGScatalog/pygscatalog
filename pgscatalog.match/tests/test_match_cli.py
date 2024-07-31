@@ -67,14 +67,25 @@ def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):
 
 
 @pytest.mark.parametrize(
-    "ambiguous,multiallelic,skipflip",
+    "ambiguous,multiallelic,skipflip,keep_first_match",
     [
-        ("--keep_ambiguous", "--keep_multiallelic", "--ignore_strand_flips"),
-        (None, None, None),
+        (
+            "--keep_ambiguous",
+            "--keep_multiallelic",
+            "--ignore_strand_flips",
+            "--keep_first_match",
+        ),
+        (None, None, None, None),
     ],
 )
 def test_match(
-    tmp_path_factory, good_scorefile, good_variants, ambiguous, multiallelic, skipflip
+    tmp_path_factory,
+    good_scorefile,
+    good_variants,
+    ambiguous,
+    multiallelic,
+    skipflip,
+    keep_first_match,
 ):
     """Test matching runs without errors with good data
 
@@ -97,6 +108,7 @@ def test_match(
             ambiguous,
             multiallelic,
             skipflip,
+            keep_first_match,
         )
     ]
     flargs = list(itertools.chain(*args))
