@@ -1,6 +1,8 @@
 import csv
+import gzip
 import itertools
 import os
+import pathlib
 from unittest.mock import patch
 import pytest
 
@@ -26,6 +28,62 @@ def good_variants(request):
 @pytest.fixture(scope="module")
 def multiallelic_variants(request):
     return request.path.parent / "data" / "multiallelic.pvar"
+
+
+@pytest.fixture()
+def filter_ids(request, tmp_path, good_scorefile):
+    with open(good_scorefile) as f:
+        scorefile = list(csv.DictReader(f, delimiter="\t"))
+    # build variant IDs from the scoring file
+    ids = [
+        ":".join(
+            [x["chr_name"], x["chr_position"], x["effect_allele"], x["other_allele"]]
+        )
+        for x in scorefile
+    ]
+    # grab half of them, use these to filter matches
+    filter_list = ids[: int(len(ids) / 2)]
+    outf = tmp_path / "filter_ids.txt"
+    with open(outf, mode="wt") as f:
+        [f.write(x + "\n") for x in filter_list]
+
+    return pathlib.Path(outf)
+
+
+def test_filter_match(tmp_path_factory, good_variants, good_scorefile, filter_ids):
+    outdir = tmp_path_factory.mktemp("outdir")
+
+    args = [
+        (
+            "pgscatalog-match",
+            "-d",
+            "test",
+            "-s",
+            str(good_scorefile),
+            "-t",
+            str(good_variants),
+            "--outdir",
+            str(outdir),
+            "--min_overlap",
+            "0.75",
+            "--filter_IDs",
+            str(filter_ids),
+        )
+    ]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run_match()
+
+    with gzip.open(
+        outdir / "test_ALL_additive_0.scorefile.gz", mode="rt"
+    ) as out_f, open(good_scorefile) as f1, open(filter_ids) as f2:
+        n_out_score = len(list(csv.DictReader(out_f, delimiter="\t")))
+        n_scorefile = sum(1 for _ in f1)
+        n_filt = sum(1 for _ in f2)
+
+    # matched output from scorefile has been filtered
+    assert n_out_score < n_filt < n_scorefile
 
 
 def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):
