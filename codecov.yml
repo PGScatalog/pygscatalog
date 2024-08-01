@@ -3,10 +3,9 @@ flag_management:
     carryforward: true
     statuses:
       - type: project
-        target: auto
-        threshold: 1%
+        target: 80%
       - type: patch
-        target: 90%
+        target: 80%
   individual_flags: # exceptions to the default rules above, stated flag by flag
     - name: pgscatalog.core  #fill in your own flag name
       paths: 
