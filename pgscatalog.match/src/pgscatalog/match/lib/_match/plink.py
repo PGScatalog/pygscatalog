@@ -14,8 +14,43 @@ def plinkify(df):
     Variants with the same ID and different effect alleles must be split into different files
 
     Input df must contain match candidates filtered to best matched variant
+
+    Some fake match data where effect_allele is the same but other_allele is different:
+
+    >>> data = {'row_nr': [1, 2, 3], 'chr_name': ['11', '11', '11'], 'chr_position': [69331418, 69331418, 69331419], 'effect_allele': ['A', 'C', 'T'], 'other_allele': ['C', 'C', 'T'], 'effect_weight': ['1', '1.5', '2'], 'effect_type': ['additive', 'additive', 'additive'], 'accession': ['pgs1', 'pgs2', 'pgs3'],'ID': ['11:69331418:A:C', '11:69331418:A:C', '11:69331419:T:T'],'matched_effect_allele': ['A', 'C', 'T']}
+    >>> plinked = plinkify(pl.DataFrame(data).lazy())
+    >>> dfs = sorted((x.collect() for x in plinked[EffectType.ADDITIVE]), key= lambda x: len(x))
+    >>> assert len(dfs) == 2
+    >>> dfs[0].select(["row_nr", "accession", "ID", "matched_effect_allele"])
+    shape: (1, 4)
+    ┌────────┬───────────┬─────────────────┬───────────────────────┐
+    │ row_nr ┆ accession ┆ ID              ┆ matched_effect_allele │
+    │ ---    ┆ ---       ┆ ---             ┆ ---                   │
+    │ i64    ┆ str       ┆ str             ┆ str                   │
+    ╞════════╪═══════════╪═════════════════╪═══════════════════════╡
+    │ 2      ┆ pgs2      ┆ 11:69331418:A:C ┆ C                     │
+    └────────┴───────────┴─────────────────┴───────────────────────┘
+
+    >>> dfs[1].select(["row_nr", "accession", "ID", "matched_effect_allele"])
+    shape: (2, 4)
+    ┌────────┬───────────┬─────────────────┬───────────────────────┐
+    │ row_nr ┆ accession ┆ ID              ┆ matched_effect_allele │
+    │ ---    ┆ ---       ┆ ---             ┆ ---                   │
+    │ i64    ┆ str       ┆ str             ┆ str                   │
+    ╞════════╪═══════════╪═════════════════╪═══════════════════════╡
+    │ 1      ┆ pgs1      ┆ 11:69331418:A:C ┆ A                     │
+    │ 3      ┆ pgs3      ┆ 11:69331419:T:T ┆ T                     │
+    └────────┴───────────┴─────────────────┴───────────────────────┘
+
+    When merging a lot of scoring files, sometimes a variant might be duplicated
+    this can happen when the matched effect allele differs at the same position, e.g.:
+        - chr1: chr2:20003:A:C A 0.3 NA
+        - chr1: chr2:20003:A:C C NA 0.7
+    where the last two columns represent different scores.  plink demands
+    unique identifiers! so need to split, score, and sum later.
     """
     min_cols = [
+        "row_nr",
         "accession",
         "effect_type",
         "chr_name",
@@ -36,7 +71,7 @@ def plinkify(df):
     deduped = {}
     for effect_type, effect_frame in effect_frames:
         deduped.setdefault(effect_type, [])
-        deduped[effect_type].append(effect_frame)
+        deduped[effect_type] = _deduplicate_variants(effect_frame)
 
     return deduped
 
@@ -94,7 +129,7 @@ def _split_effect_type(
     return additive, dominant, recessive
 
 
-def _deduplicate_variants(df: pl.LazyFrame) -> list[pl.LazyFrame | None]:
+def _deduplicate_variants(df: pl.LazyFrame) -> list[pl.LazyFrame]:
     """Find variant matches that have duplicate identifiers
     When merging a lot of scoring files, sometimes a variant might be duplicated
     this can happen when the matched effect allele differs at the same position, e.g.:
@@ -108,44 +143,44 @@ def _deduplicate_variants(df: pl.LazyFrame) -> list[pl.LazyFrame | None]:
     Returns:
         A list of dataframes, with unique ID - matched effect allele combinations
     """
-    if df.select("ID").head().collect().is_empty():
+    if df.limit(1).collect().is_empty():
         logger.info("Empty input: skipping deduplication")
-        return [None]
-    else:
-        logger.debug("Deduplicating variants")
+        return [df]
+    logger.debug("Deduplicating variants (splitting across files)")
+    ea_count: pl.LazyFrame = df.unique(
+        ["ID", "matched_effect_allele"], maintain_order=True
+    ).with_columns([pl.col(["ID"]).cum_count().over(["ID"]).alias("cum_count")])
 
-    # 1. unique ID - EA is important because normal duplicates are already
-    #   handled by pivoting, and it's pointless to split them unnecessarily
-    # 2. use cumcount to number duplicate IDs
-    # 3. join cumcount data on original DF, use this data for splitting
-    # note: effect_allele should be equivalent to matched_effect_allele
-    ea_count: pl.LazyFrame = (
-        df.select(["ID", "matched_effect_allele"])
-        .unique()
-        .with_columns(
+    # now get groups for each different cumulative count (1 instance, 2, ..., n)
+    groups = ea_count.collect().group_by(["cum_count"], maintain_order=True)
+    group_dfs = (x.lazy() for _, x in groups)
+    ldf_lst = []
+
+    for x in group_dfs:
+        tempdf = df.join(
+            x, on=["row_nr", "ID", "matched_effect_allele"], how="inner"
+        ).select(
             [
-                pl.col("ID").cumcount().over(["ID"]).alias("cumcount"),
-                pl.col("ID").count().over(["ID"]).alias("count"),
+                "row_nr",
+                "accession",
+                "effect_type",
+                "chr_name",
+                "ID",
+                "matched_effect_allele",
+                "effect_weight",
             ]
         )
-    )
+        ldf_lst.append(tempdf)
 
-    dup_label: pl.LazyFrame = df.join(
-        ea_count, on=["ID", "matched_effect_allele"], how="left"
-    )
+    # double check to help me sleep at night
+    original_length = df.select(pl.len()).collect().item(0, 0)
+    new_length = sum(x.select(pl.len()).collect().item(0, 0) for x in ldf_lst)
 
-    # now split the matched variants, and make sure we don't lose any
-    # cumcount = ngroup-1, so add 1
-    n_splits: int = ea_count.select("cumcount").max().collect().item(0, 0) + 1
-    df_lst: list = []
-
-    for i in range(0, n_splits):
-        x: pl.LazyFrame = dup_label.filter(pl.col("cumcount") == i).drop(
-            ["cumcount", "count"]
+    if original_length != new_length:
+        raise ValueError(
+            f"Some variants went missing during deduplication ({original_length} != {new_length}) "
+            "This should never happen"
         )
-        if (df := x.collect()).is_empty():
-            continue
-        else:
-            df_lst.append(df.lazy())
 
-    return df_lst
+    logger.info("Dataframe lengths are OK after deduplicating :)")
+    return ldf_lst
