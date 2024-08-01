@@ -30,6 +30,7 @@ def target(request):
 def test_intersect_cli(tmp_path_factory, ref, target, afreq, vmiss):
     outdir = tmp_path_factory.mktemp("outdir")
 
+    # using a low batch size to test batching behaviour works as expected
     args = [
         (
             "pgscatalog-intersect",
@@ -39,6 +40,8 @@ def test_intersect_cli(tmp_path_factory, ref, target, afreq, vmiss):
             str(target),
             "--outdir",
             str(outdir),
+            "--batch_size",
+            "100",
         )
     ]
     flargs = list(itertools.chain(*args))
