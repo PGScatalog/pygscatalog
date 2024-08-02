@@ -132,8 +132,8 @@ def test_duplicated(tmp_path_factory, good_variants, duplicated_scorefile):
     # variants were split correctly across the files
     assert len(f1variants) == 3 and len(f2variants) == 1
     # test2 and test3 PGS have been pivoted
-    assert all("test2" in x and "test3" in x for x in f1variants)
-    assert all("test" in x for x in f2variants)
+    assert all("test" in x and "test3" in x for x in f1variants)
+    assert all("test2" in x for x in f2variants)
 
 
 def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):
