@@ -48,12 +48,12 @@ jobs:
       - name: Set up apptainer
         uses: eWaterCycle/setup-apptainer@v2
         with:
-          apptainer-version: 1.3.0
+          apptainer-version: 1.2.0
           
       - name: Build singularity image
-        run: apptainer build img.sif "docker://ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}"
+        run: apptainer build --arch amd64 img.sif "docker://ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}"
 
       - name: Push singularity image
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | singularity remote login -u "$GITHUB_ACTOR" --password-stdin oras://ghcr.io
+          echo "${{ secrets.GITHUB_TOKEN }}" | apptainer remote login -u "$GITHUB_ACTOR" --password-stdin oras://ghcr.io
           apptainer push img.sif "oras://ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}-singularity"
