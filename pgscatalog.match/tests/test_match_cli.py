@@ -16,6 +16,11 @@ def good_scorefile(request):
 
 
 @pytest.fixture(scope="module")
+def duplicated_scorefile(request):
+    return request.path.parent / "data" / "duplicated_scorefile.txt"
+
+
+@pytest.fixture(scope="module")
 def bad_scorefile(request):
     return request.path.parent / "data" / "bad_match_scorefile.txt.gz"
 
@@ -84,6 +89,51 @@ def test_filter_match(tmp_path_factory, good_variants, good_scorefile, filter_id
 
     # matched output from scorefile has been filtered
     assert n_out_score < n_filt < n_scorefile
+
+
+def test_duplicated(tmp_path_factory, good_variants, duplicated_scorefile):
+    """A scoring file where the same variant ID has different effect alleles from different scores
+    Instead of pivoting wider, these variants must be split across different files
+    (plink2 doesn't like duplicated variants).
+    """
+    outdir = tmp_path_factory.mktemp("outdir")
+
+    args = [
+        (
+            "pgscatalog-match",
+            "-d",
+            "test",
+            "-s",
+            str(duplicated_scorefile),
+            "-t",
+            str(good_variants),
+            "--outdir",
+            str(outdir),
+            "--min_overlap",
+            "0.75",
+        )
+    ]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run_match()
+
+    # scoring files seem to be split properly
+    assert (outdir / "test_ALL_additive_0.scorefile.gz").exists()
+    assert (outdir / "test_ALL_additive_1.scorefile.gz").exists()
+
+    # test the split happened
+    with gzip.open(
+        outdir / "test_ALL_additive_0.scorefile.gz", mode="rt"
+    ) as f1, gzip.open(outdir / "test_ALL_additive_1.scorefile.gz", mode="rt") as f2:
+        f1variants = list(csv.DictReader(f1, delimiter="\t"))
+        f2variants = list(csv.DictReader(f2, delimiter="\t"))
+
+    # variants were split correctly across the files
+    assert len(f1variants) == 3 and len(f2variants) == 1
+    # test2 and test3 PGS have been pivoted
+    assert all("test2" in x and "test3" in x for x in f1variants)
+    assert all("test" in x for x in f2variants)
 
 
 def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):
