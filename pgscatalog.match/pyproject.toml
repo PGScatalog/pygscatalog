@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pgscatalog.match"
-version = "0.2.4"
+version = "0.3.0"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
 readme = "README.md"
