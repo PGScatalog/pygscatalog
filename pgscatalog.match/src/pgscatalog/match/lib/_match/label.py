@@ -221,6 +221,13 @@ def _label_duplicate_id(df: pl.LazyFrame, keep_first_match: bool) -> pl.LazyFram
 
 
 def _label_biallelic_ambiguous(df: pl.LazyFrame, remove_ambiguous) -> pl.LazyFrame:
+    """
+    Identify ambiguous variants (A/T & C/G SNPs)
+
+    Often scores and genotypes will be on different builds and including these SNPs
+    would involve tallying incorrect dosages if there has been a strand-flip across builds.
+    Even on the same build you can get improperly strand-oriented data.
+    """
     logger.debug("Labelling ambiguous variants")
     ambig = (
         df.with_columns(
@@ -259,7 +266,7 @@ def _label_biallelic_ambiguous(df: pl.LazyFrame, remove_ambiguous) -> pl.LazyFra
         )
     else:
         return (
-            ambig.with_column(pl.lit(False).alias("exclude_ambiguous"))
+            ambig.with_columns(pl.lit(False).alias("exclude_ambiguous"))
             .with_columns(max=pl.max_horizontal("exclude", "exclude_ambiguous"))
             .drop(["exclude", "exclude_ambiguous"])
             .rename({"max": "exclude"})
@@ -301,7 +308,7 @@ def _label_flips(df: pl.LazyFrame, skip_flip: bool) -> pl.LazyFrame:
         )
     else:
         logger.debug("Not excluding flipped matches")
-        return df.with_columns(match_IDs=pl.lit("NA"))
+        return df
 
 
 def _label_filter(df: pl.LazyFrame, filter_IDs: pathlib.Path) -> pl.LazyFrame:
@@ -323,4 +330,4 @@ def _label_filter(df: pl.LazyFrame, filter_IDs: pathlib.Path) -> pl.LazyFrame:
         )
     else:
         logger.info("--filter_IDs not set, skipping filtering")
-        return df
+        return df.with_columns(match_IDs=pl.lit("NA"))

@@ -49,7 +49,7 @@ def run_intersect():
                 ([key, v["ID"], v["REF"]], [IS_INDEL, STRANDAMB, IS_MA_REF])
             )
 
-        if count_var_r % 500000 == 0:
+        if count_var_r % args.batch_size == 0:
             heapq.heapify(ref_heap)
             tmppath = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
             with open(tmppath.name, "wt") as outf:
@@ -134,7 +134,7 @@ def run_intersect():
                     )
                 )
 
-            if count_var_t % 500000 == 0:
+            if count_var_t % args.batch_size == 0:
                 heapq.heapify(target_heap)
                 tmppath = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
                 with open(tmppath.name, "wt") as outf:
@@ -396,6 +396,14 @@ def parse_args(args=None):
     )
     parser.add_argument(
         "--outdir", dest="outdir", required=True, help="<Required> Output directory"
+    )
+    parser.add_argument(
+        "--batch_size",
+        dest="batch_size",
+        type=int,
+        default=500000,
+        required=False,
+        help="<Optional> Number of variants processed per batch",
     )
     return parser.parse_args(args)
 
