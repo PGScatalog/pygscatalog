@@ -1,3 +1,15 @@
+## 2024-08-02
+
+Minor release  [pgscatalog-utils-1.3.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.3.0)
+
+* Bump dependencies to latest
+
+Minor release  [pgscatalog-match-0.3.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.3.0)
+
+* **Important** Fix splitting duplicate variant IDs across different scoring files https://github.com/PGScatalog/pygscatalog/pull/38
+* Fix `--keep_ambiguous` https://github.com/PGScatalog/pgsc_calc/issues/346
+* Fix `--ignore_strand_flips`
+  
 ## 2024-07-29
 
 Minor release  [pgscatalog-utils-1.2.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.2.0)
