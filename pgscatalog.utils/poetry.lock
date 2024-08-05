@@ -425,13 +425,13 @@ xopen = {version = ">=1.8.0,<2.0.0", extras = ["zstd"]}
 
 [[package]]
 name = "pgscatalog-match"
-version = "0.3.0"
+version = "0.3.1"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "pgscatalog_match-0.3.0-py3-none-any.whl", hash = "sha256:0d2fbeb05e8ab480a1657a47ed09e9299e03e9c05653c1d4981df75e8be67e6e"},
-    {file = "pgscatalog_match-0.3.0.tar.gz", hash = "sha256:ebebc432448559f7bc9a543acc029e3aa6944eef98f5d735f6750ef3aeb79e6f"},
+    {file = "pgscatalog_match-0.3.1-py3-none-any.whl", hash = "sha256:0173a940a841286bf5828a43543bf81c52308cf78e940b69fcb211cefe9ce8bc"},
+    {file = "pgscatalog_match-0.3.1.tar.gz", hash = "sha256:316feb3337298ac54a2b8aa5baa68bb9144acc1f38795cce628d8cd9b2e3b7c1"},
 ]
 
 [package.dependencies]
@@ -710,13 +710,13 @@ files = [
 
 [[package]]
 name = "tqdm"
-version = "4.66.4"
+version = "4.66.5"
 description = "Fast, Extensible Progress Meter"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "tqdm-4.66.4-py3-none-any.whl", hash = "sha256:b75ca56b413b030bc3f00af51fd2c1a1a5eac6a0c1cca83cbb37a5c52abce644"},
-    {file = "tqdm-4.66.4.tar.gz", hash = "sha256:e4d936c9de8727928f3be6079590e97d9abfe8d39a590be678eb5919ffc186bb"},
+    {file = "tqdm-4.66.5-py3-none-any.whl", hash = "sha256:90279a3770753eafc9194a0364852159802111925aa30eb3f9d85b0e805ac7cd"},
+    {file = "tqdm-4.66.5.tar.gz", hash = "sha256:e1020aef2e5096702d8a025ac7d16b1577279c9d63f8375b63083e9a5f0fcbad"},
 ]
 
 [package.dependencies]
@@ -937,4 +937,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10"
-content-hash = "be86e43f0d5fa3d646b87b7b89173a3d476491ce69079670669eaf274f5416d8"
+content-hash = "0dcb59b8832a7c378c9bad3504dc66fd6415184b4be1721acde1679e42e0c3c4"
