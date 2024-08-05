@@ -51,7 +51,7 @@ jobs:
           apptainer-version: 1.2.0
           
       - name: Build singularity image
-        run: apptainer build --arch amd64 img.sif "docker://ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}"
+        run: apptainer build img.sif "docker://ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}"
 
       - name: Push singularity image
         run: |
