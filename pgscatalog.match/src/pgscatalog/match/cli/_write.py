@@ -47,7 +47,7 @@ def write_matches(matchresults, score_df):
         write_log(matchresults=matchresults, score_df=score_df)
 
     # returns labelled and filtered data for checking after merging
-    return matchresults.df
+    return matchresults.filtered_matches
 
 
 def write_log(matchresults, score_df):
