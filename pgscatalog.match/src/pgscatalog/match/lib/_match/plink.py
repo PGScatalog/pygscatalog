@@ -151,18 +151,14 @@ def _deduplicate_variants(
 
     if df_len == 0:
         logger.info(f"No variants with {effect_type=}, skipping deduplication")
-        return [df]
+        # best to return an empty list (which will be skipped if iterated over)
+        return []
 
     logger.debug(
         f"Splitting {effect_type} variants with different effect alleles and the same ID"
     )
 
-    # make sure input is sorted by ID, _MUST_ be chr:pos:ea:oa
-    # row_nr resets to 0 for each accession so add a temporary index (for left join)
-    df = df.sort("ID").with_row_index()
-
     # count the number of _unique_ matched alleles per ID (this operation drops rows)
-    # the cumulative count will be used to group and split the dfs
     counts = (
         df.unique(["ID", "matched_effect_allele"], maintain_order=True)
         .with_columns(
@@ -171,25 +167,25 @@ def _deduplicate_variants(
             .over("ID")
             .alias("allele_cum_count")
         )
-        .select("index", "allele_cum_count")
+        .select("ID", "matched_effect_allele", "allele_cum_count")
     )
 
-    # after joining the count variants that were dropped by unique()
-    # will have a null cumulative count
-    # forward fill (repeats last seen value) the null values to populate groups
-    # this is important because the dropped variants are OK to get pivoted wide later
-    groups = (
-        df.join(counts, on="index", how="left")
-        .with_columns(pl.col("allele_cum_count").forward_fill().alias("group"))
-        .collect()
-        .group_by(["group"], maintain_order=True)
-    )
+    # now calculate the number of splits required
+    n_splits: int = counts.select("allele_cum_count").max().collect().item()
+
+    # add the count data back to the original df
+    df = df.join(counts, on=["ID", "matched_effect_allele"], how="left")
 
     ldf_lst = []
-    for group, tempdf in groups:
-        logger.info(f"Deduplicating {group=}")
-        # now we have split dfs, restore a sort order that's friendly for humans
-        tempdf = tempdf.lazy().select(pl.exclude("index")).sort(["accession", "row_nr"])
+    # start iteration at index 1 (the smallest possible cumulative count)
+    # iteration must include max value, so + 1
+    for i in range(1, n_splits + 1):
+        logger.info(f"Splitting variants into group {i}")
+        tempdf = (
+            df.filter(pl.col("allele_cum_count") == i)
+            .select(pl.exclude("allele_cum_count"))
+            .sort(["accession", "row_nr"])
+        )
         ldf_lst.append(tempdf)
 
     # let's double-check the number of variants before and after splitting
