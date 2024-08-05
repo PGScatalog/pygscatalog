@@ -1,5 +1,6 @@
 chr_name	chr_position	effect_allele	other_allele	effect_weight	effect_type	is_duplicated	accession	row_nr
 11	69331418	C	T	0.210422987	additive	FALSE	test	0
-11	69331418	T	C	0.210422987	additive	FALSE	test2	1
-11	69379161	A	C	0.018723614	additive	FALSE	test2	2
-5	1279790	T	C	-0.005213567	additive	FALSE	test3	4
+11	69331418	T	C	0.210422987	additive	FALSE	test2	0
+11	69379161	A	C	0.018723614	additive	FALSE	test2	1
+5	1279790	T	C	-0.005213567	additive	FALSE	test3	0
+18	24337424	C	G	-0.1	additive	FALSE	test3	1

@@ -110,7 +110,7 @@ def test_duplicated(tmp_path_factory, good_variants, duplicated_scorefile):
             "--outdir",
             str(outdir),
             "--min_overlap",
-            "0.75",
+            "0.5",
         )
     ]
     flargs = list(itertools.chain(*args))
