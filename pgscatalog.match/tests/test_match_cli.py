@@ -147,6 +147,12 @@ def test_duplicated(tmp_path_factory, good_variants, duplicated_scorefile):
     ]
     assert "18:24337424:C:G" not in (x["ID"] for x in f1variants + f2variants)
 
+    with open(outdir / "test_summary.csv") as f:
+        summary_log = list(csv.DictReader(f, delimiter=","))
+
+    # the ambiguous variant gets picked up in the summary log table
+    assert sum(x["ambiguous"] == "true" for x in summary_log) == 1
+
 
 def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):
     outdir = tmp_path_factory.mktemp("outdir")
