@@ -19,21 +19,11 @@ def plinkify(df):
 
     >>> data = {'row_nr': [1, 1, 1], 'chr_name': ['11', '11', '11'], 'chr_position': [69331418, 69331418, 69331419], 'effect_allele': ['A', 'C', 'T'], 'other_allele': ['C', 'C', 'T'], 'effect_weight': ['1', '1.5', '2'], 'effect_type': ['additive', 'additive', 'additive'], 'accession': ['pgs1', 'pgs2', 'pgs3'],'ID': ['11:69331418:A:C', '11:69331418:A:C', '11:69331419:T:T'],'matched_effect_allele': ['A', 'C', 'T']}
     >>> plinked = plinkify(pl.DataFrame(data).lazy())
-    >>> dfs = sorted((x.collect() for x in plinked[EffectType.ADDITIVE]), key= lambda x: len(x))
+    >>> dfs = [x.collect() for x in plinked[EffectType.ADDITIVE]]
     >>> len(dfs)
     2
 
     >>> dfs[0].select(["row_nr", "accession", "ID", "matched_effect_allele"])
-    shape: (1, 4)
-    ┌────────┬───────────┬─────────────────┬───────────────────────┐
-    │ row_nr ┆ accession ┆ ID              ┆ matched_effect_allele │
-    │ ---    ┆ ---       ┆ ---             ┆ ---                   │
-    │ i64    ┆ str       ┆ str             ┆ str                   │
-    ╞════════╪═══════════╪═════════════════╪═══════════════════════╡
-    │ 1      ┆ pgs2      ┆ 11:69331418:A:C ┆ C                     │
-    └────────┴───────────┴─────────────────┴───────────────────────┘
-
-    >>> dfs[1].select(["row_nr", "accession", "ID", "matched_effect_allele"])
     shape: (2, 4)
     ┌────────┬───────────┬─────────────────┬───────────────────────┐
     │ row_nr ┆ accession ┆ ID              ┆ matched_effect_allele │
@@ -42,6 +32,16 @@ def plinkify(df):
     ╞════════╪═══════════╪═════════════════╪═══════════════════════╡
     │ 1      ┆ pgs1      ┆ 11:69331418:A:C ┆ A                     │
     │ 1      ┆ pgs3      ┆ 11:69331419:T:T ┆ T                     │
+    └────────┴───────────┴─────────────────┴───────────────────────┘
+
+    >>> dfs[1].select(["row_nr", "accession", "ID", "matched_effect_allele"])
+    shape: (1, 4)
+    ┌────────┬───────────┬─────────────────┬───────────────────────┐
+    │ row_nr ┆ accession ┆ ID              ┆ matched_effect_allele │
+    │ ---    ┆ ---       ┆ ---             ┆ ---                   │
+    │ i64    ┆ str       ┆ str             ┆ str                   │
+    ╞════════╪═══════════╪═════════════════╪═══════════════════════╡
+    │ 1      ┆ pgs2      ┆ 11:69331418:A:C ┆ C                     │
     └────────┴───────────┴─────────────────┴───────────────────────┘
 
     When merging a lot of scoring files, sometimes a variant might be duplicated
@@ -201,4 +201,6 @@ def _deduplicate_variants(
         )
 
     logger.info("Split dataframe lengths are consistent with input after deduplicating")
-    return ldf_lst
+    return sorted(
+        ldf_lst, key=lambda x: x.select(pl.len()).collect().item(), reverse=True
+    )
