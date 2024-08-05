@@ -110,7 +110,7 @@ def test_duplicated(tmp_path_factory, good_variants, duplicated_scorefile):
             "--outdir",
             str(outdir),
             "--min_overlap",
-            "0.75",
+            "0.5",
         )
     ]
     flargs = list(itertools.chain(*args))
@@ -134,6 +134,24 @@ def test_duplicated(tmp_path_factory, good_variants, duplicated_scorefile):
     # test2 and test3 PGS have been pivoted
     assert all("test2" in x and "test3" in x for x in f1variants)
     assert all("test" in x for x in f2variants)
+
+    # ambiguous variant correctly dropped (REF_FLIP == ALT)
+    with open(duplicated_scorefile) as f:
+        input = list(csv.DictReader(f, delimiter="\t"))
+
+    assert "18:24337424:C:G" in [
+        ":".join(
+            [x["chr_name"], x["chr_position"], x["effect_allele"], x["other_allele"]]
+        )
+        for x in input
+    ]
+    assert "18:24337424:C:G" not in (x["ID"] for x in f1variants + f2variants)
+
+    with open(outdir / "test_summary.csv") as f:
+        summary_log = list(csv.DictReader(f, delimiter=","))
+
+    # the ambiguous variant gets picked up in the summary log table
+    assert sum(x["ambiguous"] == "true" for x in summary_log) == 1
 
 
 def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):

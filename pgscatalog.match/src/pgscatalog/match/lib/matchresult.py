@@ -152,20 +152,20 @@ class MatchResults(collections.abc.Sequence):
 
     >>> with pl.Config(tbl_formatting="ASCII_MARKDOWN", tbl_hide_column_data_types=True, tbl_width_chars=120), scorefile as score_df:
     ...     MatchResults(x).full_variant_log(score_df).fetch()  # +ELLIPSIS
-    shape: (155, 23)
+    shape: (169, 23)
     | row_nr | accession | chr_name | chr_position | … | duplicate_ID | match_IDs | match_status | dataset   |
     |--------|-----------|----------|--------------|---|--------------|-----------|--------------|-----------|
-    | 0      | PGS000002 | 11       | 69331418     | … | null         | null      | unmatched    | goodmatch |
+    | 0      | PGS000002 | 11       | 69331418     | … | true         | NA        | excluded     | goodmatch |
     | 1      | PGS000002 | 11       | 69379161     | … | false        | NA        | matched      | goodmatch |
-    | 2      | PGS000002 | 11       | 69331642     | … | null         | null      | unmatched    | goodmatch |
+    | 2      | PGS000002 | 11       | 69331642     | … | false        | NA        | excluded     | goodmatch |
+    | 2      | PGS000002 | 11       | 69331642     | … | false        | NA        | not_best     | goodmatch |
     | 3      | PGS000002 | 5        | 1282319      | … | false        | NA        | matched      | goodmatch |
-    | 4      | PGS000002 | 5        | 1279790      | … | false        | NA        | matched      | goodmatch |
     | …      | …         | …        | …            | … | …            | …         | …            | …         |
-    | 72     | PGS000001 | 22       | 40876234     | … | false        | NA        | matched      | goodmatch |
     | 73     | PGS000001 | 1        | 204518842    | … | false        | NA        | matched      | goodmatch |
     | 74     | PGS000001 | 1        | 202187176    | … | false        | NA        | matched      | goodmatch |
     | 75     | PGS000001 | 2        | 19320803     | … | false        | NA        | matched      | goodmatch |
-    | 76     | PGS000001 | 16       | 53855291     | … | null         | null      | unmatched    | goodmatch |
+    | 76     | PGS000001 | 16       | 53855291     | … | false        | NA        | excluded     | goodmatch |
+    | 76     | PGS000001 | 16       | 53855291     | … | false        | NA        | not_best     | goodmatch |
     """
 
     def __init__(self, *elements):
@@ -177,19 +177,18 @@ class MatchResults(collections.abc.Sequence):
             )
 
         self.dataset = self._elements[0].dataset
+
         # a df composed of all match result elements
-        self.df = pl.scan_ipc(x.ipc_path for x in self._elements)
+        self._df = pl.scan_ipc(x.ipc_path for x in self._elements)
         if self.df.select("row_nr").collect().is_empty():
             raise ZeroMatchesError("No match candidates found for any scoring files")
 
-        # a table containing up to one row per variant (the best possible match)
-        self.filter_summary = None
-        # a summary log containing match rates for variants
-        self.summary_log = None
-        # have match candidates in df been labelled?
-        self._labelled = False
-        # have match candidates in df been filtered?
-        self._filtered = False
+        # internal dataframes
+        self._match_candidates = None
+        self._filtered_matches = None
+        self._filter_summary = None
+        self._summary_log = None
+
         # does the input scoring file count match the variant log count?
         self._log_OK = None
 
@@ -201,6 +200,31 @@ class MatchResults(collections.abc.Sequence):
 
     def __repr__(self):
         return f"{type(self).__name__}({self._elements!r})"
+
+    @property
+    def df(self) -> pl.LazyFrame:
+        """A df containing raw match results"""
+        return self._df
+
+    @property
+    def match_candidates(self) -> pl.LazyFrame:
+        """A df containing all possible matches for each input score variant"""
+        return self._match_candidates
+
+    @property
+    def filtered_matches(self) -> pl.LazyFrame:
+        """A df containing up to one row per variant (the best possible match)"""
+        return self._filtered_matches
+
+    @property
+    def filter_summary(self) -> pl.DataFrame:
+        """A log that summarises the impact of filtering"""
+        return self._filter_summary
+
+    @property
+    def summary_log(self) -> pl.DataFrame:
+        """A summary log containing match rates for variants"""
+        return self._summary_log
 
     def label(
         self,
@@ -220,7 +244,7 @@ class MatchResults(collections.abc.Sequence):
         * ``remove_multiallelic`` remove multiallelic variants before matching (default: ``True``)
         * ``filter_IDs``: constrain variants to this list of IDs (default, don't constrain)
         """
-        df = self.df.pipe(
+        return self.df.pipe(
             label_matches,
             keep_first_match=keep_first_match,
             remove_ambiguous=remove_ambiguous,
@@ -228,25 +252,20 @@ class MatchResults(collections.abc.Sequence):
             remove_multiallelic=remove_multiallelic,
             filter_IDs=filter_IDs,
         )
-        self._labelled = True
-        self.df = df
-        return self.df
 
     def filter(self, score_df, min_overlap=0.75, **kwargs):
         """Filter match candidates after labelling according to user parameters"""
-        if not self._labelled:
-            self.df = self.label(**kwargs)
+        if self._match_candidates is None:
+            self._match_candidates = self.label(**kwargs)
 
         df, filter_summary = filter_scores(
             scorefile=score_df,
-            matches=self.df,
+            matches=self._match_candidates,
             min_overlap=min_overlap,
             dataset=self.dataset,
         )
-        self.filter_summary = filter_summary
-        self.df = df
-        self._filtered = True
-        return self.df
+
+        return filter_summary, df
 
     def write_scorefiles(
         self, directory, score_df, split=False, min_overlap=0.75, **kwargs
@@ -263,34 +282,35 @@ class MatchResults(collections.abc.Sequence):
         * Sets up parallel score calculation (pivots data to wide column format)
         * Writes scores to a directory, splitting based on chromosome and effect type
         """
-        if not self._labelled:
-            _ = self.label(**kwargs)  # self.df gets updated
+        if self.match_candidates is None:
+            self._match_candidates = self.label(**kwargs)
 
-        if not self._filtered:
-            # score_df = original scoring file variants
-            _ = self.filter(score_df=score_df, min_overlap=min_overlap)
+        if self.filtered_matches is None:
+            self._filter_summary, self._filtered_matches = self.filter(
+                score_df=score_df, min_overlap=min_overlap
+            )
 
         # a summary log contains up to one variant (the best match) for each variant
         # in the scoring file
-        self.summary_log = make_summary_log(
-            match_candidates=self.df,
-            dataset=self.dataset,
-            filter_summary=self.filter_summary.lazy(),
-            scorefile=score_df,
-        )
+        if self.summary_log is None:
+            self._summary_log = make_summary_log(
+                match_candidates=self._match_candidates,
+                dataset=self.dataset,
+                filter_summary=self.filter_summary.lazy(),
+                scorefile=score_df,
+            ).collect()
 
         # double check log count vs scoring file variant count
-        self._log_OK = check_log_count(scorefile=score_df, summary_log=self.summary_log)
+        self._log_OK = check_log_count(
+            scorefile=score_df, summary_log=self.summary_log.lazy()
+        )
 
         # will be empty if no scores pass match threshold, so nothing gets written
-        plink = PlinkFrames.from_matchresult(self.df)
+        plink = PlinkFrames.from_matchresult(self._filtered_matches)
         outfs = []
         for frame in plink:
             f = frame.write(directory=directory, split=split, dataset=self.dataset)
             outfs.append(f)
-
-        # collect after joining in check_log_count (can't join df and lazy df)
-        self.summary_log = self.summary_log.collect()
 
         # error at the end, to allow logs to be generated
         for x in self.filter_summary.iter_rows():
@@ -318,19 +338,16 @@ class MatchResults(collections.abc.Sequence):
         Multiple match candidates may exist for each variant in the original file.
         Describe each variant (one variant per row) with match metadata
         """
-        if not self._labelled:
-            self.df = self.label(**kwargs)
-            self._labelled = True
+        if self.match_candidates is None:
+            self._match_candidates = self.label(**kwargs)
 
-        if not self._filtered:
-            self.df, self.filter_summary = filter_scores(
-                scorefile=score_df,
-                matches=self.df,
-                min_overlap=kwargs.get("min_overlap", 0.75),
-                dataset=self.dataset,
+        if self.filtered_matches is None:
+            self._filter_summary, self._filtered_matches = self.filter(
+                score_df=score_df, min_overlap=kwargs.get("min_overlap", 0.75)
             )
-            self._filtered = True
 
         return make_logs(
-            scorefile=score_df, dataset=self.dataset, match_candidates=self.df
+            scorefile=score_df,
+            dataset=self.dataset,
+            match_candidates=self.match_candidates,
         )
