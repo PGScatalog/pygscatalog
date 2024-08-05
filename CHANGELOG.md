@@ -1,3 +1,14 @@
+## 2024-08-05
+
+Patch release  [pgscatalog-utils-1.3.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.3.1)
+
+* Bump dependencies to latest
+
+Patch release  [pgscatalog-match-0.3.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.3.1)
+
+* Fix splitting but revert implementation to original function. v0.3.0 would trigger ValueErrors consistently on larger datasets
+* Fix variant match information getting dropped from the log if an accession was filtered from output scoring files 
+
 ## 2024-08-02
 
 Minor release  [pgscatalog-utils-1.3.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.3.0)
