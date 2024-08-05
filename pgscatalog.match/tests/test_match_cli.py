@@ -135,6 +135,18 @@ def test_duplicated(tmp_path_factory, good_variants, duplicated_scorefile):
     assert all("test2" in x and "test3" in x for x in f1variants)
     assert all("test" in x for x in f2variants)
 
+    # ambiguous variant correctly dropped (REF_FLIP == ALT)
+    with open(duplicated_scorefile) as f:
+        input = list(csv.DictReader(f, delimiter="\t"))
+
+    assert "18:24337424:C:G" in [
+        ":".join(
+            [x["chr_name"], x["chr_position"], x["effect_allele"], x["other_allele"]]
+        )
+        for x in input
+    ]
+    assert "18:24337424:C:G" not in (x["ID"] for x in f1variants + f2variants)
+
 
 def test_multiallelic(tmp_path_factory, multiallelic_variants, good_scorefile):
     outdir = tmp_path_factory.mktemp("outdir")
