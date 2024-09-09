@@ -9,7 +9,7 @@ import pathlib
 import pyliftover
 
 from .genomebuild import GenomeBuild
-from .scorevariant import ScoreVariant, Allele
+from .scorevariant import Allele
 from .pgsexceptions import LiftoverError
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,6 @@ def normalise(
         variants = scoring_file.variants
 
     variants = remap_harmonised(variants, scoring_file.harmonised, target_build)
-    variants = check_bad_variant(variants, drop_missing)
 
     if drop_missing:
         variants = drop_hla(variants)
@@ -91,11 +90,11 @@ def check_duplicates(variants):
 def drop_hla(variants):
     """Drop HLA alleles from a list of ScoreVariants
 
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
+    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(drop_hla([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(effect_allele='A',...)]
+    [ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), ...
 
-    >>> variant = ScoreVariant(**{"effect_allele": "P", "effect_weight": 5, "accession": "test", "row_nr": 0})
+    >>> variant = ScoreVariant(**{"effect_allele": "P", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(drop_hla([variant]))
     []
     """
@@ -117,23 +116,19 @@ def drop_hla(variants):
 def assign_other_allele(variants):
     """Check if there's more than one possible other allele, remove if true
 
-    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "1", "effect_allele": "A", "effect_weight": 5, "other_allele": "A"})
-    >>> list(assign_other_allele([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(..., effect_allele='A', other_allele='A', ...)]
-    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "1", "effect_allele": "A", "effect_weight": 5, "other_allele": "A/C"})
-    >>> list(assign_other_allele([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(..., effect_allele='A', other_allele=None,...)]
+    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "1", "effect_allele": "A", "effect_weight": 5, "other_allele": "A", "row_nr": 0, "accession": "test"})
+    >>> list(assign_other_allele([variant]))[0] # doctest: +ELLIPSIS
+    ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=Allele(allele='A', is_snp=True), ...)
+    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "1", "effect_allele": "A", "effect_weight": 5, "other_allele": "A/C", "row_nr": 0, "accession": "test"})
+    >>> list(assign_other_allele([variant]))[0] # doctest: +ELLIPSIS
+    ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=None, ...)
     """
     n_dropped = 0
     for variant in variants:
-        try:
-            if "/" in variant.other_allele:
-                n_dropped += 1
-                variant.other_allele = None
-        except TypeError:
-            pass  # other allele is already missing
-        finally:
-            yield variant
+        if getattr(variant.other_allele, "has_multiple_alleles", False):
+            n_dropped += 1
+            variant.other_allele = None
+        yield variant
 
     if n_dropped > 0:
         logger.warning(f"Multiple other_alleles detected in {n_dropped} variants")
@@ -147,9 +142,12 @@ def remap_harmonised(variants, harmonised, target_build):
     In this case chr_name, chr_position, and other allele are missing.
     Perhaps authors submitted rsID and effect allele originally:
 
-    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "2", "effect_allele": "A", "effect_weight": 5, "accession": "test", "hm_chr": 1, "hm_pos": 100, "hm_inferOtherAllele": "A"})
+    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "2", "effect_allele": "A", "effect_weight": 5, "accession": "test", "hm_chr": "1", "hm_pos": 100, "hm_rsID": "testrsid", "hm_inferOtherAllele": "A", "row_nr": 0})
+    >>> variant
+    ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=None, ...
+
     >>> list(remap_harmonised([variant], harmonised=True, target_build=GenomeBuild.GRCh38)) # doctest: +ELLIPSIS
-    [ScoreVariant(chr_name=1,chr_position=100,...other_allele='A'...)]
+    [ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=Allele(allele='A', is_snp=True), ...
     """
     if harmonised:
         for variant in variants:
@@ -159,7 +157,7 @@ def remap_harmonised(variants, harmonised, target_build):
             variant.chr_name = variant.hm_chr
             variant.chr_position = variant.hm_pos
             if variant.other_allele is None:
-                variant.other_allele = variant.hm_inferOtherAllele
+                variant.other_allele = Allele(allele=variant.hm_inferOtherAllele)
             # update the accession to reflect the harmonised data
             variant.accession = f"{variant.accession}_hmPOS_{str(target_build)}"
             yield variant
@@ -169,49 +167,16 @@ def remap_harmonised(variants, harmonised, target_build):
             yield variant
 
 
-def check_bad_variant(variants, drop_missing=False):
-    """
-    Missing effect allele:
-
-    >>> variant = ScoreVariant(**{"effect_allele": None, "effect_weight": 5, "accession": "test", "row_nr": 0})
-    >>> list(check_bad_variant([variant], drop_missing=True)) # doctest: +ELLIPSIS
-    []
-
-    Missing chromosome name and position:
-
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
-    >>> list(check_bad_variant([variant], drop_missing=True)) # doctest: +ELLIPSIS
-    []
-    """
-    n_bad = 0
-    for variant in variants:
-        match variant:
-            case (
-                ScoreVariant(chr_name=None)
-                | ScoreVariant(chr_position=None)
-                | ScoreVariant(effect_allele=None)
-            ):
-                # (effect weight checked separately)
-                n_bad += 1
-                if not drop_missing:
-                    yield variant
-            case _:
-                yield variant
-
-    if n_bad > 1:
-        logger.warning(f"{n_bad} bad variants")
-
-
 def check_effect_allele(variants, drop_missing=False):
     """
     Odd effect allele:
 
-    >>> variant = ScoreVariant(**{"effect_allele": "Z", "effect_weight": 5, "accession": "test", "row_nr": 0})
+    >>> variant = ScoreVariant(**{"effect_allele": "Z", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(check_effect_allele([variant], drop_missing=True)) # doctest: +ELLIPSIS
     []
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
+    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(check_effect_allele([variant], drop_missing=True)) # doctest: +ELLIPSIS
-    [ScoreVariant(effect_allele='A'...)]
+    [ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), ...)]
     """
     n_bad = 0
     for variant in variants:

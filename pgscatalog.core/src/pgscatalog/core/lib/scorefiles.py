@@ -177,7 +177,7 @@ class ScoringFile:
     >>> for variant in sf.variants: # doctest: +ELLIPSIS
     ...     variant
     ...     break
-    ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',accession='PGS000001',...
+    ScoreVariant(rsID='rs78540526', chr_name='11', chr_position=None, effect_allele=Allele(allele='T', is_snp=True)...
 
     You can also make a ``ScoringFile`` by using PGS Catalog score accessions:
 
@@ -422,7 +422,7 @@ class ScoringFile:
         >>> for x in variants: # doctest: +ELLIPSIS
         ...     x
         ...     break
-        ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',...
+        ScoreVariant(rsID='rs78540526', chr_name='11', chr_position=69516650, effect_allele=Allele(allele='T', is_snp=True), ...
 
         Supports lifting over scoring files from GRCh37 to GRCh38:
 
@@ -762,7 +762,7 @@ class NormalisedScoringFile:
     >>> for i in test.variants:  # doctest: +ELLIPSIS
     ...     i
     ...     break
-    ScoreVariant(effect_allele='T',effect_weight='0.2104229869048294',...
+    ScoreVariant(rsID=None, chr_name='11', chr_position=69331418, effect_allele=Allele(allele='T', is_snp=True), ...
 
     >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
     >>> test = NormalisedScoringFile(ScoringFile(testpath))
@@ -773,7 +773,7 @@ class NormalisedScoringFile:
     >>> for i in test.variants:  # doctest: +ELLIPSIS
     ...     i
     ...     break
-    ScoreVariant(effect_allele='T',effect_weight='0.16220387987485377',...
+    ScoreVariant(rsID='rs78540526', chr_name='11', chr_position=69516650, effect_allele=Allele(allele='T', is_snp=True), ...
     """
 
     def __init__(self, path):

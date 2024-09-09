@@ -31,6 +31,9 @@ class Allele(BaseModel):
 
     >>> Allele(allele="A")
     Allele(allele='A', is_snp=True)
+
+    >>> Allele(allele="A/T").has_multiple_alleles
+    True
     """
 
     allele: str
@@ -45,6 +48,10 @@ class Allele(BaseModel):
         effect alleles.
         """
         return not frozenset(self.allele) - self._valid_snp_bases
+
+    @cached_property
+    def has_multiple_alleles(self) -> bool:
+        return "/" in self.allele
 
     @model_serializer(mode="plain", return_type=str)
     def serialize(self):
@@ -61,6 +68,9 @@ class Allele(BaseModel):
 
     def __hash__(self):
         return hash(self.allele)
+
+    def __contains__(self, item):
+        return item in self.allele
 
 
 class EffectType(Enum):
@@ -345,11 +355,7 @@ class CatalogScoreVariant(BaseModel):
 
     @model_validator(mode="after")
     def check_position(self) -> Self:
-        rsid = getattr(self, "rsID", None)
-        chr_name = getattr(self, "chr_name", None)
-        chr_position = getattr(self, "chr_position", None)
-
-        match (rsid, chr_name, chr_position):
+        match (self.rsID, self.chr_name, self.chr_position):
             case str() | None, str(), int():
                 # mandatory coordinates with optional rsid
                 pass
@@ -357,7 +363,9 @@ class CatalogScoreVariant(BaseModel):
                 # mandatory rsid with optional coordinates
                 pass
             case _:
-                raise TypeError(f"Bad position: {rsid=}, {chr_name=}, {chr_position=}")
+                raise TypeError(
+                    f"Bad position: {self.rsID=}, {self.chr_name=}, {self.chr_position=}"
+                )
 
         return self
 
@@ -388,7 +396,7 @@ class ScoreVariant(CatalogScoreVariant):
     >>> variant_missing_positions = ScoreVariant(**{"rsID": None, "chr_name": None, "chr_position": None, "effect_allele": "A", "effect_weight": 0.5,  "row_nr": 0, "accession": "test"}) # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    TypeError: Bad position: rsid=None, chr_name=None, chr_position=None
+    TypeError: Bad position: self.rsID=None, self.chr_name=None, self.chr_position=None
 
     >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
     >>> harmonised_variant.is_harmonised
