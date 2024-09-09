@@ -7,6 +7,8 @@ Best way to reuse:
   * `import pgscatalog.core` and use fully qualified name: `pgscatalog.core.models.CatalogScoreVariant`)
 
 """
+import enum
+from datetime import date
 from functools import cached_property
 from typing import ClassVar, Optional
 from typing_extensions import Self
@@ -19,8 +21,9 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from xopen import xopen
 
-from ..lib import EffectType
+from ..lib import EffectType, GenomeBuild
 
 
 class Allele(BaseModel):
@@ -373,3 +376,91 @@ class CatalogScoreVariant(BaseModel):
                 if getattr(self, x) is None:
                     raise TypeError(f"Missing harmonised column data: {x}")
         return self
+
+
+class ScoreFormatVersion(str, enum.Enum):
+    v2 = "2.0"
+
+
+class CatalogScoreHeader(BaseModel):
+    """Headers store useful metadata about a scoring file.
+
+    This class provides convenient functions for reading and extracting information
+    from the header. The header must follow PGS Catalog standards. It's always best
+    to build headers with ``from_path()``:
+
+    >>> from ._config import Config
+    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
+    >>> CatalogScoreHeader.from_path(testpath) # doctest: +ELLIPSIS
+    CatalogScoreHeader(format_version=<ScoreFormatVersion.v2: '2.0'>, pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', trait_mapped='breast carcinoma', trait_efo='EFO_0000305', genome_build=None, variants_number=77, weight_type='NR', pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build=GenomeBuild.GRCh38, HmPOS_date=datetime.date(2022, 7, 29), HmPOS_match_pos='{"True": null, "False": null}', HmPOS_match_chr='{"True": null, "False": null}')
+
+    Harmonisation fields are optional:
+
+    >>> CatalogScoreHeader(**{"format_version": "2.0", "pgs_id": "PGS123456", "pgs_name": "testpgs", "trait_reported": "testtrait", "trait_mapped": "testtrait", "trait_efo": "testtrait", "genome_build": "NR", "variants_number": 2, "weight_type": "NR", "pgp_id": "PGP123456", "citation": "yes please"})
+    CatalogScoreHeader(format_version=<ScoreFormatVersion.v2: '2.0'>, pgs_id='PGS123456', pgs_name='testpgs', trait_reported='testtrait', trait_mapped='testtrait', trait_efo='testtrait', genome_build=None, variants_number=2, weight_type='NR', pgp_id='PGP123456', citation='yes please', HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
+    """
+
+    ###PGS CATALOG SCORING FILE - see https://www.pgscatalog.org/downloads/#dl_ftp_scoring for additional information
+    format_version: ScoreFormatVersion
+    ##POLYGENIC SCORE (PGS) INFORMATION
+    pgs_id: str
+    pgs_name: str
+    trait_reported: str
+    trait_mapped: str
+    trait_efo: str
+    genome_build: Optional[GenomeBuild]
+    variants_number: int = Field(ge=0)
+    weight_type: str
+    ##SOURCE INFORMATION
+    pgp_id: str
+    citation: str
+    ##HARMONIZATION DETAILS
+    HmPOS_build: Optional[GenomeBuild] = None
+    HmPOS_date: Optional[date] = None
+    HmPOS_match_pos: Optional[str] = None
+    HmPOS_match_chr: Optional[str] = None
+    # note: only included when different from default
+    license: Optional[str] = Field(
+        "PGS obtained from the Catalog should be cited appropriately, and "
+        "used in accordance with any licensing restrictions set by the authors. See "
+        "EBI Terms of Use (https://www.ebi.ac.uk/about/terms-of-use/) for additional "
+        "details.",
+        repr=False,
+    )
+
+    @field_validator("pgs_id")
+    @classmethod
+    def check_pgs_id(cls, pgs_id: str) -> str:
+        if not pgs_id.startswith("PGS"):
+            raise ValueError(f"pgs_id doesn't start with PGS: {pgs_id}")
+        if len(pgs_id) != 9:
+            raise ValueError(f"Invalid PGS ID format: {pgs_id}")
+        return pgs_id
+
+    @field_validator("genome_build", mode="before")
+    @classmethod
+    def parse_genome_build(cls, weight: str) -> GenomeBuild:
+        return GenomeBuild.from_string(weight)
+
+    @classmethod
+    def from_path(cls, path):
+        # TODO: I copied some library functions here for testing, clean em up or unify here
+        header = {}
+
+        def generate_header(path):
+            for line in f:
+                if line.startswith("#"):
+                    if "=" in line:
+                        yield line.strip()
+                else:
+                    # stop reading lines
+                    break
+
+        with xopen(path, "rt") as f:
+            header_text = generate_header(f)
+
+            for item in header_text:
+                key, value = item.split("=")
+                header[key[1:]] = value  # drop # character from key
+
+            return cls(**header)
