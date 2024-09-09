@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from pgscatalog.core.cli.combine_cli import run
-from pgscatalog.core.lib import ScoringFile
+from pgscatalog.core import ScoringFile
 
 
 @pytest.fixture(scope="package")
@@ -21,6 +21,16 @@ def harmonised_scorefiles(request):
     pgs000001 = request.path.parent / "data" / f"PGS000001_hmPOS_{request.param}.txt.gz"
     pgs000002 = request.path.parent / "data" / f"PGS000002_hmPOS_{request.param}.txt.gz"
     return (request.param, pgs000001), (request.param, pgs000002)
+
+
+@pytest.fixture(scope="package")
+def non_additive_scorefile_grch38(request):
+    return request.path.parent / "data" / "PGS004255_hmPOS_GRCh38.txt.gz"
+
+
+@pytest.fixture(scope="package")
+def pgs000001_grch38(request):
+    return request.path.parent / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
 
 
 @pytest.fixture(scope="package", params=("GRCh37", "GRCh38"))
@@ -72,12 +82,47 @@ def lift_scorefiles(request):
     )
 
 
+def test_combine_nonadditive(tmp_path, non_additive_scorefile_grch38):
+    """Test normalising a single non-additive scoring file fails."""
+    out_path = tmp_path / "combined.txt.gz"
+    path = [str(non_additive_scorefile_grch38)]
+
+    args = [("pgscatalog-combine", "-s"), path, ("-o", str(out_path), "-t", "GRCh38")]
+    flargs = list(itertools.chain(*args))
+
+    with pytest.raises(ValueError):
+        with patch("sys.argv", flargs):
+            run()
+
+
+def test_combine_skip(
+    tmp_path, non_additive_scorefile_grch38, pgs000001_grch38, n_variants
+):
+    """Test that combining skips non-additive files but otherwise completes successfully."""
+    out_path = tmp_path / "combined.txt.gz"
+    paths = [str(non_additive_scorefile_grch38), str(pgs000001_grch38)]
+
+    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", "GRCh38")]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run()
+
+    with gzip.open(out_path, mode="rt") as f:
+        csv_reader = csv.DictReader(f, delimiter="\t")
+        results = list(csv_reader)
+
+    # split to remove harmonisation suffix hmPOS_GRCh3X
+    pgs = collections.Counter([x["accession"].split("_")[0] for x in results])
+    assert pgs["PGS000001"] == n_variants["PGS000001"]
+
+
 def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
     """Test combining unharmonised files.
     Genome build is missing from these files, so it should fail."""
     out_path = tmp_path / "combined.txt.gz"
     paths = [str(x) for _, x in scorefiles]
-    build = [str(x) for x, _ in scorefiles][0]
+    build = "GRCh38"
 
     args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", build)]
     flargs = list(itertools.chain(*args))
