@@ -9,7 +9,7 @@ import pathlib
 import pyliftover
 
 from .genomebuild import GenomeBuild
-from .allele import Allele
+from .models import Allele
 from .pgsexceptions import LiftoverError, EffectTypeError
 from .effecttype import EffectType
 
@@ -60,10 +60,10 @@ def normalise(
 
 
 def check_effect_type(variants):
-    """Check for non-additive variants and raise an Exception"""
+    """Check for non-additive variants and complain if found"""
     for variant in variants:
         if variant.effect_type == EffectType.NONADDITIVE:
-            raise EffectTypeError(f"{variant.variant_id=} has bad effect type")
+            raise EffectTypeError(f"{variant.variant_id=} has unsupported effect type")
         yield variant
 
 
@@ -170,7 +170,7 @@ def remap_harmonised(variants, harmonised, target_build):
             variant.chr_name = variant.hm_chr
             variant.chr_position = variant.hm_pos
             if variant.other_allele is None:
-                variant.other_allele = Allele(allele=variant.hm_inferOtherAllele)
+                variant.other_allele = variant.hm_inferOtherAllele
             # update the accession to reflect the harmonised data
             variant.accession = f"{variant.accession}_hmPOS_{str(target_build)}"
             yield variant

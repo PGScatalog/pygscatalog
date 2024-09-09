@@ -1,3 +1,4 @@
+""" Public interface to the Polygenic Score Catalog core package """
 import logging
 import importlib.metadata
 
@@ -14,31 +15,13 @@ from .lib import (
     TargetVariants,
     TargetVariant,
     TargetType,
-    BasePGSException,
-    MatchError,
-    DuplicateMatchError,
-    MatchRateError,
-    ZeroMatchesError,
-    MatchValueError,
-    CombineError,
-    BuildError,
-    ScoreFormatError,
-    EffectTypeError,
-    CatalogError,
-    ScoreDownloadError,
-    ScoreChecksumError,
-    QueryError,
-    InvalidAccessionError,
-    SamplesheetError,
-    GenomesNotFound,
-    SamplesheetFormatError,
     RelabelArgs,
     relabel,
     relabel_write,
     effect_type_keyfunc,
     chrom_keyfunc,
     EffectType,
-    Allele,
+    models,
 )
 
 log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"
@@ -46,24 +29,6 @@ logging.basicConfig(format=log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "BasePGSException",
-    "MatchError",
-    "DuplicateMatchError",
-    "MatchRateError",
-    "ZeroMatchesError",
-    "MatchValueError",
-    "CombineError",
-    "BuildError",
-    "ScoreFormatError",
-    "EffectTypeError",
-    "CatalogError",
-    "ScoreDownloadError",
-    "ScoreChecksumError",
-    "QueryError",
-    "InvalidAccessionError",
-    "SamplesheetError",
-    "GenomesNotFound",
-    "SamplesheetFormatError",
     "ScoringFiles",
     "ScoringFile",
     "ScoreVariant",
@@ -82,7 +47,7 @@ __all__ = [
     "effect_type_keyfunc",
     "chrom_keyfunc",
     "EffectType",
-    "Allele",
+    "models",
 ]
 
 __version__ = importlib.metadata.version("pgscatalog.core")

@@ -6,9 +6,9 @@ import sys
 import textwrap
 
 from tqdm import tqdm
-from pgscatalog.core import GenomeBuild, ScoringFile, ScoreVariant, EffectTypeError
+from ..lib import GenomeBuild, ScoringFile, ScoreVariant, EffectTypeError
 
-from pgscatalog.core.cli._combine import get_variant_log, TextFileWriter
+from ._combine import get_variant_log, TextFileWriter
 
 logger = logging.getLogger(__name__)
 

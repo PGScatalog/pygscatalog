@@ -1,13 +1,80 @@
-"""This module a pydantic model for the PGS Catalog scoring file standard, v2 """
+""" PGS Catalog pydantic models for data validation
 
+Best way to reuse:
+
+  * `from pgscatalog.core import models` and use `models.CatalogScoreVariant(**d)`
+
+  * `import pgscatalog.core` and use fully qualified name: `pgscatalog.core.models.CatalogScoreVariant`)
+
+"""
 from functools import cached_property
-from typing import Optional, ClassVar
+from typing import ClassVar, Optional
 from typing_extensions import Self
 
-from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    computed_field,
+    model_serializer,
+    Field,
+    field_validator,
+    model_validator,
+)
 
-from .effecttype import EffectType
-from .allele import Allele
+from ..lib import EffectType
+
+
+class Allele(BaseModel):
+    """A class that represents an allele found in PGS Catalog scoring files
+    >>> simple_ea = Allele(**{"allele": "A"})
+    >>> simple_ea
+    Allele(allele='A', is_snp=True)
+    >>> str(simple_ea)
+    'A'
+    >>> Allele(**{"allele": "AG"})
+    Allele(allele='AG', is_snp=True)
+    >>> hla_example = Allele(**{"allele": "+"})
+    >>> hla_example
+    Allele(allele='+', is_snp=False)
+
+    >>> Allele(allele="A")
+    Allele(allele='A', is_snp=True)
+
+    >>> Allele(allele="A/T").has_multiple_alleles
+    True
+    """
+
+    allele: str
+    _valid_snp_bases: ClassVar[frozenset[str]] = frozenset({"A", "C", "T", "G"})
+
+    @computed_field
+    @cached_property
+    def is_snp(self) -> bool:
+        """SNPs are the most common type of effect allele in PGS Catalog scoring
+        files. More complex effect alleles, like HLAs or APOE genes, often require
+        extra work to represent in genomes. Users should be warned about complex
+        effect alleles.
+        """
+        return not frozenset(self.allele) - self._valid_snp_bases
+
+    @cached_property
+    def has_multiple_alleles(self) -> bool:
+        return "/" in self.allele
+
+    @model_serializer(mode="plain", return_type=str)
+    def serialize(self):
+        """When dumping the model, flatten it to just return the allele as a string"""
+        return self.allele
+
+    def __str__(self):
+        return self.allele
+
+    def __eq__(self, other):
+        if isinstance(other, Allele):
+            return self.allele == other.allele
+        return False
+
+    def __hash__(self):
+        return hash(self.allele)
 
 
 class CatalogScoreVariant(BaseModel):
@@ -155,8 +222,7 @@ class CatalogScoreVariant(BaseModel):
         title="Harmonized chromosome position",
         description="Chromosomal position (base pair location) where the variant is located, preferring matches to chromosomes over patches present in later builds.",
     )
-    # this is a str on purpose because it might contain / characters
-    hm_inferOtherAllele: Optional[str] = Field(
+    hm_inferOtherAllele: Optional[Allele] = Field(
         default=None,
         title="Harmonized other alleles",
         description="If only the effect_allele is given we attempt to infer the non-effect/other allele(s) using Ensembl/dbSNP alleles.",
@@ -252,7 +318,9 @@ class CatalogScoreVariant(BaseModel):
         _ = float(weight)  # will raise a ValueError if conversion fails
         return str(weight)  # store as a string to prevent loss of precision
 
-    @field_validator("effect_allele", "other_allele", mode="before")
+    @field_validator(
+        "effect_allele", "other_allele", "hm_inferOtherAllele", mode="before"
+    )
     @classmethod
     def alleles_must_parse(cls, value):
         if isinstance(value, str):

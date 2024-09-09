@@ -1,6 +1,3 @@
-"""This module contains classes that compose a ScoreVariant: a variant in a PGS
-Catalog Scoring File."""
-
 from typing import Optional, ClassVar
 from pydantic import (
     Field,
@@ -8,7 +5,7 @@ from pydantic import (
 )
 
 from .effecttype import EffectType
-from .catalogscorevariant import CatalogScoreVariant
+from .models import CatalogScoreVariant
 
 
 class ScoreVariant(CatalogScoreVariant):
