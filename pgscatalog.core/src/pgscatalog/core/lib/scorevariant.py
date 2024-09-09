@@ -5,7 +5,15 @@ from enum import Enum
 from functools import cached_property
 from typing import Optional, ClassVar
 from typing_extensions import Self
-from pydantic import BaseModel, Field, model_validator, computed_field, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    model_validator,
+    computed_field,
+    field_validator,
+    model_serializer,
+    field_serializer,
+)
 
 
 class Allele(BaseModel):
@@ -20,13 +28,16 @@ class Allele(BaseModel):
     >>> hla_example = Allele(**{"allele": "+"})
     >>> hla_example
     Allele(allele='+', is_snp=False)
+
+    >>> Allele(allele="A")
+    Allele(allele='A', is_snp=True)
     """
 
     allele: str
     _valid_snp_bases: ClassVar[frozenset[str]] = frozenset({"A", "C", "T", "G"})
 
     @computed_field
-    @property
+    @cached_property
     def is_snp(self) -> bool:
         """SNPs are the most common type of effect allele in PGS Catalog scoring
         files. More complex effect alleles, like HLAs or APOE genes, often require
@@ -34,6 +45,11 @@ class Allele(BaseModel):
         effect alleles.
         """
         return not frozenset(self.allele) - self._valid_snp_bases
+
+    @model_serializer(mode="plain", return_type=str)
+    def serialize(self):
+        """When dumping the model, flatten it to just return the allele as a string"""
+        return self.allele
 
     def __str__(self):
         return self.allele
@@ -57,6 +73,8 @@ class EffectType(Enum):
     * ScoreVariants with a dominant effect type are only added to the PGS sum if there is at least one copy of the effect allele.
     * ScoreVariants with a recessive effect type are only added to the PGS sum if there are two copies of the effect allele.
 
+    Non-additive variants aren't supported and will raise an exception
+
     >>> EffectType.ADDITIVE
     EffectType.ADDITIVE
     >>> str(EffectType.ADDITIVE)
@@ -76,47 +94,9 @@ class EffectType(Enum):
         return f"{type(self).__name__}.{self.name}"
 
 
-class ScoreVariant(BaseModel):
-    """A model representing a row from a PGS Catalog scoring file
+class CatalogScoreVariant(BaseModel):
+    """A model representing a row from a PGS Catalog scoring file, defined here:
     https://www.pgscatalog.org/downloads/#scoring_columns
-
-    >>> variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5})
-    >>> variant  # doctest: +ELLIPSIS
-    ScoreVariant(rsID=None, chr_name='1', chr_position=1, effect_allele='A', ...
-    >>> variant.is_complex
-    False
-    >>> variant.is_non_additive
-    False
-    >>> variant.is_harmonised
-    False
-    >>> variant.effect_type
-    EffectType.ADDITIVE
-
-    >>> variant_missing_positions = ScoreVariant(**{"rsID": None, "chr_name": None, "chr_position": None, "effect_allele": "A", "effect_weight": 0.5}) # doctest: +ELLIPSIS
-    Traceback (most recent call last):
-    ...
-    TypeError: Bad position: rsid=None, chr_name=None, chr_position=None
-
-    >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL"})
-    >>> harmonised_variant.is_harmonised
-    True
-
-    >>> variant_badly_harmonised = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": None, "hm_pos": None, "hm_rsID": "rs1921", "hm_source": "ENSEMBL"})
-    Traceback (most recent call last):
-    ...
-    TypeError: Missing harmonised column data: hm_chr
-
-    >>> variant_nonadditive = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "dosage_0_weight": 0, "dosage_1_weight": 1})
-    >>> variant_nonadditive.is_non_additive
-    True
-    >>> variant_nonadditive.is_complex
-    False
-    >>> variant_nonadditive.effect_type
-    EffectType.NONADDITIVE
-
-    >>> variant_complex = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "is_haplotype": True})
-    >>> variant_complex.is_complex
-    True
     """
 
     # variant description
@@ -136,12 +116,12 @@ class ScoreVariant(BaseModel):
         description="Chromosomal position associated with the variant.",
         gt=0,
     )
-    effect_allele: Optional[str] = Field(
+    effect_allele: Optional[Allele] = Field(
         default=None,
         title="Effect Allele",
         description="The allele that's dosage is counted (e.g. {0, 1, 2}) and multiplied by the variant's weight (effect_weight) when calculating score. The effect allele is also known as the 'risk allele'. Note: this does not necessarily need to correspond to the minor allele/alternative allele.",
     )
-    other_allele: Optional[str] = Field(
+    other_allele: Optional[Allele] = Field(
         default=None,
         title="Other allele(s)",
         description="The other allele(s) at the loci. Note: this does not necessarily need to correspond to the reference allele.",
@@ -178,7 +158,9 @@ class ScoreVariant(BaseModel):
     )
 
     # weight information
-    effect_weight: float = Field(
+    # TODO: think about str a bit more (check field validator)
+    # TODO: is using decimal.Decimal with precision equal to plink limit better?
+    effect_weight: str = Field(
         title="Variant Weight",
         description="Value of the effect that is multiplied by the dosage of the effect allele (effect_allele) when calculating the score. Additional information on how the effect_weight was derived is in the weight_type field of the header, and score development method in the metadata downloads.",
     )
@@ -256,7 +238,7 @@ class ScoreVariant(BaseModel):
         title="Harmonized chromosome position",
         description="Chromosomal position (base pair location) where the variant is located, preferring matches to chromosomes over patches present in later builds.",
     )
-    # this is a str on purpose
+    # this is a str on purpose because it might contain / characters
     hm_inferOtherAllele: Optional[str] = Field(
         default=None,
         title="Harmonized other alleles",
@@ -290,18 +272,16 @@ class ScoreVariant(BaseModel):
         "dosage_2_weight",
     )
 
-    # column names for output are used by __iter__ and when writing out
-    output_fields: ClassVar[tuple[str]] = (
-        "chr_name",
-        "chr_position",
-        "effect_allele",
-        "other_allele",
-        "effect_weight",
-        "effect_type",
-        "is_duplicated",
-        "accession",
-        "row_nr",
-    )
+    @computed_field
+    @cached_property
+    def variant_id(self) -> str:
+        """ID = chr:pos:effect_allele:other_allele"""
+        return ":".join(
+            [
+                str(getattr(self, k) or "")  # correctly handles None elements
+                for k in ["chr_name", "chr_position", "effect_allele", "other_allele"]
+            ]
+        )
 
     @computed_field
     @cached_property
@@ -349,12 +329,19 @@ class ScoreVariant(BaseModel):
 
         return effect
 
-    @field_validator("effect_type")
+    @field_validator("effect_weight", mode="before")
     @classmethod
-    def check_effect_type(cls, effect) -> EffectType:
-        if not isinstance(effect, EffectType):
-            raise TypeError("Bad effect type")
-        return effect
+    def effect_weight_must_float(cls, weight):
+        _ = float(weight)  # will raise a ValueError if conversion fails
+        return str(weight)  # store as a string to prevent loss of precision
+
+    @field_validator("effect_allele", "other_allele", mode="before")
+    @classmethod
+    def alleles_must_parse(cls, value):
+        if isinstance(value, str):
+            return Allele(allele=value)
+        else:
+            raise ValueError(f"Can't parse {value=}")
 
     @model_validator(mode="after")
     def check_position(self) -> Self:
@@ -363,14 +350,14 @@ class ScoreVariant(BaseModel):
         chr_position = getattr(self, "chr_position", None)
 
         match (rsid, chr_name, chr_position):
-            case None, str(), int():
-                pass  # just genomic coordinates, good
-            case str(), None, None:
-                pass  # just rsID, good
-            case str(), str(), int():
-                pass  # all data are available, good
+            case str() | None, str(), int():
+                # mandatory coordinates with optional rsid
+                pass
+            case str(), str() | None, str() | None:
+                # mandatory rsid with optional coordinates
+                pass
             case _:
-                raise TypeError(f"Bad position: {rsid=}, {chr_name=}, {chr_position=} ")
+                raise TypeError(f"Bad position: {rsid=}, {chr_name=}, {chr_position=}")
 
         return self
 
@@ -382,6 +369,78 @@ class ScoreVariant(BaseModel):
                     raise TypeError(f"Missing harmonised column data: {x}")
         return self
 
+
+class ScoreVariant(CatalogScoreVariant):
+    """This model includes attributes useful for processing and normalising variants
+
+    >>> variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "row_nr": 0, "accession": "test"})
+    >>> variant  # doctest: +ELLIPSIS
+    ScoreVariant(rsID=None, chr_name='1', chr_position=1, effect_allele=Allele(allele='A', ...
+    >>> variant.is_complex
+    False
+    >>> variant.is_non_additive
+    False
+    >>> variant.is_harmonised
+    False
+    >>> variant.effect_type
+    EffectType.ADDITIVE
+
+    >>> variant_missing_positions = ScoreVariant(**{"rsID": None, "chr_name": None, "chr_position": None, "effect_allele": "A", "effect_weight": 0.5,  "row_nr": 0, "accession": "test"}) # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    TypeError: Bad position: rsid=None, chr_name=None, chr_position=None
+
+    >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
+    >>> harmonised_variant.is_harmonised
+    True
+
+    >>> variant_badly_harmonised = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": None, "hm_pos": None, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
+    Traceback (most recent call last):
+    ...
+    TypeError: Missing harmonised column data: hm_chr
+
+    >>> variant_nonadditive = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "dosage_0_weight": 0, "dosage_1_weight": 1,  "row_nr": 0, "accession": "test"})
+    >>> variant_nonadditive.is_non_additive
+    True
+    >>> variant_nonadditive.is_complex
+    False
+    >>> variant_nonadditive.effect_type
+    EffectType.NONADDITIVE
+
+    >>> variant_complex = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "is_haplotype": True,  "row_nr": 0, "accession": "test"})
+    >>> variant_complex.is_complex
+    True
+    """
+
+    row_nr: int = Field(
+        title="Row number",
+        description="Row number of variant in scoring file (first variant = 0)",
+    )
+    accession: str = Field(title="Accession", description="Accession of score variant")
+    is_duplicated: Optional[bool] = Field(
+        default=False,
+        title="Duplicated variant",
+        description="In a list of variants with the same accession, is ID duplicated?",
+    )
+
+    # column names for output are used by __iter__ and when writing out
+    output_fields: ClassVar[tuple[str]] = (
+        "chr_name",
+        "chr_position",
+        "effect_allele",
+        "other_allele",
+        "effect_weight",
+        "effect_type",
+        "is_duplicated",
+        "accession",
+        "row_nr",
+    )
+
     def __iter__(self):
         for attr in self.output_fields:
             yield getattr(self, attr)
+
+    @field_serializer("effect_type")
+    def serialize_effect_type(self, effect_type: EffectType) -> str:
+        """Convert enum to string during serialisation"""
+        return effect_type.value
