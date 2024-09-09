@@ -9,7 +9,7 @@ import pathlib
 import pyliftover
 
 from .genomebuild import GenomeBuild
-from .scorevariant import Allele
+from .allele import Allele
 from .pgsexceptions import LiftoverError
 
 logger = logging.getLogger(__name__)

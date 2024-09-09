@@ -10,7 +10,6 @@ from .lib import (
     ScoringFile,
     NormalisedScoringFile,
     ScoreVariant,
-    EffectType,
     GenomeBuild,
     TargetVariants,
     TargetVariant,
@@ -37,6 +36,8 @@ from .lib import (
     relabel_write,
     effect_type_keyfunc,
     chrom_keyfunc,
+    EffectType,
+    Allele,
 )
 
 log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"
@@ -73,12 +74,13 @@ __all__ = [
     "TargetVariants",
     "TargetType",
     "NormalisedScoringFile",
-    "EffectType",
     "RelabelArgs",
     "relabel",
     "relabel_write",
     "effect_type_keyfunc",
     "chrom_keyfunc",
+    "EffectType",
+    "Allele",
 ]
 
 __version__ = importlib.metadata.version("pgscatalog.core")
