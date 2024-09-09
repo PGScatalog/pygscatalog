@@ -6,7 +6,7 @@ import sys
 import textwrap
 
 from tqdm import tqdm
-from pgscatalog.core import GenomeBuild, ScoringFile
+from pgscatalog.core import GenomeBuild, ScoringFile, ScoreVariant
 
 from pgscatalog.core.cli._combine import get_variant_log, TextFileWriter
 
@@ -69,9 +69,14 @@ def run():
                 target_build=target_build,
             )
         )
-        # TODO: go back to concurrent execution + write to multiple files
+        # TODO: go back to parallel execution + write to multiple files
         writer = TextFileWriter(compress=compress_output, filename=out_path)
-        writer.write(normalised_score)
+
+        # model_dump returns a dict with a subset of keys
+        dumped_variants = (
+            x.model_dump(include=ScoreVariant.output_fields) for x in normalised_score
+        )
+        writer.write(dumped_variants)
         variant_log.append(get_variant_log(normalised_score))
 
     score_log = []

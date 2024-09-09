@@ -9,7 +9,6 @@ import gzip
 import logging
 import os
 
-from ..lib.scorevariant import ScoreVariant
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +55,11 @@ class TextFileWriter(DataWriter):
     def write(self, batch):
         mode = "at" if os.path.exists(self.filename) else "wt"
         with self.open_function(self.filename, mode) as f:
-            writer = csv.writer(
-                f,
-                delimiter="\t",
-                lineterminator="\n",
+            writer = csv.DictWriter(
+                f, delimiter="\t", lineterminator="\n", fieldnames=self.fieldnames
             )
             if mode == "wt":
-                writer.writerow(ScoreVariant.output_fields)
+                writer.writeheader()
+                writer.writerows(batch)
 
             writer.writerows(batch)
