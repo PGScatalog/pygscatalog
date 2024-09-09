@@ -10,7 +10,8 @@ import pyliftover
 
 from .genomebuild import GenomeBuild
 from .allele import Allele
-from .pgsexceptions import LiftoverError
+from .pgsexceptions import LiftoverError, EffectTypeError
+from .effecttype import EffectType
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ def normalise(
     if drop_missing:
         variants = drop_hla(variants)
 
+    variants = check_effect_type(variants)
     variants = assign_other_allele(variants)
     variants = check_effect_allele(variants, drop_missing)
     variants = detect_complex(variants)
@@ -55,6 +57,14 @@ def normalise(
     variants = check_duplicates(variants)
 
     return variants
+
+
+def check_effect_type(variants):
+    """Check for non-additive variants and raise an Exception"""
+    for variant in variants:
+        if variant.effect_type == EffectType.NONADDITIVE:
+            raise EffectTypeError(f"{variant.variant_id=} has bad effect type")
+        yield variant
 
 
 def check_duplicates(variants):

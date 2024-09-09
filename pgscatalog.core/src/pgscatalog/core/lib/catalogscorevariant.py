@@ -76,7 +76,8 @@ class CatalogScoreVariant(BaseModel):
     # weight information
     # TODO: think about str a bit more (check field validator)
     # TODO: is using decimal.Decimal with precision equal to plink limit better?
-    effect_weight: str = Field(
+    effect_weight: Optional[str] = Field(
+        default=None,
         title="Variant Weight",
         description="Value of the effect that is multiplied by the dosage of the effect allele (effect_allele) when calculating the score. Additional information on how the effect_weight was derived is in the weight_type field of the header, and score development method in the metadata downloads.",
     )
@@ -258,6 +259,23 @@ class CatalogScoreVariant(BaseModel):
             return Allele(allele=value)
         else:
             raise ValueError(f"Can't parse {value=}")
+
+    @model_validator(mode="after")
+    def check_effect_weights(self) -> Self:
+        match (
+            self.effect_weight,
+            self.dosage_0_weight,
+            self.dosage_1_weight,
+            self.dosage_2_weight,
+        ):
+            case None, None, None, None:
+                raise ValueError("All effect weight fields are missing")
+            case str(), str(), str(), str():
+                raise ValueError("Additive and non-additive fields are present")
+            case None, zero, one, two if any(x is None for x in (zero, one, two)):
+                raise ValueError("Dosage missing effect weight")
+            case _:
+                return self
 
     @model_validator(mode="after")
     def check_position(self) -> Self:
