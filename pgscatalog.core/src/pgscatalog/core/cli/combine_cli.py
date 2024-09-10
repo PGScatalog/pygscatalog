@@ -92,7 +92,7 @@ def run():
             n_finished += 1
             good_scores.append(scorefile)
 
-    if not n_finished > 0:
+    if n_finished == 0:
         raise ValueError(
             "Couldn't process any scoring files. Did they all have non-additive weights?"
         )
