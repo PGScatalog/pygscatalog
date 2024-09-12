@@ -141,12 +141,12 @@ class CatalogScoreVariant(BaseModel):
     )
 
     # weight information
-    # TODO: think about str a bit more (check field validator)
-    # TODO: is using decimal.Decimal with precision equal to plink limit better?
+    # all effect weight fields are handled as strings internally to faithfully reproduce author-uploaded scores (i.e. avoid any floating point errors)
     effect_weight: Optional[str] = Field(
         default=None,
         title="Variant Weight",
         description="Value of the effect that is multiplied by the dosage of the effect allele (effect_allele) when calculating the score. Additional information on how the effect_weight was derived is in the weight_type field of the header, and score development method in the metadata downloads.",
+        coerce_numbers_to_str=True,
     )
     is_interaction: Optional[bool] = Field(
         default=False,
@@ -163,20 +163,23 @@ class CatalogScoreVariant(BaseModel):
         title="FLAG: Recessive Inheritance Model",
         description="This is a TRUE/FALSE variable that flags whether the weight should be added to the PGS sum only if there are 2 copies of the effect allele (e.g. it is a recessive allele).",
     )
-    dosage_0_weight: Optional[float] = Field(
+    dosage_0_weight: Optional[str] = Field(
         default=None,
         title="Effect weight with 0 copy of the effect allele",
         description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
+        coerce_numbers_to_str=True,
     )
-    dosage_1_weight: Optional[float] = Field(
+    dosage_1_weight: Optional[str] = Field(
         default=None,
         title="Effect weight with 1 copy of the effect allele",
         description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
+        coerce_numbers_to_str=True,
     )
-    dosage_2_weight: Optional[float] = Field(
+    dosage_2_weight: Optional[str] = Field(
         default=None,
         title="Effect weight with 2 copies of the effect allele",
         description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
+        coerce_numbers_to_str=True,
     )
 
     # other information
@@ -312,11 +315,13 @@ class CatalogScoreVariant(BaseModel):
 
         return effect
 
-    @field_validator("effect_weight", mode="before")
+    @field_validator(
+        "effect_weight", "dosage_0_weight", "dosage_1_weight", "dosage_2_weight"
+    )
     @classmethod
-    def effect_weight_must_float(cls, weight):
+    def effect_weight_must_float(cls, weight: str) -> str:
         _ = float(weight)  # will raise a ValueError if conversion fails
-        return str(weight)  # store as a string to prevent loss of precision
+        return weight
 
     @field_validator(
         "effect_allele", "other_allele", "hm_inferOtherAllele", mode="before"
