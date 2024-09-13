@@ -7,8 +7,8 @@ from typing import Optional
 
 from tqdm import tqdm
 
-from pgscatalog.core.lib.models import ScoreLog, ScoreLogs
-from ..lib import GenomeBuild, ScoringFile, ScoreVariant, EffectTypeError
+from ..lib.models import ScoreLog, ScoreLogs, ScoreVariant
+from ..lib import GenomeBuild, ScoringFile, EffectTypeError
 
 from ._combine import TextFileWriter
 

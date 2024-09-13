@@ -36,6 +36,7 @@ class ScoringFile:
 
     You can make ``ScoringFiles`` with a path to a scoring file with minimal metadata:
 
+    >>> from ..lib import GenomeBuild
     >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "data" / "custom.txt")
     >>> sf # doctest: +ELLIPSIS
     ScoringFile('.../custom.txt', target_build=None)
@@ -279,6 +280,8 @@ class ScoringFile:
         :returns: None
 
         >>> import tempfile, os
+        >>> from ..lib import GenomeBuild
+
         >>> with tempfile.TemporaryDirectory() as tmp_dir:
         ...     ScoringFile("PGS000001").download(tmp_dir)
         ...     print(os.listdir(tmp_dir))
@@ -320,6 +323,7 @@ class ScoringFile:
 
         Takes care of quality control.
 
+        >>> from ..lib import GenomeBuild
         >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
         >>> variants = ScoringFile(testpath).normalise()
         >>> for x in variants: # doctest: +ELLIPSIS
@@ -383,6 +387,7 @@ class ScoringFiles:
 
     You can use publications or trait accessions to instantiate:
 
+    >>> from ..lib import GenomeBuild
     >>> ScoringFiles("PGP000001", target_build=GenomeBuild.GRCh37)
     ScoringFiles('PGS000001', 'PGS000002', 'PGS000003', target_build=GenomeBuild.GRCh37)
 
