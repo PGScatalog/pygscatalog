@@ -8,9 +8,10 @@ Best way to reuse:
 
 """
 import enum
+import pathlib
 from datetime import date
 from functools import cached_property
-from typing import ClassVar, Optional
+from typing import ClassVar, Optional, Union
 from typing_extensions import Self
 
 from pydantic import (
@@ -20,6 +21,8 @@ from pydantic import (
     Field,
     field_validator,
     model_validator,
+    ConfigDict,
+    field_serializer,
 )
 from xopen import xopen
 
@@ -378,7 +381,84 @@ class CatalogScoreVariant(BaseModel):
         return self
 
 
+class ScoreVariant(CatalogScoreVariant):
+    """This model includes attributes useful for processing and normalising variants
+
+    >>> variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "row_nr": 0, "accession": "test"})
+    >>> variant  # doctest: +ELLIPSIS
+    ScoreVariant(rsID=None, chr_name='1', chr_position=1, effect_allele=Allele(allele='A', ...
+    >>> variant.is_complex
+    False
+    >>> variant.is_non_additive
+    False
+    >>> variant.is_harmonised
+    False
+    >>> variant.effect_type
+    EffectType.ADDITIVE
+
+    >>> variant_missing_positions = ScoreVariant(**{"rsID": None, "chr_name": None, "chr_position": None, "effect_allele": "A", "effect_weight": 0.5,  "row_nr": 0, "accession": "test"}) # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    TypeError: Bad position: self.rsID=None, self.chr_name=None, self.chr_position=None
+
+    >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
+    >>> harmonised_variant.is_harmonised
+    True
+
+    >>> variant_badly_harmonised = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": None, "hm_pos": None, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
+    Traceback (most recent call last):
+    ...
+    TypeError: Missing harmonised column data: hm_chr
+
+    >>> variant_nonadditive = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "dosage_0_weight": 0, "dosage_1_weight": 1,  "row_nr": 0, "accession": "test"})
+    >>> variant_nonadditive.is_non_additive
+    True
+    >>> variant_nonadditive.is_complex
+    False
+    >>> variant_nonadditive.effect_type
+    EffectType.NONADDITIVE
+
+    >>> variant_complex = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "is_haplotype": True,  "row_nr": 0, "accession": "test"})
+    >>> variant_complex.is_complex
+    True
+    """
+
+    model_config = ConfigDict(use_enum_values=True)
+
+    row_nr: int = Field(
+        title="Row number",
+        description="Row number of variant in scoring file (first variant = 0)",
+    )
+    accession: str = Field(title="Accession", description="Accession of score variant")
+    is_duplicated: Optional[bool] = Field(
+        default=False,
+        title="Duplicated variant",
+        description="In a list of variants with the same accession, is ID duplicated?",
+    )
+
+    # column names for output are used by __iter__ and when writing out
+    output_fields: ClassVar[tuple[str]] = (
+        "chr_name",
+        "chr_position",
+        "effect_allele",
+        "other_allele",
+        "effect_weight",
+        "effect_type",
+        "is_duplicated",
+        "accession",
+        "row_nr",
+    )
+
+    def __iter__(self):
+        for attr in self.output_fields:
+            yield getattr(self, attr)
+
+
 class ScoreFormatVersion(str, enum.Enum):
+    """See https://www.pgscatalog.org/downloads/#scoring_changes
+    v1 was deprecated in December 2021
+    """
+
     v2 = "2.0"
 
 
@@ -386,7 +466,6 @@ class WeightType(str, enum.Enum):
     BETA = "beta"
     ODDSRATIO = "OR"
     HAZARDRATIO = "HR"
-    NR = "NR"
 
 
 class ScoreHeader(BaseModel):
@@ -397,6 +476,11 @@ class ScoreHeader(BaseModel):
 
     >>> ScoreHeader(**{"pgs_id": "PGS123456", "trait_reported": "testtrait", "genome_build": "GRCh38"})
     ScoreHeader(pgs_id='PGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38)
+
+    >>> from ._config import Config
+    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
+    >>> ScoreHeader.from_path(testpath).row_count
+    77
     """
 
     pgs_id: str = Field(title="PGS identifier")
@@ -405,17 +489,38 @@ class ScoreHeader(BaseModel):
     # genome build is Optional because "NR" is represented internally as None
     genome_build: Optional[GenomeBuild] = Field(description="Genome build")
 
+    _path: Optional[pathlib.Path]
+
+    @property
+    def is_harmonised(self):
+        # custom scores can't be harmonised o_o
+        return False
+
+    @field_validator("genome_build", mode="before")
     @classmethod
-    def _parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
+    def parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
         if value == "NR":
             return None
         else:
             return GenomeBuild.from_string(value)
 
-    @field_validator("genome_build", mode="before")
-    @classmethod
-    def parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
-        return cls._parse_genome_build(value)
+    @field_serializer("genome_build")
+    def serialize_genomebuild(self, genome_build, _info):
+        return genome_build.value if genome_build is not None else "NR"
+
+    @cached_property
+    def row_count(self) -> Optional[int]:
+        """Calculate the number of variants in the scoring file by counting the number of rows"""
+        if getattr(self, "_path", None) is None:
+            n_variants = None
+        else:
+            with xopen(self._path, "rt") as fh:
+                # skip header line with - 1
+                n_variants = sum(1 for x in fh if not x.startswith("#")) - 1
+                if n_variants == 0:
+                    raise ValueError(f"No variants in {self._path}")
+
+        return n_variants
 
     @classmethod
     def from_path(cls, path):
@@ -439,7 +544,9 @@ class ScoreHeader(BaseModel):
                 key, value = item.split("=")
                 header[key[1:]] = value  # drop # character from key
 
-            return cls(**header)
+        scoreheader = cls(**header)
+        scoreheader._path = pathlib.Path(path)
+        return scoreheader
 
 
 class CatalogScoreHeader(ScoreHeader):
@@ -449,8 +556,11 @@ class CatalogScoreHeader(ScoreHeader):
 
     >>> from ._config import Config
     >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
-    >>> ScoreHeader.from_path(testpath) # doctest: +ELLIPSIS
-    ScoreHeader(format_version=<ScoreFormatVersion.v2: '2.0'>, pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', trait_mapped=['breast carcinoma'], trait_efo=['EFO_0000305'], genome_build=None, variants_number=77, weight_type=None)
+    >>> test = CatalogScoreHeader.from_path(testpath) # doctest: +ELLIPSIS
+    >>> test # doctest: +ELLIPSIS
+    CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=<ScoreFormatVersion.v2: '2.0'>, trait_mapped=['breast carcinoma'], trait_efo=['EFO_0000305'], variants_number=77, weight_type=None, pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build=GenomeBuild.GRCh38, HmPOS_date=datetime.date(2022, 7, 29), HmPOS_match_pos='{"True": null, "False": null}', HmPOS_match_chr='{"True": null, "False": null}')
+    >>> test.variants_number == test.row_count
+    True
     """
 
     format_version: ScoreFormatVersion
@@ -507,7 +617,7 @@ class CatalogScoreHeader(ScoreHeader):
     def check_pgs_id(cls, pgs_id: str) -> str:
         return cls._check_accession(pgs_id, "PGS")
 
-    @field_validator("pgs_id")
+    @field_validator("pgp_id")
     @classmethod
     def check_pgp_id(cls, pgp_id: str) -> str:
         return cls._check_accession(pgp_id, "PGP")
@@ -515,7 +625,14 @@ class CatalogScoreHeader(ScoreHeader):
     @field_validator("genome_build", "HmPOS_build", mode="before")
     @classmethod
     def parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
-        return cls._parse_genome_build(value)
+        if value == "NR":
+            return None
+        else:
+            return GenomeBuild.from_string(value)
+
+    @field_serializer("genome_build", "HmPOS_build")
+    def serialize_genomebuild(self, genome_build, _info):
+        return genome_build.value if genome_build is not None else "NR"
 
     @field_validator("format_version")
     @classmethod
@@ -524,9 +641,123 @@ class CatalogScoreHeader(ScoreHeader):
             raise ValueError(f"Invalid format_version: {version}")
         return version
 
-    @field_validator("weight_type")
+    @field_validator("weight_type", mode="before")
     @classmethod
-    def parse_weight_type(cls, value: WeightType) -> Optional[WeightType]:
-        if value == WeightType.NR:
+    def parse_weight_type(cls, value: str) -> Optional[str]:
+        if value == "NR":
             value = None
         return value
+
+    @property
+    def is_harmonised(self):
+        if self.HmPOS_build is None and self.HmPOS_date is None:
+            return False
+        else:
+            return True
+
+
+class ScoreLog(BaseModel):
+    """A log that includes header information and variant summary statistics
+
+    >>> header = CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=ScoreFormatVersion.v2, trait_mapped='breast carcinoma', trait_efo='EFO_0000305', variants_number=77, weight_type="NR", pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build="GRCh38", HmPOS_date="2022-07-29")
+    >>> variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "row_nr": 0, "accession": "test"})
+    >>> ScoreLog(header=header, variants=[variant])  # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    pydantic_core._pydantic_core.ValidationError: 1 validation error for ScoreLog
+      Value error, variants_harmonised=False but header_harmonised=True [type=value_error, input_value={'header': CatalogScoreHe...e=EffectType.ADDITIVE)]}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.9/v/value_error
+
+    >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
+    >>> scorelog = ScoreLog(header=header, variants=[harmonised_variant])
+
+    In the original scoring file header there were 77 variants:
+
+    >>> scorelog.header.variants_number
+    77
+
+    But we've only got 1 ScoreVariant:
+
+    >>> scorelog.n_actual_variants
+    1
+    >>> scorelog.variant_count_difference
+    76
+    >>> scorelog.variants_are_missing
+    True
+
+    Maybe they were all filtered out during normalisationIt's important to log and warn when this happens.
+
+    >>> scorelog.sources
+    ['ENSEMBL']
+
+    >>> scorelog.model_dump()  # doctest: +ELLIPSIS
+    {'header': {'pgs_id': 'PGS000001', ...}, 'compatible_effect_type': True, 'pgs_id': 'PGS000001', 'is_harmonised': True, 'sources': ['ENSEMBL']}
+    """
+
+    model_config = ConfigDict(use_enum_values=True)
+
+    header: Union[ScoreHeader, CatalogScoreHeader] = Field(
+        description="Metadata from the scoring file header"
+    )
+    variants: Optional[list[ScoreVariant]] = Field(
+        description="A list of variants associated with the header. Some may be filtered out during normalisation.",
+        exclude=True,
+    )
+    compatible_effect_type: bool = Field(
+        description="Did all variants in this score contain compatible effect types? (i.e. additive / recessive / dominant)",
+        default=True,
+    )
+
+    @computed_field
+    def pgs_id(self) -> str:
+        return self.header.pgs_id
+
+    @computed_field
+    def is_harmonised(self) -> bool:
+        return self.header.is_harmonised
+
+    @computed_field
+    @cached_property
+    def sources(self) -> Optional[list[str]]:
+        if self.variants is not None:
+            return list(set(getattr(item, "hm_source") for item in self.variants))
+        else:
+            return None
+
+    @property
+    def n_actual_variants(self) -> int:
+        # this distinction is useful if variants have been filtered out
+        return len(self.variants)
+
+    @cached_property
+    def variant_count_difference(self) -> int:
+        # grab directly from header
+        header_variants = getattr(self.header, "variants_number", None)
+        if header_variants is None:
+            # parse by counting the number of rows in the scoring file
+            if self.header.row_count is None:
+                # give up
+                header_variants = 0
+            else:
+                header_variants = self.header.row_count
+
+        return abs(header_variants - self.n_actual_variants)
+
+    @property
+    def variants_are_missing(self) -> bool:
+        return self.variant_count_difference != 0
+
+    @model_validator(mode="after")
+    def check_harmonised(self) -> Self:
+        if self.variants is not None:
+            variants_harmonised = all(x.is_harmonised for x in self.variants)
+            header_harmonised = self.header.is_harmonised
+            if not variants_harmonised == header_harmonised:
+                raise ValueError(f"{variants_harmonised=} but {header_harmonised=}")
+        return self
+
+
+class ScoreLogs(BaseModel):
+    """A container of ScoreLog to simplify serialising to a JSON list"""
+
+    logs: list[ScoreLog]

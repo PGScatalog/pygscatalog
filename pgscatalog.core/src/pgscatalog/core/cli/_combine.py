@@ -2,7 +2,6 @@
 standardised format, combining them, and calculating some statistics. Only really
 useful for the CLI, not good for importing elsewhere."""
 
-import collections
 import csv
 import functools
 import gzip
@@ -11,13 +10,6 @@ import os
 
 
 logger = logging.getLogger(__name__)
-
-
-def get_variant_log(batch):
-    # these statistics can only be generated while iterating through variants
-    n_variants = collections.Counter("n_variants" for item in batch)
-    hm_source = collections.Counter(getattr(item, "hm_source") for item in batch)
-    return n_variants + hm_source
 
 
 class DataWriter:

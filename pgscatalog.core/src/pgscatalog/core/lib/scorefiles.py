@@ -7,10 +7,10 @@ import itertools
 import logging
 import pathlib
 
+from pydantic import ValidationError
 from xopen import xopen
 
-from .scorevariant import ScoreVariant
-from .genomebuild import GenomeBuild
+from .models import ScoreVariant, ScoreHeader, CatalogScoreHeader
 from .catalogapi import ScoreQueryResult, CatalogQuery
 from ._normalise import normalise
 from ._download import https_download
@@ -20,137 +20,9 @@ from ._read import (
     read_rows_lazy,
     get_columns,
     detect_wide,
-    read_header,
 )
 
 logger = logging.getLogger(__name__)
-
-
-class ScoringFileHeader:
-    """Headers store useful metadata about a scoring file.
-
-    This class provides convenient functions for reading and extracting information
-    from the header. The header must follow PGS Catalog standards. It's always best
-    to build headers with ``from_path()``:
-
-    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
-    >>> ScoringFileHeader.from_path(testpath) # doctest: +ELLIPSIS
-    ScoringFileHeader(pgs_id='PGS000001', pgp_id='PGP000001', pgs_name='PRS77_BC', ...
-
-    But you can construct an instance with some minimum data:
-
-    >>> header = ScoringFileHeader(pgs_name="PGS0000001", genome_build="hg19")
-    >>> header # doctest: +ELLIPSIS
-    ScoringFileHeader(pgs_id='None', pgp_id='None', pgs_name='PGS0000001', ...
-
-    Strings are always used to construct (e.g. genome_build='GRCh37') but the header
-    contains some objects:
-
-    >>> header.genome_build
-    GenomeBuild.GRCh37
-    """
-
-    fields = (
-        "pgs_id",
-        "pgp_id",
-        "pgs_name",
-        "genome_build",
-        "variants_number",
-        "trait_reported",
-        "trait_efo",
-        "trait_mapped",
-        "weight_type",
-        "citation",
-        "HmPOS_build",
-        "HmPOS_date",
-        "format_version",
-        "license",
-    )
-
-    _default_license_text = (
-        "PGS obtained from the Catalog should be cited appropriately, and "
-        "used in accordance with any licensing restrictions set by the authors. See "
-        "EBI "
-        "Terms of Use (https://www.ebi.ac.uk/about/terms-of-use/) for additional "
-        "details."
-    )
-
-    def __init__(
-        self,
-        *,
-        pgs_name,
-        genome_build,
-        pgs_id=None,
-        pgp_id=None,
-        variants_number=None,
-        trait_reported=None,
-        trait_efo=None,
-        trait_mapped=None,
-        weight_type=None,
-        citation=None,
-        HmPOS_build=None,
-        HmPOS_date=None,
-        format_version=None,
-        license=None,
-    ):
-        """kwargs are forced because this is a complicated init and from_path() is
-        almost always the correct thing to do.
-
-        Mandatory/optional fields in a header are less clear than columns. The
-        Catalog provides this information automatically but scoring files from other
-        places might not.
-
-        We don't want to annoy people and force them to reformat their custom scoring
-        files, but we do require some minimum information for the calculator,
-        so pgs_name and genome_build are mandatory.
-        """
-        self.pgs_name = pgs_name
-        self.genome_build = GenomeBuild.from_string(genome_build)
-
-        if self.genome_build is None:
-            # try overwriting with harmonised data
-            self.genome_build = GenomeBuild.from_string(HmPOS_build)
-
-        if self.pgs_name is None:
-            raise ValueError("pgs_name cannot be None")
-
-        # the rest of these fields are optional
-        self.pgs_id = pgs_id
-        self.pgp_id = pgp_id
-
-        try:
-            self.variants_number = int(variants_number)
-        except TypeError:
-            self.variants_number = None
-
-        self.trait_reported = trait_reported
-        self.trait_efo = trait_efo
-        self.trait_mapped = trait_mapped
-        self.weight_type = weight_type
-        self.citation = citation
-        self.HmPOS_build = GenomeBuild.from_string(HmPOS_build)
-        self.HmPOS_date = HmPOS_date
-        self.format_version = format_version
-        self.license = license
-
-        if self.license is None:
-            self.license = self._default_license_text
-
-    def __repr__(self):
-        values = {x: getattr(self, x) for x in self.fields}
-        value_strings = ", ".join([f"{key}='{value}'" for key, value in values.items()])
-        return f"{type(self).__name__}({value_strings})"
-
-    @classmethod
-    def from_path(cls, path):
-        raw_header: dict = read_header(path)
-
-        if len(raw_header) == 0:
-            raise ValueError(f"No header detected in scoring file {path=}")
-
-        header_dict = {k: raw_header.get(k) for k in cls.fields}
-
-        return cls(**header_dict)
 
 
 class ScoringFile:
@@ -162,11 +34,28 @@ class ScoringFile:
     :raises pgscatalog.corelib.InvalidAccessionError: If the PGS Catalog API can't find the provided accession
     :raises pgscatalog.corelib.ScoreFormatError: If you try to iterate over a ``ScoringFile`` without a local path (before downloading it)
 
-    You can make ``ScoringFiles`` with a path to a scoring file:
+    You can make ``ScoringFiles`` with a path to a scoring file with minimal metadata:
+
+    >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "data" / "custom.txt")
+    >>> sf # doctest: +ELLIPSIS
+    ScoringFile('.../custom.txt', target_build=None)
+    >>> sf.header
+    ScoreHeader(pgs_id='test', pgs_name='test', trait_reported='test trait', genome_build=GenomeBuild.GRCh37)
+    >>> sf.is_harmonised
+    False
+
+    Also supports PGS Catalog header metadata:
 
     >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz")
     >>> sf # doctest: +ELLIPSIS
     ScoringFile('.../PGS000001_hmPOS_GRCh38.txt.gz', target_build=None)
+    >>> sf.header
+    CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=<ScoreFormatVersion.v2: '2.0'>, trait_mapped=['breast carcinoma'], trait_efo=['EFO_0000305'], variants_number=77, weight_type=None, pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build=GenomeBuild.GRCh38, HmPOS_date=datetime.date(2022, 7, 29), HmPOS_match_pos='{"True": null, "False": null}', HmPOS_match_chr='{"True": null, "False": null}')
+
+    Looking at the header above, the original submission lacked a genome build but has been harmonised:
+
+    >>> sf.is_harmonised
+    True
 
     >>> sf.genome_build
     GenomeBuild.GRCh38
@@ -229,13 +118,19 @@ class ScoringFile:
             self._identifier = query_result
 
         try:
-            self._header = ScoringFileHeader.from_path(self._identifier)
-        except (FileNotFoundError, TypeError):
-            self.include_children = kwargs.get("include_children", None)
-            self._init_from_accession(self._identifier, target_build=target_build)
-        else:
+            # let's try parsing a PGS Catalog header
+            self._header = CatalogScoreHeader.from_path(self._identifier)
             self.local_path = pathlib.Path(self._identifier)
             self._init_from_path(target_build=target_build)
+        except ValidationError:
+            # that didn't work, let's try parsing a basic score header
+            self._header = ScoreHeader.from_path(self._identifier)
+            self.local_path = pathlib.Path(self._identifier)
+            self._init_from_path(target_build=target_build)
+        except (FileNotFoundError, TypeError):
+            # was it an accession?
+            self.include_children = kwargs.get("include_children", None)
+            self._init_from_accession(self._identifier, target_build=target_build)
 
         # set up local file attributes
         try:
@@ -278,7 +173,7 @@ class ScoringFile:
                 "Only PGS ids are supported. Try ScoringFiles()"
             )
 
-        self.pgs_id = score.pgs_id
+        self._pgs_id = score.pgs_id
         self.catalog_response = score
         self.path = score.get_download_url(target_build)
         self.local_path = None
@@ -294,18 +189,26 @@ class ScoringFile:
 
         self.path = self.local_path
         self.catalog_response = None
+        self._pgs_id = self._header.pgs_id
 
-        if (pgs_id := self._header.pgs_id) is not None:
-            self.pgs_id = pgs_id
-        else:
-            raise ScoreFormatError("Missing pgs_id from header")
+    @property
+    def pgs_id(self):
+        return self._pgs_id
 
-        if (build := self._header.HmPOS_build) is not None:
-            self.genome_build = build
-            self.harmonised = True
+    @property
+    def is_harmonised(self):
+        return self._header.is_harmonised
+
+    @property
+    def genome_build(self):
+        if self.is_harmonised:
+            return self._header.HmPOS_build
         else:
-            self.genome_build = self._header.genome_build
-            self.harmonised = False
+            return self._header.genome_build
+
+    @property
+    def header(self):
+        return self._header
 
     def _generate_variants(self):
         """Yields rows from a scoring file as ScoreVariant objects"""
@@ -426,10 +329,9 @@ class ScoringFile:
 
         Supports lifting over scoring files from GRCh37 to GRCh38:
 
-        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh37.txt"
+        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "lift_to_grch38.txt"
         >>> chaindir = Config.ROOT_DIR / "tests" / "data" / "chain"
         >>> sf = ScoringFile(testpath)
-        >>> sf.harmonised = False  # lying, or liftover will be skipped
         >>> variants = sf.normalise(liftover=True, chain_dir=chaindir, target_build=GenomeBuild.GRCh38)
         >>> for x in variants:
         ...     (x.rsID, x.chr_name, x.chr_position)
@@ -438,10 +340,9 @@ class ScoringFile:
 
         Example of lifting down (GRCh38 to GRCh37):
 
-        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt"
+        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "lift_to_grch37.txt"
         >>> chaindir = Config.ROOT_DIR / "tests" / "data" / "chain"
         >>> sf = ScoringFile(testpath)
-        >>> sf.harmonised = False  # lying, or liftover will be skipped
         >>> variants = sf.normalise(liftover=True, chain_dir=chaindir, target_build=GenomeBuild.GRCh37)
         >>> for x in variants:
         ...     (x.rsID, x.chr_name, x.chr_position)
@@ -452,20 +353,6 @@ class ScoringFile:
         in the PGS Catalog. It's always best to use harmonised data when it's
         available from the PGS Catalog. Harmonised data goes through a lot of validation
         and error checking.
-
-        For example, if you set the wrong genome build, you can get odd
-        results returned without any errors, warnings, or exceptions:
-
-        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt"
-        >>> chaindir = Config.ROOT_DIR / "tests" / "data" / "chain"
-        >>> sf = ScoringFile(testpath)
-        >>> sf.harmonised = False  # lying, or liftover will be skipped
-        >>> sf.genome_build = GenomeBuild.GRCh37  # wrong build ! it's GRCh38
-        >>> variants = sf.normalise(liftover=True, chain_dir=chaindir, target_build=GenomeBuild.GRCh38)
-        >>> for x in variants:
-        ...     (x.rsID, x.chr_name, x.chr_position)
-        ...     break
-        ('rs78540526', '11', 69701882)
 
         A :class:`LiftoverError` is only raised when many converted coordinates are missing.
 
@@ -489,50 +376,6 @@ class ScoringFile:
             chain_dir=chain_dir,
             target_build=target_build,
         )
-
-    def get_log(self, drop_missing=False, variant_log=None):
-        """Create a JSON log from a ScoringFile's header and variant rows."""
-
-        logger.debug(f"Creating JSON log for {self!r}")
-
-        log = {}
-
-        for attr in self._header.fields:
-            if (extracted_attr := getattr(self._header, attr, None)) is not None:
-                log[attr] = str(extracted_attr)
-            else:
-                log[attr] = None
-
-        if log["variants_number"] is None:
-            # custom scoring files might not have this information
-            log["variants_number"] = variant_log["n_variants"]
-
-        if (
-            variant_log is not None
-            and int(log["variants_number"]) != variant_log["n_variants"]
-            and not drop_missing
-        ):
-            logger.warning(
-                f"Mismatch between header ({log['variants_number']}) and output row count ({variant_log['n_variants']}) for {self.pgs_id}"
-            )
-            logger.warning(
-                "This can happen with older scoring files in the PGS Catalog (e.g. PGS000028)"
-            )
-
-        # multiple terms may be separated with a pipe
-        if log["trait_mapped"]:
-            log["trait_mapped"] = log["trait_mapped"].split("|")
-
-        if log["trait_efo"]:
-            log["trait_efo"] = log["trait_efo"].split("|")
-
-        log["columns"] = self._fields
-        log["use_harmonised"] = self.harmonised
-
-        if variant_log is not None:
-            log["sources"] = [k for k, v in variant_log.items() if k != "n_variants"]
-
-        return {self.pgs_id: log}
 
 
 class ScoringFiles:

@@ -127,9 +127,10 @@ def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
     args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", build)]
     flargs = list(itertools.chain(*args))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as excinfo:
         with patch("sys.argv", flargs):
             run()
+        assert "Can't combine files with missing build" in str(excinfo.value)
 
 
 def test_combine_score_harmonised(
@@ -156,6 +157,8 @@ def test_combine_score_harmonised(
     assert pgs == n_variants
     assert all([expected_fields == tuple(variant.keys()) for variant in results])
 
+    assert (tmp_path / "log_combined.json").exists(), "Missing log output"
+
 
 def test_combine_fail(tmp_path, harmonised_scorefiles):
     """Test combining files with the same build but the wrong target build.
@@ -177,9 +180,10 @@ def test_combine_fail(tmp_path, harmonised_scorefiles):
     ]
     flargs = list(itertools.chain(*args))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as excinfo:
         with patch("sys.argv", flargs):
             run()
+        assert "without --liftover" in str(excinfo.value)
 
 
 def test_combine_custom(tmp_path, custom_scorefiles):
