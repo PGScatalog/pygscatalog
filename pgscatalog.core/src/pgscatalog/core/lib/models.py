@@ -382,73 +382,49 @@ class ScoreFormatVersion(str, enum.Enum):
     v2 = "2.0"
 
 
-class CatalogScoreHeader(BaseModel):
+class WeightType(str, enum.Enum):
+    BETA = "beta"
+    ODDSRATIO = "OR"
+    HAZARDRATIO = "HR"
+    NR = "NR"
+
+
+class ScoreHeader(BaseModel):
     """Headers store useful metadata about a scoring file.
 
-    This class provides convenient functions for reading and extracting information
-    from the header. The header must follow PGS Catalog standards. It's always best
-    to build headers with ``from_path()``:
+    Data validation is less strict than the CatalogScoreHeader, to make
+    it easier for people to use custom scoring files with the PGS Catalog Calculator.
 
-    >>> from ._config import Config
-    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
-    >>> CatalogScoreHeader.from_path(testpath) # doctest: +ELLIPSIS
-    CatalogScoreHeader(format_version=<ScoreFormatVersion.v2: '2.0'>, pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', trait_mapped='breast carcinoma', trait_efo='EFO_0000305', genome_build=None, variants_number=77, weight_type='NR', pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build=GenomeBuild.GRCh38, HmPOS_date=datetime.date(2022, 7, 29), HmPOS_match_pos='{"True": null, "False": null}', HmPOS_match_chr='{"True": null, "False": null}')
-
-    Harmonisation fields are optional:
-
-    >>> CatalogScoreHeader(**{"format_version": "2.0", "pgs_id": "PGS123456", "pgs_name": "testpgs", "trait_reported": "testtrait", "trait_mapped": "testtrait", "trait_efo": "testtrait", "genome_build": "NR", "variants_number": 2, "weight_type": "NR", "pgp_id": "PGP123456", "citation": "yes please"})
-    CatalogScoreHeader(format_version=<ScoreFormatVersion.v2: '2.0'>, pgs_id='PGS123456', pgs_name='testpgs', trait_reported='testtrait', trait_mapped='testtrait', trait_efo='testtrait', genome_build=None, variants_number=2, weight_type='NR', pgp_id='PGP123456', citation='yes please', HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
+    >>> ScoreHeader(**{"pgs_id": "PGS123456", "trait_reported": "testtrait", "genome_build": "GRCh38"})
+    ScoreHeader(pgs_id='PGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38)
     """
 
-    ###PGS CATALOG SCORING FILE - see https://www.pgscatalog.org/downloads/#dl_ftp_scoring for additional information
-    format_version: ScoreFormatVersion
-    ##POLYGENIC SCORE (PGS) INFORMATION
-    pgs_id: str
-    pgs_name: str
-    trait_reported: str
-    trait_mapped: str
-    trait_efo: str
-    genome_build: Optional[GenomeBuild]
-    variants_number: int = Field(ge=0)
-    weight_type: str
-    ##SOURCE INFORMATION
-    pgp_id: str
-    citation: str
-    ##HARMONIZATION DETAILS
-    HmPOS_build: Optional[GenomeBuild] = None
-    HmPOS_date: Optional[date] = None
-    HmPOS_match_pos: Optional[str] = None
-    HmPOS_match_chr: Optional[str] = None
-    # note: only included when different from default
-    license: Optional[str] = Field(
-        "PGS obtained from the Catalog should be cited appropriately, and "
-        "used in accordance with any licensing restrictions set by the authors. See "
-        "EBI Terms of Use (https://www.ebi.ac.uk/about/terms-of-use/) for additional "
-        "details.",
-        repr=False,
-    )
+    pgs_id: str = Field(title="PGS identifier")
+    pgs_name: Optional[str] = Field(description="PGS name", default=None)
+    trait_reported: str = Field(description="Trait name")
+    # genome build is Optional because "NR" is represented internally as None
+    genome_build: Optional[GenomeBuild] = Field(description="Genome build")
 
-    @field_validator("pgs_id")
     @classmethod
-    def check_pgs_id(cls, pgs_id: str) -> str:
-        if not pgs_id.startswith("PGS"):
-            raise ValueError(f"pgs_id doesn't start with PGS: {pgs_id}")
-        if len(pgs_id) != 9:
-            raise ValueError(f"Invalid PGS ID format: {pgs_id}")
-        return pgs_id
+    def _parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
+        if value == "NR":
+            return None
+        else:
+            return GenomeBuild.from_string(value)
 
     @field_validator("genome_build", mode="before")
     @classmethod
-    def parse_genome_build(cls, weight: str) -> GenomeBuild:
-        return GenomeBuild.from_string(weight)
+    def parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
+        return cls._parse_genome_build(value)
 
     @classmethod
     def from_path(cls, path):
-        # TODO: I copied some library functions here for testing, clean em up or unify here
         header = {}
 
-        def generate_header(path):
+        def generate_header(f):
             for line in f:
+                if line.startswith("##"):
+                    continue
                 if line.startswith("#"):
                     if "=" in line:
                         yield line.strip()
@@ -464,3 +440,93 @@ class CatalogScoreHeader(BaseModel):
                 header[key[1:]] = value  # drop # character from key
 
             return cls(**header)
+
+
+class CatalogScoreHeader(ScoreHeader):
+    """A ScoreHeader that validates the PGS Catalog Scoring File header standard
+
+    https://www.pgscatalog.org/downloads/#dl_ftp_scoring
+
+    >>> from ._config import Config
+    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
+    >>> ScoreHeader.from_path(testpath) # doctest: +ELLIPSIS
+    ScoreHeader(format_version=<ScoreFormatVersion.v2: '2.0'>, pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', trait_mapped=['breast carcinoma'], trait_efo=['EFO_0000305'], genome_build=None, variants_number=77, weight_type=None)
+    """
+
+    format_version: ScoreFormatVersion
+    trait_mapped: list[str] = Field(description="Trait name")
+    trait_efo: list[str] = Field(
+        description="Ontology trait name, e.g. 'breast carcinoma"
+    )
+    variants_number: int = Field(
+        gt=0, description="Number of variants listed in the PGS", default=None
+    )
+    # note: we'll make sure to serialise None values here and in genome_build as string "NR"
+    weight_type: Optional[WeightType] = Field(
+        description="Variant weight type", default=None
+    )
+
+    ##SOURCE INFORMATION
+    pgp_id: str
+    citation: str
+    ##HARMONIZATION DETAILS
+    HmPOS_build: Optional[GenomeBuild] = Field(default=None)
+    HmPOS_date: Optional[date] = Field(default=None)
+    HmPOS_match_pos: Optional[str] = Field(default=None)
+    HmPOS_match_chr: Optional[str] = Field(default=None)
+
+    # note: only included when different from default
+    license: Optional[str] = Field(
+        "PGS obtained from the Catalog should be cited appropriately, and "
+        "used in accordance with any licensing restrictions set by the authors. See "
+        "EBI Terms of Use (https://www.ebi.ac.uk/about/terms-of-use/) for additional "
+        "details.",
+        repr=False,
+    )
+
+    @field_validator("trait_mapped", "trait_efo", mode="before")
+    @classmethod
+    def split_traits(cls, trait: str) -> list[str]:
+        if isinstance(trait, str):
+            traits = trait.split("|")
+            if len(traits) == 0:
+                raise ValueError("No traits defined")
+            return traits
+        raise ValueError(f"Can't parse trait string: {trait}")
+
+    @classmethod
+    def _check_accession(cls, value: str, prefix: str) -> str:
+        if not value.startswith(prefix):
+            raise ValueError(f"{value} doesn't start with {prefix}")
+        if len(value) != 9:
+            raise ValueError(f"Invalid accession format: {value}")
+        return value
+
+    @field_validator("pgs_id")
+    @classmethod
+    def check_pgs_id(cls, pgs_id: str) -> str:
+        return cls._check_accession(pgs_id, "PGS")
+
+    @field_validator("pgs_id")
+    @classmethod
+    def check_pgp_id(cls, pgp_id: str) -> str:
+        return cls._check_accession(pgp_id, "PGP")
+
+    @field_validator("genome_build", "HmPOS_build", mode="before")
+    @classmethod
+    def parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
+        return cls._parse_genome_build(value)
+
+    @field_validator("format_version")
+    @classmethod
+    def check_format_version(cls, version: ScoreFormatVersion) -> ScoreFormatVersion:
+        if version != ScoreFormatVersion.v2:
+            raise ValueError(f"Invalid format_version: {version}")
+        return version
+
+    @field_validator("weight_type")
+    @classmethod
+    def parse_weight_type(cls, value: WeightType) -> Optional[WeightType]:
+        if value == WeightType.NR:
+            value = None
+        return value
