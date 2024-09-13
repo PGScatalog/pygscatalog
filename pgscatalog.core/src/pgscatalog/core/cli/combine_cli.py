@@ -99,13 +99,16 @@ def run():
             writer.write(dumped_variants)
             n_finished += 1
         finally:
-            variant_log.append(
-                ScoreLog(
-                    header=scorefile.header,
-                    variants=normalised_score,
-                    compatible_effect_type=is_compatible,
-                )
+            log = ScoreLog(
+                header=scorefile.header,
+                variants=normalised_score,
+                compatible_effect_type=is_compatible,
             )
+            if log.variants_are_missing:
+                logger.warning(
+                    f"{log.variant_count_difference} fewer variants in output compared to original file"
+                )
+            variant_log.append(log)
 
     if n_finished == 0:
         raise ValueError(

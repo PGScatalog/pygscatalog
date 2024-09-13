@@ -725,12 +725,15 @@ class ScoreLog(BaseModel):
             return None
 
     @property
-    def n_actual_variants(self) -> int:
+    def n_actual_variants(self) -> Optional[int]:
         # this distinction is useful if variants have been filtered out
-        return len(self.variants)
+        if self.variants is not None:
+            return len(self.variants)
+        else:
+            return None
 
     @cached_property
-    def variant_count_difference(self) -> int:
+    def variant_count_difference(self) -> Optional[int]:
         # grab directly from header
         header_variants = getattr(self.header, "variants_number", None)
         if header_variants is None:
@@ -741,7 +744,10 @@ class ScoreLog(BaseModel):
             else:
                 header_variants = self.header.row_count
 
-        return abs(header_variants - self.n_actual_variants)
+        try:
+            return abs(header_variants - self.n_actual_variants)
+        except TypeError:
+            return None
 
     @property
     def variants_are_missing(self) -> bool:
