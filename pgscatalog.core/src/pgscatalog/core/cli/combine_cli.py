@@ -86,7 +86,6 @@ def run():
                 f"Unsupported non-additive effect types in {scorefile=}, skipping"
             )
             is_compatible = False
-            continue
         else:
             # TODO: go back to parallel execution + write to multiple files
             writer = TextFileWriter(compress=compress_output, filename=out_path)

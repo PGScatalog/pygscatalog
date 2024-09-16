@@ -2,6 +2,7 @@ import collections
 import csv
 import gzip
 import itertools
+import json
 from unittest.mock import patch
 import pytest
 
@@ -115,6 +116,13 @@ def test_combine_skip(
     # split to remove harmonisation suffix hmPOS_GRCh3X
     pgs = collections.Counter([x["accession"].split("_")[0] for x in results])
     assert pgs["PGS000001"] == n_variants["PGS000001"]
+
+    # the log should contain records of two scoring files though:
+    with open(tmp_path / "log_combined.json") as f:
+        log = json.load(f)
+        assert len(log["logs"]) == 2, "Missing scorefile from log"
+        assert sum(x["compatible_effect_type"] is True for x in log["logs"]) == 1
+        assert sum(x["compatible_effect_type"] is False for x in log["logs"]) == 1
 
 
 def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
