@@ -23,6 +23,7 @@ from pydantic import (
     model_validator,
     ConfigDict,
     field_serializer,
+    RootModel,
 )
 from xopen import xopen
 
@@ -763,7 +764,7 @@ class ScoreLog(BaseModel):
         return self
 
 
-class ScoreLogs(BaseModel):
+class ScoreLogs(RootModel):
     """A container of ScoreLog to simplify serialising to a JSON list"""
 
-    logs: list[ScoreLog]
+    root: list[ScoreLog]

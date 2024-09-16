@@ -120,7 +120,7 @@ def run():
     log_out_path = pathlib.Path(args.outfile).parent / args.logfile
     with open(log_out_path, "w") as f:
         logger.info(f"Writing log to {f.name}")
-        f.write(ScoreLogs(logs=variant_log).model_dump_json())
+        f.write(ScoreLogs(variant_log).model_dump_json())
 
     logger.info("Combining complete")
 

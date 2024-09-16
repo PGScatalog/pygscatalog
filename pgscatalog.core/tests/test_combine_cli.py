@@ -120,9 +120,9 @@ def test_combine_skip(
     # the log should contain records of two scoring files though:
     with open(tmp_path / "log_combined.json") as f:
         log = json.load(f)
-        assert len(log["logs"]) == 2, "Missing scorefile from log"
-        assert sum(x["compatible_effect_type"] is True for x in log["logs"]) == 1
-        assert sum(x["compatible_effect_type"] is False for x in log["logs"]) == 1
+        assert len(log) == 2, "Missing scorefile from log"
+        assert sum(x["compatible_effect_type"] is True for x in log) == 1
+        assert sum(x["compatible_effect_type"] is False for x in log) == 1
 
 
 def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
