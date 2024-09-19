@@ -315,6 +315,16 @@ class CatalogScoreVariant(BaseModel):
 
         return effect
 
+    @field_validator("rsid", mode="after")
+    @classmethod
+    def check_rsid_format(cls, rsid: Optional[str]) -> Optional[str]:
+        if rsid is None or rsid == ".":
+            return None
+        if rsid.startswith("rs") or rsid.startswith("ss") or rsid.startswith("HLA"):
+            return rsid
+        else:
+            raise ValueError("rsid field must start with rs or ss or HLA")
+
     @field_validator(
         "effect_weight", "dosage_0_weight", "dosage_1_weight", "dosage_2_weight"
     )
