@@ -315,7 +315,7 @@ class CatalogScoreVariant(BaseModel):
 
         return effect
 
-    @field_validator("rsid", mode="after")
+    @field_validator("rsID", mode="after")
     @classmethod
     def check_rsid_format(cls, rsid: Optional[str]) -> Optional[str]:
         if rsid is None or rsid == ".":
