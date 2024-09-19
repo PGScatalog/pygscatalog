@@ -1,4 +1,4 @@
-name: Run pytest
+name: Run pytest and mypy
 
 on:
   workflow_call:
@@ -62,3 +62,28 @@ jobs:
             fail_ci_if_error: true
             slug: PGScatalog/pygscatalog
             flags: ${{ inputs.package-directory }}
+            
+  mypy:
+      runs-on: ubuntu-latest
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Install Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: ${{ inputs.python-version }}
+            cache: 'pip'
+
+        - uses: actions/cache@v4
+          with:
+            path: ${{ inputs.package-directory }}/.venv
+            key: venv-${{ hashFiles('**/poetry.lock') }}
+
+        - run: pip install poetry
+
+        - run: poetry install --with dev --all-extras
+          working-directory: ${{ inputs.package-directory }}
+
+        - run: mypy # import to run in top level directory
+
