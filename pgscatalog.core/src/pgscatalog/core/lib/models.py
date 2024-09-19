@@ -1,4 +1,4 @@
-""" PGS Catalog pydantic models for data validation
+"""PGS Catalog pydantic models for data validation
 
 Best way to reuse:
 
@@ -7,9 +7,10 @@ Best way to reuse:
   * `import pgscatalog.core` and use fully qualified name: `pgscatalog.core.models.CatalogScoreVariant`)
 
 """
+
 from functools import cached_property
 from typing import ClassVar, Optional
-from typing_extensions import Self
+from typing_extensions import Self, Literal
 
 from pydantic import (
     BaseModel,
@@ -46,7 +47,7 @@ class Allele(BaseModel):
     allele: str
     _valid_snp_bases: ClassVar[frozenset[str]] = frozenset({"A", "C", "T", "G"})
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def is_snp(self) -> bool:
         """SNPs are the most common type of effect allele in PGS Catalog scoring
@@ -242,23 +243,35 @@ class CatalogScoreVariant(BaseModel):
     )
 
     # helpful class attributes (not used by pydantic to instantiate a class)
-    harmonised_columns: ClassVar[tuple[str]] = (
+    harmonised_columns: ClassVar[
+        tuple[Literal["hm_rsID"], Literal["hm_chr"], Literal["hm_pos"]]
+    ] = (
         "hm_rsID",
         "hm_chr",
         "hm_pos",
     )  # it's OK if (""hm_source", "hm_inferOtherAllele", "hm_match_chr", "hm_match_pos") are missing
-    complex_columns: ClassVar[tuple[str]] = (
+    complex_columns: ClassVar[
+        tuple[
+            Literal["is_haplotype"], Literal["is_diplotype"], Literal["is_interaction"]
+        ]
+    ] = (
         "is_haplotype",
         "is_diplotype",
         "is_interaction",
     )
-    non_additive_columns: ClassVar[tuple[str]] = (
+    non_additive_columns: ClassVar[
+        tuple[
+            Literal["dosage_0_weight"],
+            Literal["dosage_1_weight"],
+            Literal["dosage_2_weight"],
+        ]
+    ] = (
         "dosage_0_weight",
         "dosage_1_weight",
         "dosage_2_weight",
     )
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def variant_id(self) -> str:
         """ID = chr:pos:effect_allele:other_allele"""
@@ -269,7 +282,7 @@ class CatalogScoreVariant(BaseModel):
             ]
         )
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def is_harmonised(self) -> bool:
         # simple check: do any of the harmonised columns have data?
@@ -278,7 +291,7 @@ class CatalogScoreVariant(BaseModel):
                 return True
         return False
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def is_complex(self) -> bool:
         # checking flag fields here, which are defaulted to False
@@ -287,7 +300,7 @@ class CatalogScoreVariant(BaseModel):
                 return True
         return False
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def is_non_additive(self) -> bool:
         # simple check: do any of the weight dosage columns have data?
@@ -296,7 +309,7 @@ class CatalogScoreVariant(BaseModel):
                 return True
         return False
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def effect_type(self) -> EffectType:
         match (self.is_recessive, self.is_dominant, self.is_non_additive):

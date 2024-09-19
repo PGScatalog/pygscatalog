@@ -1,4 +1,4 @@
-from typing import Optional, ClassVar
+from typing import Optional, ClassVar, Literal
 from pydantic import (
     Field,
     field_serializer,
@@ -62,7 +62,19 @@ class ScoreVariant(CatalogScoreVariant):
     )
 
     # column names for output are used by __iter__ and when writing out
-    output_fields: ClassVar[tuple[str]] = (
+    output_fields: ClassVar[
+        tuple[
+            Literal["chr_name"],
+            Literal["chr_position"],
+            Literal["effect_allele"],
+            Literal["other_allele"],
+            Literal["effect_weight"],
+            Literal["effect_type"],
+            Literal["is_duplicated"],
+            Literal["accession"],
+            Literal["row_nr"],
+        ]
+    ] = (
         "chr_name",
         "chr_position",
         "effect_allele",

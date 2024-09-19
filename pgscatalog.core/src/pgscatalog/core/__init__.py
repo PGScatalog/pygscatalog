@@ -1,4 +1,5 @@
-""" Public interface to the Polygenic Score Catalog core package """
+"""Public interface to the Polygenic Score Catalog core package"""
+
 import logging
 import importlib.metadata
 
