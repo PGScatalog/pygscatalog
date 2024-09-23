@@ -293,6 +293,10 @@ class CatalogScoreVariant(BaseModel):
         for x in self.complex_columns:
             if getattr(self, x):
                 return True
+
+        if not self.effect_allele.is_snp:
+            return True
+
         return False
 
     @computed_field
@@ -368,19 +372,16 @@ class CatalogScoreVariant(BaseModel):
                 # mandatory rsid with optional coordinates
                 pass
             case _:
-                raise TypeError(
-                    f"Bad position: {self.rsID=}, {self.chr_name=}, {self.chr_position=}"
-                    f"for variant {self=}"
-                )
+                if self.is_complex:
+                    # complex variants can have odd non-standard positions
+                    # e.g. e2 allele of APOE gene
+                    pass
+                else:
+                    raise TypeError(
+                        f"Bad position: {self.rsID=}, {self.chr_name=}, {self.chr_position=}"
+                        f"for variant {self=}"
+                    )
 
-        return self
-
-    @model_validator(mode="after")
-    def check_harmonised_columns(self) -> Self:
-        if self.is_harmonised:
-            for x in self.harmonised_columns:
-                if getattr(self, x) is None:
-                    raise TypeError(f"Missing harmonised column data: {x}")
         return self
 
     @field_validator(
