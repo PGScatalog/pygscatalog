@@ -98,9 +98,14 @@ def run():
             writer.write(dumped_variants)
             n_finished += 1
         finally:
+            # grab essential information only for the score log
+            log_variants = (
+                x.model_dump(include={"accession", "row_nr", "hm_source"})
+                for x in normalised_score
+            )
             log = ScoreLog(
                 header=scorefile.header,
-                variants=normalised_score,
+                variants=log_variants,
                 compatible_effect_type=is_compatible,
             )
             if log.variants_are_missing:

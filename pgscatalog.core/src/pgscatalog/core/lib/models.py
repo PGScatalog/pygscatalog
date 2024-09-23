@@ -228,6 +228,7 @@ class CatalogScoreVariant(BaseModel):
         description="Chromosome that the harmonized variant is present on, preferring matches to chromosomes over patches present in later builds.",
     )
     hm_pos: Optional[int] = Field(
+        ge=0,
         default=None,
         title="Harmonized chromosome position",
         description="Chromosomal position (base pair location) where the variant is located, preferring matches to chromosomes over patches present in later builds.",
@@ -369,6 +370,7 @@ class CatalogScoreVariant(BaseModel):
             case _:
                 raise TypeError(
                     f"Bad position: {self.rsID=}, {self.chr_name=}, {self.chr_position=}"
+                    f"for variant {self=}"
                 )
 
         return self
@@ -380,6 +382,14 @@ class CatalogScoreVariant(BaseModel):
                 if getattr(self, x) is None:
                     raise TypeError(f"Missing harmonised column data: {x}")
         return self
+
+    @field_validator(
+        "rsID", "chr_name", "chr_position", "hm_chr", "hm_pos", mode="before"
+    )
+    def empty_string_to_none(cls, v):
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 
 class ScoreVariant(CatalogScoreVariant):
@@ -692,7 +702,11 @@ class ScoreLog(BaseModel):
     header: Union[ScoreHeader, CatalogScoreHeader] = Field(
         description="Metadata from the scoring file header"
     )
-    variants: Optional[list[ScoreVariant]] = Field(
+    # intentionally a vague type (dict) here to prevent revalidating ScoreVariants
+    # failed harmonisation can create ScoreVariants which make field and model validators sad
+    # e.g. missing genomic coordinates
+    # the dict must contain "hm_source" key
+    variants: Optional[list[dict]] = Field(
         description="A list of variants associated with the header. Some may be filtered out during normalisation.",
         exclude=True,
     )
@@ -713,7 +727,7 @@ class ScoreLog(BaseModel):
     @cached_property
     def sources(self) -> Optional[list[str]]:
         if self.variants is not None:
-            return list(set(getattr(item, "hm_source") for item in self.variants))
+            return list(set(item.get("hm_source") for item in self.variants))
         else:
             return None
 
@@ -745,15 +759,6 @@ class ScoreLog(BaseModel):
     @property
     def variants_are_missing(self) -> bool:
         return self.variant_count_difference != 0
-
-    @model_validator(mode="after")
-    def check_harmonised(self) -> Self:
-        if self.variants is not None:
-            variants_harmonised = all(x.is_harmonised for x in self.variants)
-            header_harmonised = self.header.is_harmonised
-            if not variants_harmonised == header_harmonised:
-                raise ValueError(f"{variants_harmonised=} but {header_harmonised=}")
-        return self
 
 
 class ScoreLogs(RootModel):
