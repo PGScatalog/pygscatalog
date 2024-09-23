@@ -463,12 +463,6 @@ class ScoreFormatVersion(str, enum.Enum):
     v2 = "2.0"
 
 
-class WeightType(str, enum.Enum):
-    BETA = "beta"
-    ODDSRATIO = "OR"
-    HAZARDRATIO = "HR"
-
-
 class ScoreHeader(BaseModel):
     """Headers store useful metadata about a scoring file.
 
@@ -573,9 +567,7 @@ class CatalogScoreHeader(ScoreHeader):
         gt=0, description="Number of variants listed in the PGS", default=None
     )
     # note: we'll make sure to serialise None values here and in genome_build as string "NR"
-    weight_type: Optional[WeightType] = Field(
-        description="Variant weight type", default=None
-    )
+    weight_type: Optional[str] = Field(description="Variant weight type", default=None)
 
     ##SOURCE INFORMATION
     pgp_id: str
@@ -642,7 +634,7 @@ class CatalogScoreHeader(ScoreHeader):
             raise ValueError(f"Invalid format_version: {version}")
         return version
 
-    @field_validator("weight_type", mode="before")
+    @field_validator("weight_type", mode="after")
     @classmethod
     def parse_weight_type(cls, value: str) -> Optional[str]:
         if value == "NR":
