@@ -55,8 +55,6 @@ __all__ = [
     "CatalogQuery",
     "ScoreQueryResult",
     "CatalogCategory",
-    "TargetVariant",
-    "TargetVariants",
     "TargetType",
     "NormalisedScoringFile",
     "RelabelArgs",
