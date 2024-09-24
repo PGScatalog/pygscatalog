@@ -302,11 +302,15 @@ class CatalogScoreVariant(BaseModel):
     @computed_field
     @cached_property
     def is_non_additive(self) -> bool:
-        # simple check: do any of the weight dosage columns have data?
-        for x in self.non_additive_columns:
-            if getattr(self, x) is not None:
-                return True
-        return False
+        if self.effect_weight is not None:
+            # if there's an effect weight value, we can work with it
+            non_additive = False
+        else:
+            # dosage columns are trickier
+            non_additive = any(
+                getattr(self, col) is not None for col in self.non_additive_columns
+            )
+        return non_additive
 
     @computed_field
     @cached_property
@@ -355,8 +359,6 @@ class CatalogScoreVariant(BaseModel):
         ):
             case None, None, None, None:
                 raise ValueError("All effect weight fields are missing")
-            case str(), str(), str(), str():
-                raise ValueError("Additive and non-additive fields are present")
             case None, zero, one, two if any(x is None for x in (zero, one, two)):
                 raise ValueError("Dosage missing effect weight")
             case _:
@@ -417,7 +419,7 @@ class ScoreVariant(CatalogScoreVariant):
     >>> harmonised_variant.is_harmonised
     True
 
-    >>> variant_nonadditive = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "dosage_0_weight": 0, "dosage_1_weight": 1,  "row_nr": 0, "accession": "test"})
+    >>> variant_nonadditive = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "dosage_0_weight": 0, "dosage_1_weight": 1,  "dosage_2_weight": 0, "row_nr": 0, "accession": "test"})
     >>> variant_nonadditive.is_non_additive
     True
     >>> variant_nonadditive.is_complex
