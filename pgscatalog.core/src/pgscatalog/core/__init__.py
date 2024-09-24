@@ -10,7 +10,6 @@ from .lib import (
     ScoringFiles,
     ScoringFile,
     NormalisedScoringFile,
-    ScoreVariant,
     GenomeBuild,
     TargetVariants,
     TargetVariant,
@@ -31,7 +30,6 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "ScoringFiles",
     "ScoringFile",
-    "ScoreVariant",
     "Config",
     "GenomeBuild",
     "CatalogQuery",
