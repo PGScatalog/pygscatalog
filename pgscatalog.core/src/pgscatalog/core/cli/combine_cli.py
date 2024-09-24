@@ -1,14 +1,16 @@
 import argparse
-import json
 import logging
 import pathlib
 import sys
 import textwrap
+from typing import Optional
 
 from tqdm import tqdm
-from ..lib import GenomeBuild, ScoringFile, ScoreVariant, EffectTypeError
 
-from ._combine import get_variant_log, TextFileWriter
+from ..lib.models import ScoreLog, ScoreLogs, ScoreVariant
+from ..lib import GenomeBuild, ScoringFile, EffectTypeError
+
+from ._combine import TextFileWriter
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,12 @@ def run():
     target_build = GenomeBuild.from_string(args.target_build)
 
     for x in scoring_files:
+        if x.genome_build is None and target_build is not None:
+            raise ValueError(
+                f"Can't combine files with missing build in "
+                f"header when requesting {target_build=}"
+            )
+
         if x.genome_build != target_build and not args.liftover:
             raise ValueError(
                 f"Can't combine scoring file with genome build {x.genome_build!r} when {target_build=} without --liftover"
@@ -61,10 +69,10 @@ def run():
         liftover_kwargs = {"liftover": False}
 
     n_finished = 0
-    good_scores = []
-
     for scorefile in tqdm(scoring_files, total=len(scoring_files)):
         logger.info(f"Processing {scorefile.pgs_id}")
+        normalised_score: Optional[list[ScoreVariant]] = None
+        is_compatible = True
         try:
             normalised_score = list(
                 scorefile.normalise(
@@ -77,22 +85,40 @@ def run():
             logger.warning(
                 f"Unsupported non-additive effect types in {scorefile=}, skipping"
             )
-            continue
+            is_compatible = False
         else:
             # TODO: go back to parallel execution + write to multiple files
             writer = TextFileWriter(compress=compress_output, filename=out_path)
 
             # model_dump returns a dict with a subset of keys
             dumped_variants = (
-                x.model_dump(include=ScoreVariant.output_fields)
+                x.model_dump(include=set(ScoreVariant.output_fields))
                 for x in normalised_score
             )
             writer.write(dumped_variants)
-            variant_log.append(get_variant_log(normalised_score))
             n_finished += 1
-            good_scores.append(scorefile)
+        finally:
+            # grab essential information only for the score log
+            if normalised_score is not None:
+                log_variants = (
+                    x.model_dump(include={"accession", "row_nr", "hm_source"})
+                    for x in normalised_score
+                )
+            else:
+                log_variants = None
 
-    if not n_finished > 0:
+            log = ScoreLog(
+                header=scorefile.header,
+                variants=log_variants,
+                compatible_effect_type=is_compatible,
+            )
+            if log.variants_are_missing:
+                logger.warning(
+                    f"{log.variant_count_difference} fewer variants in output compared to original file"
+                )
+            variant_log.append(log)
+
+    if n_finished == 0:
         raise ValueError(
             "Couldn't process any scoring files. Did they all have non-additive weights?"
         )
@@ -100,14 +126,10 @@ def run():
     if n_finished != len(scoring_files):
         logger.warning(f"{len(scoring_files) - n_finished} scoring files were skipped")
 
-    score_log = []
-    for sf, log in zip(good_scores, variant_log, strict=True):
-        score_log.append(sf.get_log(variant_log=log))
-
     log_out_path = pathlib.Path(args.outfile).parent / args.logfile
     with open(log_out_path, "w") as f:
         logger.info(f"Writing log to {f.name}")
-        json.dump(score_log, f, indent=4)
+        f.write(ScoreLogs(variant_log).model_dump_json())
 
     logger.info("Combining complete")
 
