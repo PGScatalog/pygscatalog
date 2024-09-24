@@ -3,7 +3,6 @@ from .effecttype import EffectType
 from .genomebuild import GenomeBuild
 from .catalogapi import ScoreQueryResult, CatalogQuery, CatalogCategory
 from .scorefiles import ScoringFiles, ScoringFile, NormalisedScoringFile
-from .targetvariants import TargetVariants, TargetVariant, TargetType
 from ._relabel import RelabelArgs, relabel, relabel_write
 from ._sortpaths import effect_type_keyfunc, chrom_keyfunc
 from .pgsexceptions import (
@@ -55,7 +54,6 @@ __all__ = [
     "CatalogQuery",
     "ScoreQueryResult",
     "CatalogCategory",
-    "TargetType",
     "NormalisedScoringFile",
     "RelabelArgs",
     "relabel",
