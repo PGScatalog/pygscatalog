@@ -99,10 +99,14 @@ def run():
             n_finished += 1
         finally:
             # grab essential information only for the score log
-            log_variants = (
-                x.model_dump(include={"accession", "row_nr", "hm_source"})
-                for x in normalised_score
-            )
+            if normalised_score is not None:
+                log_variants = (
+                    x.model_dump(include={"accession", "row_nr", "hm_source"})
+                    for x in normalised_score
+                )
+            else:
+                log_variants = None
+
             log = ScoreLog(
                 header=scorefile.header,
                 variants=log_variants,

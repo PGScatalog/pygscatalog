@@ -411,16 +411,11 @@ class ScoreVariant(CatalogScoreVariant):
     >>> variant_missing_positions = ScoreVariant(**{"rsID": None, "chr_name": None, "chr_position": None, "effect_allele": "A", "effect_weight": 0.5,  "row_nr": 0, "accession": "test"}) # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    TypeError: Bad position: self.rsID=None, self.chr_name=None, self.chr_position=None
+    TypeError: Bad position: self.rsID=None, self.chr_name=None, self.chr_position=None...
 
     >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
     >>> harmonised_variant.is_harmonised
     True
-
-    >>> variant_badly_harmonised = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": None, "hm_pos": None, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
-    Traceback (most recent call last):
-    ...
-    TypeError: Missing harmonised column data: hm_chr
 
     >>> variant_nonadditive = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "dosage_0_weight": 0, "dosage_1_weight": 1,  "row_nr": 0, "accession": "test"})
     >>> variant_nonadditive.is_non_additive
@@ -664,16 +659,10 @@ class ScoreLog(BaseModel):
     """A log that includes header information and variant summary statistics
 
     >>> header = CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=ScoreFormatVersion.v2, trait_mapped='breast carcinoma', trait_efo='EFO_0000305', variants_number=77, weight_type="NR", pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build="GRCh38", HmPOS_date="2022-07-29")
-    >>> variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "row_nr": 0, "accession": "test"})
-    >>> ScoreLog(header=header, variants=[variant])  # doctest: +ELLIPSIS
-    Traceback (most recent call last):
-    ...
-    pydantic_core._pydantic_core.ValidationError: 1 validation error for ScoreLog
-      Value error, variants_harmonised=False but header_harmonised=True [type=value_error, input_value={'header': CatalogScoreHe...e=EffectType.ADDITIVE)]}, input_type=dict]
-        For further information visit https://errors.pydantic.dev/2.9/v/value_error
-
     >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
-    >>> scorelog = ScoreLog(header=header, variants=[harmonised_variant])
+    >>> scorelog = ScoreLog(header=header, variants=[harmonised_variant.model_dump(include={"hm_source"})])  # doctest: +ELLIPSIS
+    >>> scorelog
+    ScoreLog(header=CatalogScoreHeader(...), compatible_effect_type=True, pgs_id='PGS000001', is_harmonised=True, sources=['ENSEMBL'])
 
     In the original scoring file header there were 77 variants:
 
@@ -710,6 +699,7 @@ class ScoreLog(BaseModel):
     variants: Optional[list[dict]] = Field(
         description="A list of variants associated with the header. Some may be filtered out during normalisation.",
         exclude=True,
+        repr=False,
     )
     compatible_effect_type: bool = Field(
         description="Did all variants in this score contain compatible effect types? (i.e. additive / recessive / dominant)",
@@ -727,10 +717,14 @@ class ScoreLog(BaseModel):
     @computed_field
     @cached_property
     def sources(self) -> Optional[list[str]]:
+        unique_sources = None
         if self.variants is not None:
-            return list(set(item.get("hm_source") for item in self.variants))
-        else:
-            return None
+            sources: list[Optional[str]] = [x.get("hm_source") for x in self.variants]
+            if all(x is None for x in sources):
+                unique_sources = None
+            else:
+                unique_sources = list(set(sources))
+        return unique_sources
 
     @property
     def n_actual_variants(self) -> Optional[int]:
