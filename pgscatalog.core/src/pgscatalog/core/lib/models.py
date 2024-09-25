@@ -301,7 +301,7 @@ class CatalogScoreVariant(BaseModel):
     @computed_field  # type: ignore
     @cached_property
     def is_complex(self) -> bool:
-        is_complex = getattr(self.effect_allele, "is_snp", False)
+        is_complex = not getattr(self.effect_allele, "is_snp", False)
         for x in self.complex_columns:
             if getattr(self, x):
                 is_complex = True
