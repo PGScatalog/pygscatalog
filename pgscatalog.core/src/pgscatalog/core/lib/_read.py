@@ -2,7 +2,6 @@
 These functions aren't really meant to be imported outside corelib"""
 
 import logging
-import pathlib
 from typing import Generator, Iterator
 
 from xopen import xopen
@@ -68,34 +67,3 @@ def detect_wide(cols: list[str]) -> bool:
         return True
     else:
         return False
-
-
-def generate_header_lines(f):
-    """Header lines in a PGS Catalog scoring file are structured like:
-
-    #pgs_id=PGS000348
-    #pgs_name=PRS_PrCa
-
-    Files can be big, so we want to only read header lines and stop immediately
-    """
-    for line in f:
-        if line.startswith("#"):
-            if "=" in line:
-                yield line.strip()
-        else:
-            # stop reading lines
-            break
-
-
-def read_header(path: pathlib.Path) -> dict:
-    """Parses the header of a PGS Catalog format scoring file into a dictionary"""
-    header = {}
-
-    with xopen(path, "rt") as f:
-        header_text = generate_header_lines(f)
-
-        for item in header_text:
-            key, value = item.split("=")
-            header[key[1:]] = value  # drop # character from key
-
-    return header
