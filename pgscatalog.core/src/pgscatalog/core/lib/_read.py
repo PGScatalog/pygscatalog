@@ -7,7 +7,7 @@ from typing import Generator, Iterator
 
 from xopen import xopen
 
-from .scorevariant import ScoreVariant
+from .models import ScoreVariant
 
 logger = logging.getLogger(__name__)
 
@@ -43,23 +43,6 @@ def read_rows_lazy(
         row_nr += 1
 
 
-def generate_header_lines(f):
-    """Header lines in a PGS Catalog scoring file are structured like:
-
-    #pgs_id=PGS000348
-    #pgs_name=PRS_PrCa
-
-    Files can be big, so we want to only read header lines and stop immediately
-    """
-    for line in f:
-        if line.startswith("#"):
-            if "=" in line:
-                yield line.strip()
-        else:
-            # stop reading lines
-            break
-
-
 def get_columns(path):
     """Grab column labels from a PGS Catalog scoring file. line_no is useful to skip the header"""
     with xopen(path, mode="rt") as f:
@@ -85,6 +68,23 @@ def detect_wide(cols: list[str]) -> bool:
         return True
     else:
         return False
+
+
+def generate_header_lines(f):
+    """Header lines in a PGS Catalog scoring file are structured like:
+
+    #pgs_id=PGS000348
+    #pgs_name=PRS_PrCa
+
+    Files can be big, so we want to only read header lines and stop immediately
+    """
+    for line in f:
+        if line.startswith("#"):
+            if "=" in line:
+                yield line.strip()
+        else:
+            # stop reading lines
+            break
 
 
 def read_header(path: pathlib.Path) -> dict:
