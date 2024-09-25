@@ -1,4 +1,4 @@
-""" PGS Catalog pydantic models for data validation
+"""PGS Catalog pydantic models for data validation
 
 Best way to reuse:
 
@@ -12,7 +12,7 @@ import pathlib
 from datetime import date
 from functools import cached_property
 from typing import ClassVar, Optional, Union
-from typing_extensions import Self
+from typing_extensions import Self, Literal
 
 from pydantic import (
     BaseModel,
@@ -53,7 +53,7 @@ class Allele(BaseModel):
     allele: str
     _valid_snp_bases: ClassVar[frozenset[str]] = frozenset({"A", "C", "T", "G"})
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def is_snp(self) -> bool:
         """SNPs are the most common type of effect allele in PGS Catalog scoring
@@ -250,23 +250,35 @@ class CatalogScoreVariant(BaseModel):
     )
 
     # helpful class attributes (not used by pydantic to instantiate a class)
-    harmonised_columns: ClassVar[tuple[str]] = (
+    harmonised_columns: ClassVar[
+        tuple[Literal["hm_rsID"], Literal["hm_chr"], Literal["hm_pos"]]
+    ] = (
         "hm_rsID",
         "hm_chr",
         "hm_pos",
     )  # it's OK if (""hm_source", "hm_inferOtherAllele", "hm_match_chr", "hm_match_pos") are missing
-    complex_columns: ClassVar[tuple[str]] = (
+    complex_columns: ClassVar[
+        tuple[
+            Literal["is_haplotype"], Literal["is_diplotype"], Literal["is_interaction"]
+        ]
+    ] = (
         "is_haplotype",
         "is_diplotype",
         "is_interaction",
     )
-    non_additive_columns: ClassVar[tuple[str]] = (
+    non_additive_columns: ClassVar[
+        tuple[
+            Literal["dosage_0_weight"],
+            Literal["dosage_1_weight"],
+            Literal["dosage_2_weight"],
+        ]
+    ] = (
         "dosage_0_weight",
         "dosage_1_weight",
         "dosage_2_weight",
     )
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def variant_id(self) -> str:
         """ID = chr:pos:effect_allele:other_allele"""
@@ -277,7 +289,7 @@ class CatalogScoreVariant(BaseModel):
             ]
         )
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def is_harmonised(self) -> bool:
         # simple check: do any of the harmonised columns have data?
@@ -286,20 +298,17 @@ class CatalogScoreVariant(BaseModel):
                 return True
         return False
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def is_complex(self) -> bool:
-        # checking flag fields here, which are defaulted to False
+        is_complex = not getattr(self.effect_allele, "is_snp", False)
         for x in self.complex_columns:
             if getattr(self, x):
-                return True
+                is_complex = True
 
-        if not self.effect_allele.is_snp:
-            return True
+        return is_complex
 
-        return False
-
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def is_non_additive(self) -> bool:
         if self.effect_weight is not None:
@@ -312,7 +321,7 @@ class CatalogScoreVariant(BaseModel):
             )
         return non_additive
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def effect_type(self) -> EffectType:
         match (self.is_recessive, self.is_dominant, self.is_non_additive):
@@ -456,7 +465,19 @@ class ScoreVariant(CatalogScoreVariant):
     )
 
     # column names for output are used by __iter__ and when writing out
-    output_fields: ClassVar[tuple[str]] = (
+    output_fields: ClassVar[
+        tuple[
+            Literal["chr_name"],
+            Literal["chr_position"],
+            Literal["effect_allele"],
+            Literal["other_allele"],
+            Literal["effect_weight"],
+            Literal["effect_type"],
+            Literal["is_duplicated"],
+            Literal["accession"],
+            Literal["row_nr"],
+        ]
+    ] = (
         "chr_name",
         "chr_position",
         "effect_allele",
@@ -522,16 +543,17 @@ class ScoreHeader(BaseModel):
         return genome_build.value if genome_build is not None else "NR"
 
     @cached_property
-    def row_count(self) -> Optional[int]:
+    def row_count(self) -> int:
         """Calculate the number of variants in the scoring file by counting the number of rows"""
-        if getattr(self, "_path", None) is None:
-            n_variants = None
+        path: Optional[pathlib.Path] = getattr(self, "_path", None)
+        if path is None:
+            raise TypeError("Can't calculate row count without path")
         else:
-            with xopen(self._path, "rt") as fh:
+            with xopen(path, "rt") as fh:
                 # skip header line with - 1
                 n_variants = sum(1 for x in fh if not x.startswith("#")) - 1
                 if n_variants == 0:
-                    raise ValueError(f"No variants in {self._path}")
+                    raise ValueError(f"No variants in {path}")
 
         return n_variants
 
@@ -654,7 +676,7 @@ class CatalogScoreHeader(ScoreHeader):
 
     @field_validator("weight_type", mode="after")
     @classmethod
-    def parse_weight_type(cls, value: str) -> Optional[str]:
+    def parse_weight_type(cls, value: Optional[str]) -> Optional[str]:
         if value == "NR":
             value = None
         return value
@@ -726,16 +748,17 @@ class ScoreLog(BaseModel):
     def is_harmonised(self) -> bool:
         return self.header.is_harmonised
 
-    @computed_field
+    @computed_field  # type: ignore
     @cached_property
     def sources(self) -> Optional[list[str]]:
-        unique_sources = None
+        unique_sources: Optional[list[str]] = None
         if self.variants is not None:
             sources: list[Optional[str]] = [x.get("hm_source") for x in self.variants]
-            if all(x is None for x in sources):
+            filtered_sources = [x for x in sources if x is not None]
+            if not filtered_sources:
                 unique_sources = None
             else:
-                unique_sources = list(set(sources))
+                unique_sources = list(set(filtered_sources))
         return unique_sources
 
     @property
@@ -752,16 +775,14 @@ class ScoreLog(BaseModel):
         header_variants = getattr(self.header, "variants_number", None)
         if header_variants is None:
             # parse by counting the number of rows in the scoring file
-            if self.header.row_count is None:
-                # give up
-                header_variants = 0
-            else:
-                header_variants = self.header.row_count
+            header_variants = self.header.row_count
 
-        try:
-            return abs(header_variants - self.n_actual_variants)
-        except TypeError:
-            return None
+        if self.n_actual_variants is None:
+            variant_difference: Optional[int] = None
+        else:
+            variant_difference = abs(header_variants - self.n_actual_variants)
+
+        return variant_difference
 
     @property
     def variants_are_missing(self) -> bool:

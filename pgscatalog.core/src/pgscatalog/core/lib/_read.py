@@ -2,6 +2,7 @@
 These functions aren't really meant to be imported outside corelib"""
 
 import logging
+from typing import Generator, Iterator
 
 from xopen import xopen
 
@@ -11,8 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 def read_rows_lazy(
-    *, csv_reader, fields: list[str], name: str, wide: bool, row_nr: int
-):
+    *,
+    csv_reader: Iterator[list[str]],
+    fields: list[str],
+    name: str,
+    wide: bool,
+    row_nr: int,
+) -> Generator[ScoreVariant, None, None]:
     """Read rows from an open scoring file and instantiate them as ScoreVariants"""
     for row in csv_reader:
         variant = dict(zip(fields, row))

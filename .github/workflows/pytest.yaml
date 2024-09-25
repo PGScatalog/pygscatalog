@@ -1,4 +1,4 @@
-name: Run pytest
+name: Run pytest and mypy
 
 on:
   workflow_call:
@@ -62,3 +62,20 @@ jobs:
             fail_ci_if_error: true
             slug: PGScatalog/pygscatalog
             flags: ${{ inputs.package-directory }}
+            
+  mypy:
+      runs-on: ubuntu-latest
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Install Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: ${{ inputs.python-version }}
+            cache: 'pip'
+
+        - run: pip install mypy
+
+        - run: mypy # import to run in top level directory
+
