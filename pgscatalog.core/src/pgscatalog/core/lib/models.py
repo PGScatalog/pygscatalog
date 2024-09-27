@@ -8,11 +8,11 @@ Best way to reuse:
 
 """
 import enum
+import itertools
 import pathlib
 from datetime import date
 from functools import cached_property
-from typing import ClassVar, Optional, Union
-from typing_extensions import Self, Literal
+from typing import ClassVar, Optional, Union, Any, Self, Literal
 
 from pydantic import (
     BaseModel,
@@ -87,7 +87,24 @@ class Allele(BaseModel):
 class CatalogScoreVariant(BaseModel):
     """A model representing a row from a PGS Catalog scoring file, defined here:
     https://www.pgscatalog.org/downloads/#scoring_columns
+
+    Supports dynamic ancestry specific allele frequency information as reported by authors (e.g. first row from PGS000662):
+
+    >>> variant_with_allelefrequency = {"chr_name": "1", "chr_position": 5743196, "effect_allele": "T", "other_allele": "C", "effect_weight": 0.102298257, "allelefrequency_effect_European": 0.067, "allelefrequency_effect_African": 0.439, "allelefrequency_effect_Asian": 0.113, "allelefrequency_effect_Hispanic": 0.157}
+    >>> CatalogScoreVariant(**variant_with_allelefrequency)  # doctest: +ELLIPSIS
+    CatalogScoreVariant(rsID=None, chr_name='1', chr_position=5743196..., allelefrequency_effect_European=0.067, allelefrequency_effect_African=0.439, allelefrequency_effect_Asian=0.113, allelefrequency_effect_Hispanic=0.157, ...)
+
+    >>> bad_extra_fields = variant_with_allelefrequency | {"favourite_ice_cream": "vanilla"}
+    >>> CatalogScoreVariant(**bad_extra_fields)
+    Traceback (most recent call last):
+    ...
+    pydantic_core._pydantic_core.ValidationError: 1 validation error for CatalogScoreVariant
+      Value error, Invalid extra fields detected: ['favourite_ice_cream'] ...
     """
+
+    model_config = ConfigDict(
+        extra="allow"
+    )  # extra fields are checked by a model validator
 
     # variant description
     rsID: Optional[str] = Field(
@@ -204,11 +221,6 @@ class CatalogScoreVariant(BaseModel):
         default=None,
         title="Effect Allele Frequency",
         description="Reported effect allele frequency, if the associated locus is a haplotype then haplotype frequency will be extracted.",
-    )
-    allelefrequency_effect_Ancestry: Optional[float] = Field(
-        default=None,
-        title="Population-specific effect allele frequency",
-        description="Reported effect allele frequency in a specific population (described by the authors).",
     )
 
     # harmonised files - additional columns
@@ -362,11 +374,33 @@ class CatalogScoreVariant(BaseModel):
         "effect_allele", "other_allele", "hm_inferOtherAllele", mode="before"
     )
     @classmethod
-    def alleles_must_parse(cls, value):
+    def alleles_must_parse(cls, value: Any) -> Allele:
         if isinstance(value, str):
             return Allele(allele=value)
         else:
             raise ValueError(f"Can't parse {value=}")
+
+    @model_validator(mode="after")
+    def check_extra_fields(self) -> Self:
+        """Only allelefrequency_effect_{ancestry} is supported as an extra field
+        {ancestry} is dynamic and set by submitters"""
+        extra: list[str] = list(self.model_extra.keys())
+        if extra:
+            field_match: list[bool] = [
+                x.startswith("allelefrequency_effect_") for x in extra
+            ]
+            if not all(field_match):
+                bad_extra_fields: list[str] = list(
+                    itertools.compress(extra, [not x for x in field_match])
+                )
+                raise ValueError(f"Invalid extra fields detected: {bad_extra_fields}")
+            else:
+                for field in extra:
+                    # make sure allele frequency is a float or raise a value error
+                    allelefrequency: float = float(getattr(self, field))
+                    setattr(self, field, allelefrequency)
+
+        return self
 
     @model_validator(mode="after")
     def check_effect_weights(self) -> Self:
@@ -406,9 +440,16 @@ class CatalogScoreVariant(BaseModel):
         return self
 
     @field_validator(
-        "rsID", "chr_name", "chr_position", "hm_chr", "hm_pos", mode="before"
+        "rsID",
+        "chr_name",
+        "chr_position",
+        "hm_chr",
+        "hm_pos",
+        "allelefrequency_effect",
+        mode="before",
     )
-    def empty_string_to_none(cls, v):
+    @classmethod
+    def empty_string_to_none(cls, v: Any) -> Optional[str]:
         if isinstance(v, str) and v.strip() == "":
             return None
         return v
