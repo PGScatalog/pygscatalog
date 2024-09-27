@@ -10,7 +10,7 @@ import pathlib
 from pydantic import ValidationError
 from xopen import xopen
 
-from .models import ScoreVariant, ScoreHeader, CatalogScoreHeader
+from .models import ScoreHeader, CatalogScoreHeader
 from .catalogapi import ScoreQueryResult, CatalogQuery
 from ._normalise import normalise
 from ._download import https_download
@@ -590,74 +590,3 @@ class ScoringFiles:
     def elements(self):
         """Returns a list of :class:`ScoringFile` objects contained inside :class:`ScoringFiles`"""
         return self._elements
-
-
-def _read_normalised_rows(path):
-    with xopen(path) as f:
-        reader = csv.DictReader(f, delimiter="\t")
-        for row in reader:
-            yield ScoreVariant(**row)
-
-
-class NormalisedScoringFile:
-    """This class represents a ScoringFile that's been normalised to have a consistent format
-
-    Its main purpose is to provide a convenient way to iterate over variants
-
-    >>> normpath = Config.ROOT_DIR / "tests" / "data" / "combined.txt.gz"
-    >>> test = NormalisedScoringFile(normpath)
-    >>> test  # doctest: +ELLIPSIS
-    NormalisedScoringFile('.../combined.txt.gz')
-
-    >>> for i in test.variants:  # doctest: +ELLIPSIS
-    ...     i
-    ...     break
-    ScoreVariant(rsID=None, chr_name='11', chr_position=69331418, effect_allele=Allele(allele='T', is_snp=True), ...
-
-    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
-    >>> test = NormalisedScoringFile(ScoringFile(testpath))
-    >>> test  # doctest: +ELLIPSIS
-    NormalisedScoringFile(ScoringFile('.../PGS000001_hmPOS_GRCh38.txt.gz', ...))
-
-
-    >>> for i in test.variants:  # doctest: +ELLIPSIS
-    ...     i
-    ...     break
-    ScoreVariant(rsID='rs78540526', chr_name='11', chr_position=69516650, effect_allele=Allele(allele='T', is_snp=True), ...
-    """
-
-    def __init__(self, path):
-        try:
-            with xopen(path):
-                pass
-        except TypeError:
-            self.is_path = False
-            self.path = str(path)
-        else:
-            self.is_path = True
-            self.path = path
-        finally:
-            # either a ScoringFile or a path to a combined file
-            self._scoringfile = path
-
-    def __iter__(self):
-        yield from self.variants
-
-    @property
-    def variants(self):
-        if self.is_path:
-            # get a fresh generator from the file
-            self._variants = _read_normalised_rows(self._scoringfile)
-        else:
-            # get a fresh generator from the normalise() method
-            self._variants = self._scoringfile.normalise()
-
-        return self._variants
-
-    def __repr__(self):
-        if self.is_path:
-            x = f"{repr(str(self._scoringfile))}"
-        else:
-            x = f"{repr(self._scoringfile)}"
-
-        return f"{type(self).__name__}({x})"
