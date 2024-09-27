@@ -694,7 +694,7 @@ class ScoreLog(BaseModel):
 
     >>> header = CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=ScoreFormatVersion.v2, trait_mapped='breast carcinoma', trait_efo='EFO_0000305', variants_number=77, weight_type="NR", pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build="GRCh38", HmPOS_date="2022-07-29")
     >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
-    >>> scorelog = ScoreLog(header=header, variants=[harmonised_variant.model_dump(include={"hm_source"})])  # doctest: +ELLIPSIS
+    >>> scorelog = ScoreLog(header=header, variant_sources=[harmonised_variant.model_dump(include={"hm_source"})])  # doctest: +ELLIPSIS
     >>> scorelog
     ScoreLog(header=CatalogScoreHeader(...), compatible_effect_type=True, pgs_id='PGS000001', is_harmonised=True, sources=['ENSEMBL'])
 
@@ -730,7 +730,7 @@ class ScoreLog(BaseModel):
     # failed harmonisation can create ScoreVariants which make field and model validators sad
     # e.g. missing genomic coordinates
     # the dict must contain "hm_source" key
-    variants: Optional[list[dict]] = Field(
+    variant_sources: Optional[list[dict]] = Field(
         description="A list of variants associated with the header. Some may be filtered out during normalisation.",
         exclude=True,
         repr=False,
@@ -752,8 +752,10 @@ class ScoreLog(BaseModel):
     @cached_property
     def sources(self) -> Optional[list[str]]:
         unique_sources: Optional[list[str]] = None
-        if self.variants is not None:
-            sources: list[Optional[str]] = [x.get("hm_source") for x in self.variants]
+        if self.variant_sources is not None:
+            sources: list[Optional[str]] = [
+                x.get("hm_source") for x in self.variant_sources
+            ]
             filtered_sources = [x for x in sources if x is not None]
             if not filtered_sources:
                 unique_sources = None
@@ -764,8 +766,8 @@ class ScoreLog(BaseModel):
     @property
     def n_actual_variants(self) -> Optional[int]:
         # this distinction is useful if variants have been filtered out
-        if self.variants is not None:
-            return len(self.variants)
+        if self.variant_sources is not None:
+            return len(self.variant_sources)
         else:
             return None
 

@@ -109,7 +109,7 @@ def run():
 
             log = ScoreLog(
                 header=scorefile.header,
-                variants=log_variants,
+                variant_sources=log_variants,
                 compatible_effect_type=is_compatible,
             )
             if log.variants_are_missing:
