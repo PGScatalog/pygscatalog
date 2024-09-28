@@ -12,7 +12,8 @@ import itertools
 import pathlib
 from datetime import date
 from functools import cached_property
-from typing import ClassVar, Optional, Union, Any, Self, Literal
+from typing import ClassVar, Optional, Union, Any, Literal
+from typing_extensions import Self
 
 from pydantic import (
     BaseModel,

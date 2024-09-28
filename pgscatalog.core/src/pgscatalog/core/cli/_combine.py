@@ -48,10 +48,17 @@ class TextFileWriter(DataWriter):
         mode = "at" if os.path.exists(self.filename) else "wt"
         with self.open_function(self.filename, mode) as f:
             writer = csv.DictWriter(
-                f, delimiter="\t", lineterminator="\n", fieldnames=self.fieldnames
+                f,
+                delimiter="\t",
+                lineterminator="\n",
+                fieldnames=self.fieldnames,
+                extrasaction="ignore",
             )
-            if mode == "wt":
-                writer.writeheader()
-                writer.writerows(batch)
-
-            writer.writerows(batch)
+            match mode:
+                case "wt":
+                    writer.writeheader()
+                    writer.writerows(batch)
+                case "at":
+                    writer.writerows(batch)
+                case _:
+                    raise ValueError(f"Invalid {mode=}")

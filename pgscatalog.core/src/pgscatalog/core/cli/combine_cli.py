@@ -71,15 +71,22 @@ def run():
     n_finished = 0
     for scorefile in tqdm(scoring_files, total=len(scoring_files)):
         logger.info(f"Processing {scorefile.pgs_id}")
-        normalised_score: Optional[list[ScoreVariant]] = None
+        dumped_variants: Optional[list[dict]] = None
         is_compatible = True
         try:
-            normalised_score = list(
-                scorefile.normalise(
-                    drop_missing=args.drop_missing,
-                    **liftover_kwargs,
-                    target_build=target_build,
-                )
+            normalised_score = scorefile.normalise(
+                drop_missing=args.drop_missing,
+                **liftover_kwargs,
+                target_build=target_build,
+            )
+            fields: set[str] = set(ScoreVariant.output_fields).union(
+                {"accession", "row_nr", "hm_source"}
+            )
+            # it's important to create the list here to raise EffectTypeErrors
+            # list is more efficient than using itertools.tee
+            # and we're materialising a small subset of fields only
+            dumped_variants = list(
+                x.model_dump(include=fields) for x in normalised_score
             )
         except EffectTypeError:
             logger.warning(
@@ -87,29 +94,13 @@ def run():
             )
             is_compatible = False
         else:
-            # TODO: go back to parallel execution + write to multiple files
             writer = TextFileWriter(compress=compress_output, filename=out_path)
-
-            # model_dump returns a dict with a subset of keys
-            dumped_variants = (
-                x.model_dump(include=set(ScoreVariant.output_fields))
-                for x in normalised_score
-            )
             writer.write(dumped_variants)
             n_finished += 1
         finally:
-            # grab essential information only for the score log
-            if normalised_score is not None:
-                log_variants = (
-                    x.model_dump(include={"accession", "row_nr", "hm_source"})
-                    for x in normalised_score
-                )
-            else:
-                log_variants = None
-
             log = ScoreLog(
                 header=scorefile.header,
-                variant_sources=log_variants,
+                variant_sources=dumped_variants,
                 compatible_effect_type=is_compatible,
             )
             if log.variants_are_missing:
