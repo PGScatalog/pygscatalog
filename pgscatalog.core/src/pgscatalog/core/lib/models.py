@@ -433,7 +433,7 @@ class CatalogScoreVariant(BaseModel):
                     # e.g. e2 allele of APOE gene
                     pass
                 else:
-                    raise TypeError(
+                    raise ValueError(
                         f"Bad position: {self.rsID=}, {self.chr_name=}, {self.chr_position=}"
                         f"for variant {self=}"
                     )
