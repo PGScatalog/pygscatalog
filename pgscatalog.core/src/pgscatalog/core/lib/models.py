@@ -434,7 +434,7 @@ class CatalogScoreVariant(BaseModel):
                     pass
                 else:
                     raise ValueError(
-                        f"Bad position: {self.rsID=}, {self.chr_name=}, {self.chr_position=}"
+                        f"Bad position: {self.rsID=}, {self.chr_name=}, {self.chr_position=} "
                         f"for variant {self=}"
                     )
 
@@ -478,7 +478,9 @@ class ScoreVariant(CatalogScoreVariant):
     >>> variant_missing_positions = ScoreVariant(**{"rsID": None, "chr_name": None, "chr_position": None, "effect_allele": "A", "effect_weight": 0.5,  "row_nr": 0, "accession": "test"}) # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    TypeError: Bad position: self.rsID=None, self.chr_name=None, self.chr_position=None...
+    pydantic_core._pydantic_core.ValidationError: 1 validation error for ScoreVariant
+      Value error, Bad position: self.rsID=None, self.chr_name=None, self.chr_position=None...
+      ...
 
     >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
     >>> harmonised_variant.is_harmonised
