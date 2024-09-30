@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import logging
 import pathlib
 import sys
@@ -15,11 +16,55 @@ from ._combine import TextFileWriter
 logger = logging.getLogger(__name__)
 
 
+def _combine(
+    scorefile: ScoringFile,
+    target_build: GenomeBuild,
+    drop_missing: bool,
+    compress_output: bool,
+    out_path: pathlib.Path,
+    liftover_kwargs: dict,
+) -> ScoreLog:
+    """This function normalises a single scoring file to a consistent structure and returns a summary log generated from the score header and variant statistics"""
+    logger.info(f"Processing {scorefile.pgs_id}")
+    dumped_variants: Optional[list[dict]] = None
+    is_compatible: bool = True
+    try:
+        normalised_score = scorefile.normalise(
+            drop_missing=drop_missing,
+            **liftover_kwargs,
+            target_build=target_build,
+        )
+        fields: set[str] = set(ScoreVariant.output_fields).union(
+            {"accession", "row_nr", "hm_source"}
+        )
+        # it's important to create the list here to raise EffectTypeErrors
+        # for the largest scoring files this can use quite a lot of memory (~16GB)
+        dumped_variants = list(x.model_dump(include=fields) for x in normalised_score)
+    except EffectTypeError:
+        logger.warning(
+            f"Unsupported non-additive effect types in {scorefile=}, skipping"
+        )
+        is_compatible = False
+    else:
+        writer = TextFileWriter(compress=compress_output, filename=out_path)
+        writer.write(dumped_variants)
+    finally:
+        log: ScoreLog = ScoreLog(
+            header=scorefile.header,
+            variant_sources=dumped_variants,
+            compatible_effect_type=is_compatible,
+        )
+        if log.variants_are_missing:
+            logger.warning(
+                f"{log.variant_count_difference} fewer variants in output compared to original file"
+            )
+        return log
+
+
 def run():
     args = parse_args()
-
     if args.verbose:
-        logging.getLogger("pgscatalog.corelib").setLevel(logging.DEBUG)
+        logging.getLogger("pgscatalog.core").setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
         logger.debug("Verbose logging enabled")
 
@@ -44,7 +89,7 @@ def run():
     for x in scoring_files:
         if x.genome_build is None and target_build is not None:
             raise ValueError(
-                f"Can't combine files with missing build in "
+                f"Can't combine {x.pgs_id} with missing build in "
                 f"header when requesting {target_build=}"
             )
 
@@ -53,7 +98,7 @@ def run():
                 f"Can't combine scoring file with genome build {x.genome_build!r} when {target_build=} without --liftover"
             )
 
-    variant_log = []
+    variant_log: list[ScoreLog] = []
 
     if args.liftover:
         chain_dir = pathlib.Path(args.chain_dir)
@@ -69,43 +114,33 @@ def run():
         liftover_kwargs = {"liftover": False}
 
     n_finished = 0
-    for scorefile in tqdm(scoring_files, total=len(scoring_files)):
-        logger.info(f"Processing {scorefile.pgs_id}")
-        dumped_variants: Optional[list[dict]] = None
-        is_compatible = True
-        try:
-            normalised_score = scorefile.normalise(
-                drop_missing=args.drop_missing,
-                **liftover_kwargs,
-                target_build=target_build,
+
+    # TODO: max_workers=1: ready to parallelise and write to separate files
+    with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+        futures = []
+        for scorefile in scoring_files:
+            futures.append(
+                executor.submit(
+                    _combine,
+                    scorefile=scorefile,
+                    target_build=target_build,
+                    liftover_kwargs=liftover_kwargs,
+                    drop_missing=args.drop_missing,
+                    compress_output=compress_output,
+                    out_path=out_path,
+                )
             )
-            fields: set[str] = set(ScoreVariant.output_fields).union(
-                {"accession", "row_nr", "hm_source"}
-            )
-            # it's important to create the list here to raise EffectTypeErrors
-            # list is more efficient than using itertools.tee
-            # and we're materialising a small subset of fields only
-            dumped_variants = list(
-                x.model_dump(include=fields) for x in normalised_score
-            )
-        except EffectTypeError:
-            logger.warning(
-                f"Unsupported non-additive effect types in {scorefile=}, skipping"
-            )
-            is_compatible = False
-        else:
-            writer = TextFileWriter(compress=compress_output, filename=out_path)
-            writer.write(dumped_variants)
-            n_finished += 1
-        finally:
-            log = ScoreLog(
-                header=scorefile.header,
-                variant_sources=dumped_variants,
-                compatible_effect_type=is_compatible,
-            )
-            if log.variants_are_missing:
-                logger.warning(
-                    f"{log.variant_count_difference} fewer variants in output compared to original file"
+
+        for future in tqdm(
+            concurrent.futures.as_completed(futures), total=len(futures)
+        ):
+            log: ScoreLog = future.result()
+            if log.compatible_effect_type:
+                logger.info(f"Finished processing {log.pgs_id}")
+                n_finished += 1
+            else:
+                logger.info(
+                    f"Couldn't process {log.pgs_id} because of incompatible effect type"
                 )
             variant_log.append(log)
 

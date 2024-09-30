@@ -125,6 +125,7 @@ class ScoringFile:
             self.local_path = pathlib.Path(self._identifier)
             self._init_from_path(target_build=target_build)
         except ValidationError:
+            logger.warning("PGS Catalog header not detected in scoring file")
             # that didn't work, let's try parsing a basic score header
             self._header = ScoreHeader.from_path(self._identifier)
             logger.info(f"{identifier}: Valid simple score header")
