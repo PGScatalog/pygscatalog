@@ -446,6 +446,8 @@ class CatalogScoreVariant(BaseModel):
         "chr_position",
         "hm_chr",
         "hm_pos",
+        "hm_match_chr",
+        "hm_match_pos",
         "allelefrequency_effect",
         mode="before",
     )
