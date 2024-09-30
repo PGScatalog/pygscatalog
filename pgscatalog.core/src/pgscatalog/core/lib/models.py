@@ -444,6 +444,8 @@ class CatalogScoreVariant(BaseModel):
         "rsID",
         "chr_name",
         "chr_position",
+        "is_haplotype",
+        "is_diplotype",
         "hm_chr",
         "hm_pos",
         "hm_match_chr",
@@ -452,7 +454,7 @@ class CatalogScoreVariant(BaseModel):
         mode="before",
     )
     @classmethod
-    def empty_string_to_none(cls, v: Any) -> Optional[str]:
+    def empty_string_to_none(cls, v: Any) -> Optional[Any]:
         if isinstance(v, str) and v.strip() == "":
             return None
         return v
