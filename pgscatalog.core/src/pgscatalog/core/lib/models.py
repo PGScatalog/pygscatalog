@@ -487,12 +487,9 @@ class CatalogScoreVariant(BaseModel):
     @model_validator(mode="after")
     def check_complex_variants(self) -> Self:
         if self.variant_type is not None:
-            if self.chr_name is None:
-                raise ValueError(f"Complex variants must have chromosome field: {self}")
-
-            if not self.is_haplotype and not self.is_diplotype:
+            if self.is_haplotype is None and self.is_diplotype is None:
                 raise ValueError(
-                    f"Complex alleles must be haplotypes or diplotypes: {self}"
+                    f"Complex alleles must have is_haplotype or is_diplotype fields: {self}"
                 )
 
             if getattr(self.effect_allele, "is_snp", False):
