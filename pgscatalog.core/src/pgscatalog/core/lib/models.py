@@ -85,6 +85,20 @@ class Allele(BaseModel):
         return hash(self.allele)
 
 
+class VariantType(str, enum.Enum):
+    """Complex alleles are usually haplotypes/diplotypes and the gametic phase must be known to apply them accurately.
+
+    See PGS Catalog Curation Guidelines: Appendix A – Special Cases for more information
+
+    (Not supported by the calculator.)"""
+
+    APOE_ALLELE = "APOE_allele"
+    CYP_ALLELE = "CYP_allele"
+    HLA_ALLELE = "HLA_allele"
+    HLA_AA = "HLA_AA"
+    HLA_SEROTYPE = "HLA_serotype"
+
+
 class CatalogScoreVariant(BaseModel):
     """A model representing a row from a PGS Catalog scoring file, defined here:
     https://www.pgscatalog.org/downloads/#scoring_columns
@@ -101,6 +115,12 @@ class CatalogScoreVariant(BaseModel):
     ...
     pydantic_core._pydantic_core.ValidationError: 1 validation error for CatalogScoreVariant
       Value error, Invalid extra fields detected: ['favourite_ice_cream'] ...
+
+    Complex alleles are represented a little differently:
+
+    >>> complex_allele = {"chr_name": 19, "effect_allele": "APOE_e2", "effect_weight": -0.5, "locus_name": "APOE", "is_haplotype": True, "variant_type": "APOE_allele", "variant_description": None}
+    >>> CatalogScoreVariant(**complex_allele)
+    CatalogScoreVariant(rsID=None, chr_name='19', chr_position=None, effect_allele=Allele(allele='APOE_e2', is_snp=False), other_allele=None, locus_name='APOE', is_haplotype=True, is_diplotype=False, imputation_method=None, variant_description=None, inclusion_criteria=None, effect_weight='-0.5', is_interaction=False, is_dominant=False, is_recessive=False, dosage_0_weight=None, dosage_1_weight=None, dosage_2_weight=None, OR=None, HR=None, allelefrequency_effect=None, hm_source=None, hm_rsID=None, hm_chr=None, hm_pos=None, hm_inferOtherAllele=None, hm_match_chr=None, hm_match_pos=None, variant_type=<VariantType.APOE_ALLELE: 'APOE_allele'>, variant_id='19::APOE_e2:', is_harmonised=False, is_complex=True, is_non_additive=False, effect_type=EffectType.ADDITIVE)
     """
 
     model_config = ConfigDict(
@@ -117,6 +137,7 @@ class CatalogScoreVariant(BaseModel):
         default=None,
         title="Location - Chromosome ",
         description="Chromosome name/number associated with the variant.",
+        coerce_numbers_to_str=True,
     )
     chr_position: Optional[int] = Field(
         default=None,
@@ -261,6 +282,9 @@ class CatalogScoreVariant(BaseModel):
         title="FLAG: matching chromosome position",
         description="Used for QC. Only provided if the scoring file is being harmonized to the same genome build, and where the chromosome name is provided in the column chr_position.",
     )
+    variant_type: Optional[VariantType] = Field(
+        default=None, title="Complex alleles only: how is the variant name formatted?"
+    )
 
     # helpful class attributes (not used by pydantic to instantiate a class)
     harmonised_columns: ClassVar[
@@ -381,6 +405,26 @@ class CatalogScoreVariant(BaseModel):
         else:
             raise ValueError(f"Can't parse {value=}")
 
+    @field_validator(
+        "rsID",
+        "chr_name",
+        "chr_position",
+        "is_haplotype",
+        "is_diplotype",
+        "hm_chr",
+        "hm_pos",
+        "hm_match_chr",
+        "hm_match_pos",
+        "allelefrequency_effect",
+        "variant_type",
+        mode="before",
+    )
+    @classmethod
+    def empty_string_to_none(cls, v: Any) -> Optional[Any]:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
     @model_validator(mode="after")
     def check_extra_fields(self) -> Self:
         """Only allelefrequency_effect_{ancestry} is supported as an extra field
@@ -440,24 +484,23 @@ class CatalogScoreVariant(BaseModel):
 
         return self
 
-    @field_validator(
-        "rsID",
-        "chr_name",
-        "chr_position",
-        "is_haplotype",
-        "is_diplotype",
-        "hm_chr",
-        "hm_pos",
-        "hm_match_chr",
-        "hm_match_pos",
-        "allelefrequency_effect",
-        mode="before",
-    )
-    @classmethod
-    def empty_string_to_none(cls, v: Any) -> Optional[Any]:
-        if isinstance(v, str) and v.strip() == "":
-            return None
-        return v
+    @model_validator(mode="after")
+    def check_complex_variants(self) -> Self:
+        if self.variant_type is not None:
+            if self.chr_name is None:
+                raise ValueError(f"Complex variants must have chromosome field: {self}")
+
+            if not self.is_haplotype and not self.is_diplotype:
+                raise ValueError(
+                    f"Complex alleles must be haplotypes or diplotypes: {self}"
+                )
+
+            if getattr(self.effect_allele, "is_snp", False):
+                raise ValueError(
+                    f"Complex variants can't have SNP effect alleles: {self}"
+                )
+
+        return self
 
 
 class ScoreVariant(CatalogScoreVariant):
