@@ -170,7 +170,9 @@ def _parse_args(args=None):
         "--verify_variants",
         dest="verify_variants",
         action="store_true",
-        help="<Optional> Verify variants from scoring file match scored variants perfectly. Note: requires .scorefile.gz files used by plink to create the calculated score, and a .sscore.vars file output by plink after during",
+        help="<Optional> Verify variants from scoring file match scored variants perfectly."
+        " Note: requires .scorefile.gz files used by plink to create the calculated score, and a .sscore.vars file output by plink after scoring"
+        " It's assumed that these files have a common file name prefix (this is default plink behaviour) e.g. cineca_22_additive_0.sscore.zst needs cineca_22_additive_0.scorefile.gz & cineca_22_additive_0.sscore.vars",
     )
     return parser.parse_args(args)
 
