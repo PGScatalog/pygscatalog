@@ -41,8 +41,10 @@ def verify_variants(score: pathlib.Path) -> None:
     with open(var_path) as f:
         # just a file where each line contains a variant ID
         scored_variants = frozenset(x.strip() for x in f)
+        logger.info(f"Read {len(scored_variants)} from {var_path}")
 
     scorefile_variants = frozenset(get_id_from_scorefile(scorefile_path))
+    logger.info(f"Read {len(scorefile_variants)} from {scorefile_path}")
 
     if diff := scored_variants.symmetric_difference(scorefile_variants):
         raise ValueError(f"Missing variants {diff}")
