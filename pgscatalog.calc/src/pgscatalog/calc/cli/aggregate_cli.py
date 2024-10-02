@@ -145,13 +145,6 @@ def _parse_args(args=None):
         help="<Required> List of scorefile paths. Use a wildcard (*) to select multiple files.",
     )
     parser.add_argument(
-        "--variants",
-        dest="variants",
-        required=False,
-        nargs="+",
-        help="<Optional> List of plink2 vars files, where each line is a variant ID that contributed to the corresponding score.",
-    )
-    parser.add_argument(
         "-o",
         "--outdir",
         dest="outdir",
