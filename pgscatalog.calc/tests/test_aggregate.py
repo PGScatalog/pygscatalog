@@ -1,6 +1,7 @@
 import glob
 import itertools
 import shutil
+from os import unlink
 from unittest.mock import patch
 
 from pgscatalog.calc.cli.aggregate_cli import run_aggregate
@@ -109,10 +110,26 @@ def test_var_overlap(tmp_path_factory, calculated_scores, score_vars, score_file
     assert [x.name for x in outf] == ["aggregated_scores.txt.gz"]
 
 
-def test_var_overlap_missing(tmp_path_factory, calculated_scores):
+@pytest.mark.parametrize(
+    "use_score_vars, use_score_files",
+    [
+        (True, False),  # Use score_vars but not score_files
+        (False, True),  # Use score_files but not score_vars
+    ],
+)
+def test_var_overlap_missing(
+    tmp_path_factory,
+    calculated_scores,
+    score_vars,
+    score_files,
+    use_score_files,
+    use_score_vars,
+):
     outdir = tmp_path_factory.mktemp("outdir")
     # stage data to outdir
     copied_calculated_scores = [shutil.copy(x, outdir) for x in calculated_scores]
+    copied_score_vars = [shutil.copy(x, outdir) for x in score_vars]
+    copied_score_files = [shutil.copy(x, outdir) for x in score_files]
 
     args = [
         (
@@ -127,6 +144,13 @@ def test_var_overlap_missing(tmp_path_factory, calculated_scores):
         )
     ]
     flargs = list(itertools.chain(*args))
+
+    # parameterised: delete data important for verification
+    if not use_score_vars:
+        [unlink(x) for x in copied_score_vars]
+
+    if not use_score_files:
+        [unlink(x) for x in copied_score_files]
 
     with pytest.raises(FileNotFoundError):
         with patch("sys.argv", flargs):

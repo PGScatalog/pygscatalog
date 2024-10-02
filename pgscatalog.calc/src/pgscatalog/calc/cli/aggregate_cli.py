@@ -39,6 +39,7 @@ def verify_variants(score: pathlib.Path) -> None:
         raise FileNotFoundError(f"{scorefile_path} doesn't exist")
 
     with open(var_path) as f:
+        # just a file where each line contains a variant ID
         scored_variants = frozenset(x.strip() for x in f)
 
     scorefile_variants = frozenset(get_id_from_scorefile(scorefile_path))
