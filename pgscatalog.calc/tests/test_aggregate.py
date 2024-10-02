@@ -109,6 +109,30 @@ def test_var_overlap(tmp_path_factory, calculated_scores, score_vars, score_file
     assert [x.name for x in outf] == ["aggregated_scores.txt.gz"]
 
 
+def test_var_overlap_missing(tmp_path_factory, calculated_scores):
+    outdir = tmp_path_factory.mktemp("outdir")
+    # stage data to outdir
+    copied_calculated_scores = [shutil.copy(x, outdir) for x in calculated_scores]
+
+    args = [
+        (
+            "pgscatalog-aggregate",
+            "-s",
+            *copied_calculated_scores,
+            "--outdir",
+            str(outdir),
+            "--no-split",
+            "--verify_variants",
+            "--verbose",
+        )
+    ]
+    flargs = list(itertools.chain(*args))
+
+    with pytest.raises(FileNotFoundError):
+        with patch("sys.argv", flargs):
+            run_aggregate()
+
+
 def test_var_overlap_fails(
     tmp_path_factory, calculated_scores, score_vars, score_files
 ):
@@ -130,6 +154,7 @@ def test_var_overlap_fails(
             str(outdir),
             "--no-split",
             "--verify_variants",
+            "--verbose",
         )
     ]
     flargs = list(itertools.chain(*args))
