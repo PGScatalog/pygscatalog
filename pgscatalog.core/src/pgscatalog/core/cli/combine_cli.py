@@ -34,8 +34,9 @@ def _combine(
             **liftover_kwargs,
             target_build=target_build,
         )
+        # these fields are important for dumping and analysing output variants
         fields: set[str] = set(ScoreVariant.output_fields).union(
-            {"accession", "row_nr", "hm_source"}
+            {"accession", "row_nr", "hm_source", "is_complex"}
         )
         # it's important to create the list here to raise EffectTypeErrors
         # for the largest scoring files this can use quite a lot of memory (~16GB)
@@ -140,7 +141,9 @@ def run():
         ):
             log: ScoreLog = future.result()
             if log.compatible_effect_type:
-                logger.info(f"Finished processing {log.pgs_id}")
+                logger.info(
+                    f"Finished scorefile with compatible effect type {log.pgs_id}"
+                )
                 n_finished += 1
             else:
                 logger.info(

@@ -844,10 +844,10 @@ class ScoreLog(BaseModel):
     """A log that includes header information and variant summary statistics
 
     >>> header = CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=ScoreFormatVersion.v2, trait_mapped='breast carcinoma', trait_efo='EFO_0000305', variants_number=77, weight_type="NR", pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build="GRCh38", HmPOS_date="2022-07-29")
-    >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
-    >>> scorelog = ScoreLog(header=header, variant_sources=[harmonised_variant.model_dump(include={"hm_source"})])  # doctest: +ELLIPSIS
+    >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "HLA-DQ", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
+    >>> scorelog = ScoreLog(header=header, compatible_effect_type=True, variant_sources=[harmonised_variant.model_dump(include={"hm_source", "is_complex"})])  # doctest: +ELLIPSIS
     >>> scorelog
-    ScoreLog(header=CatalogScoreHeader(...), compatible_effect_type=True, pgs_id='PGS000001', is_harmonised=True, sources=['ENSEMBL'])
+    ScoreLog(header=CatalogScoreHeader(...), compatible_effect_type=True, has_complex_alleles=True, pgs_id='PGS000001', is_harmonised=True, sources=['ENSEMBL'])
 
     In the original scoring file header there were 77 variants:
 
@@ -869,7 +869,7 @@ class ScoreLog(BaseModel):
     ['ENSEMBL']
 
     >>> scorelog.model_dump()  # doctest: +ELLIPSIS
-    {'header': {'pgs_id': 'PGS000001', ...}, 'compatible_effect_type': True, 'pgs_id': 'PGS000001', 'is_harmonised': True, 'sources': ['ENSEMBL']}
+    {'header': {'pgs_id': 'PGS000001', ...}, 'compatible_effect_type': True, 'has_complex_alleles': True, 'pgs_id': 'PGS000001', 'is_harmonised': True, 'sources': ['ENSEMBL']}
     """
 
     model_config = ConfigDict(use_enum_values=True)
@@ -880,22 +880,32 @@ class ScoreLog(BaseModel):
     # intentionally a vague type (dict) here to prevent revalidating ScoreVariants
     # failed harmonisation can create ScoreVariants which make field and model validators sad
     # e.g. missing genomic coordinates
-    # the dict must contain "hm_source" key
+    # the dict must contain at least "hm_source" and "is_complex" keys
     variant_sources: Optional[list[dict]] = Field(
         description="A list of variants associated with the header. Some may be filtered out during normalisation.",
         exclude=True,
         repr=False,
     )
     compatible_effect_type: bool = Field(
-        description="Did all variants in this score contain compatible effect types? (i.e. additive / recessive / dominant)",
-        default=True,
+        description="Did all variants in this score contain compatible effect types? (i.e. additive / recessive / dominant)"
     )
 
-    @computed_field
+    @computed_field  # type: ignore
+    @cached_property
+    def has_complex_alleles(self) -> bool:
+        """Do any variants contain complex alleles? e.g. HLA/APOE"""
+        has_complex = False
+        if self.variant_sources is not None:
+            has_complex = any(x["is_complex"] for x in self.variant_sources)
+        return has_complex
+
+    @computed_field  # type: ignore
+    @property
     def pgs_id(self) -> str:
         return self.header.pgs_id
 
-    @computed_field
+    @computed_field  # type: ignore
+    @property
     def is_harmonised(self) -> bool:
         return self.header.is_harmonised
 
