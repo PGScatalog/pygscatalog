@@ -455,13 +455,8 @@ class CatalogScoreVariant(BaseModel):
     @classmethod
     def effect_weight_must_float(cls, weight: str) -> str:
         # reminder: weight fields default to None because check_effect_weights validates the model after instantiation
-        # default values for fields are never validated
-        # but any non-default value is validated, and must be coercible to float
-        try:
-            _ = float(weight)  # will raise a ValueError if conversion fails
-        except TypeError:
-            # field validators _must_ raise ValueErrors
-            raise ValueError("Can't convert value to float")
+        # default values for fields are never validated. any non-default value is validated during instantiation
+        _ = float(weight)  # will raise a ValueError if conversion fails
         return weight
 
     # start validating the entire model now (i.e. after instantiation, all fields are set)
