@@ -25,7 +25,7 @@ def _combine(
     liftover_kwargs: dict,
 ) -> ScoreLog:
     """This function normalises a single scoring file to a consistent structure and returns a summary log generated from the score header and variant statistics"""
-    logger.info(f"Processing {scorefile.pgs_id}")
+    logger.info(f"Started processing {scorefile.pgs_id}")
     dumped_variants: Optional[list[dict]] = None
     is_compatible: bool = True
     try:
@@ -40,14 +40,17 @@ def _combine(
         # it's important to create the list here to raise EffectTypeErrors
         # for the largest scoring files this can use quite a lot of memory (~16GB)
         dumped_variants = list(x.model_dump(include=fields) for x in normalised_score)
+        logger.info(f"Finished processing {scorefile.pgs_id}")
     except EffectTypeError:
         logger.warning(
             f"Unsupported non-additive effect types in {scorefile=}, skipping"
         )
         is_compatible = False
     else:
+        logger.info("Writing variants to file")
         writer = TextFileWriter(compress=compress_output, filename=out_path)
         writer.write(dumped_variants)
+        logger.info("Finished writing")
     finally:
         log: ScoreLog = ScoreLog(
             header=scorefile.header,
@@ -58,6 +61,7 @@ def _combine(
             logger.warning(
                 f"{log.variant_count_difference} fewer variants in output compared to original file"
             )
+        logger.info("Normalisation complete, returning score log")
         return log
 
 
