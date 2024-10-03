@@ -360,7 +360,7 @@ class CatalogScoreVariant(BaseModel):
 
     # these computed fields provide convenient properties e.g. when normalising variants
     @computed_field  # type: ignore
-    @property
+    @cached_property
     def variant_id(self) -> str:
         """ID = chr:pos:effect_allele:other_allele"""
         return ":".join(
@@ -371,7 +371,7 @@ class CatalogScoreVariant(BaseModel):
         )
 
     @computed_field  # type: ignore
-    @property
+    @cached_property
     def is_harmonised(self) -> bool:
         # simple check: do any of the harmonised columns have data?
         for x in self.harmonised_columns:
@@ -380,7 +380,7 @@ class CatalogScoreVariant(BaseModel):
         return False
 
     @computed_field  # type: ignore
-    @property
+    @cached_property
     def is_complex(self) -> bool:
         is_complex = not getattr(self.effect_allele, "is_snp", False)
         for x in self.complex_columns:
@@ -390,7 +390,7 @@ class CatalogScoreVariant(BaseModel):
         return is_complex
 
     @computed_field  # type: ignore
-    @property
+    @cached_property
     def is_non_additive(self) -> bool:
         if self.effect_weight is not None:
             # if there's an effect weight value, we can work with it
@@ -403,7 +403,7 @@ class CatalogScoreVariant(BaseModel):
         return non_additive
 
     @computed_field  # type: ignore
-    @property
+    @cached_property
     def effect_type(self) -> EffectType:
         match (self.is_recessive, self.is_dominant, self.is_non_additive):
             case False, False, False:
