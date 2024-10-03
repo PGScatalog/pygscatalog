@@ -145,7 +145,7 @@ class CatalogScoreVariant(BaseModel):
     pydantic_core._pydantic_core.ValidationError: 1 validation error for CatalogScoreVariant
       Value error, All effect weight fields are missing ...
 
-    effect_weight can be missing if dosage_n_weight (non-additive) fields are missing.
+    effect_weight can be missing if dosage_n_weight (non-additive) fields are all present
 
     However, dosage_n_weight fields must _all_ be present, if they're present:
 
