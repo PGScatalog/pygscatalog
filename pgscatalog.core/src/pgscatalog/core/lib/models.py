@@ -136,6 +136,31 @@ class CatalogScoreVariant(BaseModel):
     >>> complex_allele = {"chr_name": 19, "effect_allele": "APOE_e2", "effect_weight": -0.5, "locus_name": "APOE", "is_haplotype": True, "variant_type": "APOE_allele", "variant_description": None}
     >>> CatalogScoreVariant(**complex_allele)
     CatalogScoreVariant(rsID=None, chr_name='19', chr_position=None, effect_allele=Allele(allele='APOE_e2', is_snp=False), other_allele=None, locus_name='APOE', is_haplotype=True, is_diplotype=False, imputation_method=None, variant_description=None, inclusion_criteria=None, effect_weight='-0.5', is_interaction=False, is_dominant=False, is_recessive=False, dosage_0_weight=None, dosage_1_weight=None, dosage_2_weight=None, OR=None, HR=None, allelefrequency_effect=None, hm_source=None, hm_rsID=None, hm_chr=None, hm_pos=None, hm_inferOtherAllele=None, hm_match_chr=None, hm_match_pos=None, variant_type=<VariantType.APOE_ALLELE: 'APOE_allele'>, variant_id='19::APOE_e2:', is_harmonised=False, is_complex=True, is_non_additive=False, effect_type=EffectType.ADDITIVE)
+
+    Although effect weights are typed as optional, if all effect weight fields are missing then a model validator will raise a validation error:
+
+    >>> CatalogScoreVariant(**{"chr_name": "19", "chr_position": 1, "effect_allele": "A", "effect_weight": None})  # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    pydantic_core._pydantic_core.ValidationError: 1 validation error for CatalogScoreVariant
+      Value error, All effect weight fields are missing ...
+
+    effect_weight can be missing if dosage_n_weight (non-additive) fields are missing.
+
+    However, dosage_n_weight fields must _all_ be present, if they're present:
+
+    >>> CatalogScoreVariant(**{"chr_name": "19", "chr_position": 1, "effect_allele": "A", "dosage_0_weight": 0.1, "dosage_1_weight": None, "dosage_2_weight": None})  # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    pydantic_core._pydantic_core.ValidationError: 1 validation error for CatalogScoreVariant
+      Value error, Dosage missing effect weight ...
+
+    A variant may have all effect weight fields. During normalisation the standard effect_weight column will be used:
+
+    >>> CatalogScoreVariant(**{"chr_name": "19", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.05, "dosage_0_weight": 0, "dosage_1_weight": 0.1, "dosage_2_weight": 0.3})
+    CatalogScoreVariant(rsID=None, chr_name='19', ..., is_non_additive=False, ...
+
+    Note that is_non_additive is false if effect_weight column exists, although non-additive fields do exist.
     """
 
     model_config = ConfigDict(
@@ -453,15 +478,13 @@ class CatalogScoreVariant(BaseModel):
         mode="after",
     )
     @classmethod
-    def effect_weight_must_float(cls, weight: str) -> str:
+    def effect_weight_must_float(cls, weight: Optional[str]) -> Optional[str]:
         # reminder: weight fields default to None because check_effect_weights validates the model after instantiation
         # default values for fields are never validated
         # but any non-default value is validated, and must be coercible to float
-        try:
+        if weight is not None:
             _ = float(weight)  # will raise a ValueError if conversion fails
-        except TypeError:
-            # field validators _must_ raise ValueErrors
-            raise ValueError("Can't convert value to float")
+
         return weight
 
     # start validating the entire model now (i.e. after instantiation, all fields are set)
