@@ -101,13 +101,28 @@ class VariantType(str, enum.Enum):
 
 class CatalogScoreVariant(BaseModel):
     """A model representing a row from a PGS Catalog scoring file, defined here:
+
     https://www.pgscatalog.org/downloads/#scoring_columns
 
-    Supports dynamic ancestry specific allele frequency information as reported by authors (e.g. first row from PGS000662):
+    Implementation notes:
+
+        - You should instantiate effect weight fields with strings (e.g. with csv.reader, which returns data as a list of strings)
+
+        - The model always handles effect weights internally as strings and will coerce numeric input to strings when instantiated
+
+        - Our string obsession comes from a desire to faithfully reproduce author submitted data and avoid introducing precision errors
+
+    Extra / dynamically named fields:
+
+    Only one type of dynamic field is supported. Ancestry specific allele frequency information uses labels defined by authors.
+
+    An example from the first row from PGS000662:
 
     >>> variant_with_allelefrequency = {"chr_name": "1", "chr_position": 5743196, "effect_allele": "T", "other_allele": "C", "effect_weight": 0.102298257, "allelefrequency_effect_European": 0.067, "allelefrequency_effect_African": 0.439, "allelefrequency_effect_Asian": 0.113, "allelefrequency_effect_Hispanic": 0.157}
     >>> CatalogScoreVariant(**variant_with_allelefrequency)  # doctest: +ELLIPSIS
     CatalogScoreVariant(rsID=None, chr_name='1', chr_position=5743196..., allelefrequency_effect_European=0.067, allelefrequency_effect_African=0.439, allelefrequency_effect_Asian=0.113, allelefrequency_effect_Hispanic=0.157, ...)
+
+    Extra field names which don't follow the pattern "allelefrequency_effect_{label}" will raise a ValueError:
 
     >>> bad_extra_fields = variant_with_allelefrequency | {"favourite_ice_cream": "vanilla"}
     >>> CatalogScoreVariant(**bad_extra_fields)
@@ -188,6 +203,9 @@ class CatalogScoreVariant(BaseModel):
 
     # weight information
     # all effect weight fields are handled as strings internally to faithfully reproduce author-uploaded scores (i.e. avoid any floating point errors)
+    # weight fields are validated by effect_weight_must_float and check_effect_weights
+    # note: string coercion only happens if class is instantiated with numeric data
+    # to avoid precision errors, always instantiate with strings, e.g. csv.reader which always return a list of strings
     effect_weight: Optional[str] = Field(
         default=None,
         title="Variant Weight",
@@ -315,8 +333,9 @@ class CatalogScoreVariant(BaseModel):
         "dosage_2_weight",
     )
 
+    # these computed fields provide convenient properties e.g. when normalising variants
     @computed_field  # type: ignore
-    @cached_property
+    @property
     def variant_id(self) -> str:
         """ID = chr:pos:effect_allele:other_allele"""
         return ":".join(
@@ -327,7 +346,7 @@ class CatalogScoreVariant(BaseModel):
         )
 
     @computed_field  # type: ignore
-    @cached_property
+    @property
     def is_harmonised(self) -> bool:
         # simple check: do any of the harmonised columns have data?
         for x in self.harmonised_columns:
@@ -336,7 +355,7 @@ class CatalogScoreVariant(BaseModel):
         return False
 
     @computed_field  # type: ignore
-    @cached_property
+    @property
     def is_complex(self) -> bool:
         is_complex = not getattr(self.effect_allele, "is_snp", False)
         for x in self.complex_columns:
@@ -346,7 +365,7 @@ class CatalogScoreVariant(BaseModel):
         return is_complex
 
     @computed_field  # type: ignore
-    @cached_property
+    @property
     def is_non_additive(self) -> bool:
         if self.effect_weight is not None:
             # if there's an effect weight value, we can work with it
@@ -359,7 +378,7 @@ class CatalogScoreVariant(BaseModel):
         return non_additive
 
     @computed_field  # type: ignore
-    @cached_property
+    @property
     def effect_type(self) -> EffectType:
         match (self.is_recessive, self.is_dominant, self.is_non_additive):
             case False, False, False:
@@ -377,24 +396,9 @@ class CatalogScoreVariant(BaseModel):
 
         return effect
 
-    @field_validator("rsID", mode="after")
-    @classmethod
-    def check_rsid_format(cls, rsid: Optional[str]) -> Optional[str]:
-        if rsid is None or rsid == ".":
-            return None
-        if rsid.startswith("rs") or rsid.startswith("ss") or rsid.startswith("HLA"):
-            return rsid
-        else:
-            raise ValueError("rsid field must start with rs or ss or HLA")
-
-    @field_validator(
-        "effect_weight", "dosage_0_weight", "dosage_1_weight", "dosage_2_weight"
-    )
-    @classmethod
-    def effect_weight_must_float(cls, weight: str) -> str:
-        _ = float(weight)  # will raise a ValueError if conversion fails
-        return weight
-
+    # start validating individual fields from here (happens before model validation)
+    # ordered by mode: "before" field validators work with raw data (e.g. strings/ints)
+    # "after" field validators work with fields that are the correct type
     @field_validator(
         "effect_allele", "other_allele", "hm_inferOtherAllele", mode="before"
     )
@@ -425,6 +429,42 @@ class CatalogScoreVariant(BaseModel):
             return None
         return v
 
+    @field_validator("rsID", mode="after")
+    @classmethod
+    def check_rsid_format(cls, rsid: Optional[str]) -> Optional[str]:
+        if rsid == ".":
+            rsid = None
+
+        if (
+            rsid is None
+            or rsid.startswith("rs")
+            or rsid.startswith("ss")
+            or rsid.startswith("HLA")
+        ):
+            return rsid
+        else:
+            raise ValueError("rsid field must start with rs or ss or HLA")
+
+    @field_validator(
+        "effect_weight",
+        "dosage_0_weight",
+        "dosage_1_weight",
+        "dosage_2_weight",
+        mode="after",
+    )
+    @classmethod
+    def effect_weight_must_float(cls, weight: str) -> str:
+        # reminder: weight fields default to None because check_effect_weights validates the model after instantiation
+        # default values for fields are never validated
+        # but any non-default value is validated, and must be coercible to float
+        try:
+            _ = float(weight)  # will raise a ValueError if conversion fails
+        except TypeError:
+            # field validators _must_ raise ValueErrors
+            raise ValueError("Can't convert value to float")
+        return weight
+
+    # start validating the entire model now (i.e. after instantiation, all fields are set)
     @model_validator(mode="after")
     def check_extra_fields(self) -> Self:
         """Only allelefrequency_effect_{ancestry} is supported as an extra field
