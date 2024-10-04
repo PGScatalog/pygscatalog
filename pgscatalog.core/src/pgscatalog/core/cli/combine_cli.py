@@ -8,7 +8,7 @@ from typing import Optional
 
 from tqdm import tqdm
 
-from ..lib.models import ScoreLog, ScoreLogs, ScoreVariant
+from ..lib.models import ScoreLog, ScoreLogs, ScoreVariant, VariantLog
 from ..lib import GenomeBuild, ScoringFile, EffectTypeError
 
 from ._combine import TextFileWriter
@@ -53,9 +53,13 @@ def _combine(
         writer.write(dumped_variants)
         logger.info("Finished writing")
     finally:
+        variant_logs: Optional[list[VariantLog]] = None
+        if dumped_variants is not None:
+            variant_logs = [VariantLog(**x) for x in dumped_variants]
+
         log: ScoreLog = ScoreLog(
             header=scorefile.header,
-            variant_sources=dumped_variants,
+            variant_logs=variant_logs,
             compatible_effect_type=is_compatible,
         )
         if log.variants_are_missing:

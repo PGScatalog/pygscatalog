@@ -7,12 +7,14 @@ Best way to reuse:
   * `import pgscatalog.core` and use fully qualified name: `pgscatalog.core.models.CatalogScoreVariant`)
 
 """
+
 import enum
 import itertools
 import pathlib
 from datetime import date
 from functools import cached_property
-from typing import ClassVar, Optional, Union, Any, Literal
+from typing import ClassVar, Optional, Union, Any, Annotated
+
 from typing_extensions import Self
 
 from pydantic import (
@@ -168,191 +170,264 @@ class CatalogScoreVariant(BaseModel):
     )  # extra fields are checked by a model validator
 
     # variant description
-    rsID: Optional[str] = Field(
-        default=None,
-        title="dbSNP Accession ID (rsID)",
-        description="The SNP’s rs ID. This column also contains HLA alleles in the standard notation (e.g. HLA-DQA1*0102) that aren’t always provided with chromosomal positions.",
-    )
-    chr_name: Optional[str] = Field(
-        default=None,
-        title="Location - Chromosome ",
-        description="Chromosome name/number associated with the variant.",
-        coerce_numbers_to_str=True,
-    )
-    chr_position: Optional[int] = Field(
-        default=None,
-        title="Location within the Chromosome",
-        description="Chromosomal position associated with the variant.",
-        gt=0,
-    )
-    effect_allele: Optional[Allele] = Field(
-        default=None,
-        title="Effect Allele",
-        description="The allele that's dosage is counted (e.g. {0, 1, 2}) and multiplied by the variant's weight (effect_weight) when calculating score. The effect allele is also known as the 'risk allele'. Note: this does not necessarily need to correspond to the minor allele/alternative allele.",
-    )
-    other_allele: Optional[Allele] = Field(
-        default=None,
-        title="Other allele(s)",
-        description="The other allele(s) at the loci. Note: this does not necessarily need to correspond to the reference allele.",
-    )
-    locus_name: Optional[str] = Field(
-        default=None,
-        title="Locus Name",
-        description="This is kept in for loci where the variant may be referenced by the gene (APOE e4). It is also common (usually in smaller PGS) to see the variants named according to the genes they impact.",
-    )
-    is_haplotype: Optional[bool] = Field(
-        default=False,
-        title="FLAG: Haplotype",
-        description="This is a TRUE/FALSE variable that flags whether the effect allele is a haplotype/diplotype rather than a single SNP. Constituent SNPs in the haplotype are semi-colon separated.",
-    )
-    is_diplotype: Optional[bool] = Field(
-        default=False,
-        title="FLAG: Diplotype",
-        description="This is a TRUE/FALSE variable that flags whether the effect allele is a haplotype/diplotype rather than a single SNP. Constituent SNPs in the haplotype are semi-colon separated.",
-    )
-    imputation_method: Optional[str] = Field(
-        default=None,
-        title="Imputation Method",
-        description="This described whether the variant was specifically called with a specific imputation or variant calling method. This is mostly kept to describe HLA-genotyping methods (e.g. flag SNP2HLA, HLA*IMP) that gives alleles that are not referenced by genomic position.",
-    )
-    variant_description: Optional[str] = Field(
-        default=None,
-        title="Variant Description",
-        description="This field describes any extra information about the variant (e.g. how it is genotyped or scored) that cannot be captured by the other fields.",
-    )
-    inclusion_criteria: Optional[str] = Field(
-        default=None,
-        title="Score Inclusion Criteria",
-        description="Explanation of when this variant gets included into the PGS (e.g. if it depends on the results from other variants).",
-    )
+    rsID: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="dbSNP Accession ID (rsID)",
+            description="The SNP’s rs ID. This column also contains HLA alleles in the standard notation (e.g. HLA-DQA1*0102) that aren’t always provided with chromosomal positions.",
+        ),
+    ]
+    chr_name: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Location - Chromosome ",
+            description="Chromosome name/number associated with the variant.",
+            coerce_numbers_to_str=True,
+        ),
+    ]
+    chr_position: Annotated[
+        Optional[int],
+        Field(
+            default=None,
+            title="Location within the Chromosome",
+            description="Chromosomal position associated with the variant.",
+            gt=0,
+        ),
+    ]
+    effect_allele: Annotated[
+        Optional[Allele],
+        Field(
+            default=None,
+            title="Effect Allele",
+            description="The allele that's dosage is counted (e.g. {0, 1, 2}) and multiplied by the variant's weight (effect_weight) when calculating score. The effect allele is also known as the 'risk allele'. Note: this does not necessarily need to correspond to the minor allele/alternative allele.",
+        ),
+    ]
+    other_allele: Annotated[
+        Optional[Allele],
+        Field(
+            default=None,
+            title="Other allele(s)",
+            description="The other allele(s) at the loci. Note: this does not necessarily need to correspond to the reference allele.",
+        ),
+    ]
+    locus_name: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Locus Name",
+            description="This is kept in for loci where the variant may be referenced by the gene (APOE e4). It is also common (usually in smaller PGS) to see the variants named according to the genes they impact.",
+        ),
+    ]
+    is_haplotype: Annotated[
+        Optional[bool],
+        Field(
+            default=False,
+            title="FLAG: Haplotype",
+            description="This is a TRUE/FALSE variable that flags whether the effect allele is a haplotype/diplotype rather than a single SNP. Constituent SNPs in the haplotype are semi-colon separated.",
+        ),
+    ]
+    is_diplotype: Annotated[
+        Optional[bool],
+        Field(
+            default=False,
+            title="FLAG: Diplotype",
+            description="This is a TRUE/FALSE variable that flags whether the effect allele is a haplotype/diplotype rather than a single SNP. Constituent SNPs in the haplotype are semi-colon separated.",
+        ),
+    ]
+    imputation_method: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Imputation Method",
+            description="This described whether the variant was specifically called with a specific imputation or variant calling method. This is mostly kept to describe HLA-genotyping methods (e.g. flag SNP2HLA, HLA*IMP) that gives alleles that are not referenced by genomic position.",
+        ),
+    ]
+    variant_description: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Variant Description",
+            description="This field describes any extra information about the variant (e.g. how it is genotyped or scored) that cannot be captured by the other fields.",
+        ),
+    ]
+    inclusion_criteria: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Score Inclusion Criteria",
+            description="Explanation of when this variant gets included into the PGS (e.g. if it depends on the results from other variants).",
+        ),
+    ]
 
     # weight information
     # all effect weight fields are handled as strings internally to faithfully reproduce author-uploaded scores (i.e. avoid any floating point errors)
     # weight fields are validated by effect_weight_must_float and check_effect_weights
     # note: string coercion only happens if class is instantiated with numeric data
     # to avoid precision errors, always instantiate with strings, e.g. csv.reader which always return a list of strings
-    effect_weight: Optional[str] = Field(
-        default=None,
-        title="Variant Weight",
-        description="Value of the effect that is multiplied by the dosage of the effect allele (effect_allele) when calculating the score. Additional information on how the effect_weight was derived is in the weight_type field of the header, and score development method in the metadata downloads.",
-        coerce_numbers_to_str=True,
-    )
-    is_interaction: Optional[bool] = Field(
-        default=False,
-        title="FLAG: Interaction",
-        description="This is a TRUE/FALSE variable that flags whether the weight should be multiplied with the dosage of more than one variant. Interactions are demarcated with a _x_ between entries for each of the variants present in the interaction.",
-    )
-    is_dominant: Optional[bool] = Field(
-        default=False,
-        title="FLAG: Dominant Inheritance Model",
-        description="This is a TRUE/FALSE variable that flags whether the weight should be added to the PGS sum if there is at least 1 copy of the effect allele (e.g. it is a dominant allele).",
-    )
-    is_recessive: Optional[bool] = Field(
-        default=False,
-        title="FLAG: Recessive Inheritance Model",
-        description="This is a TRUE/FALSE variable that flags whether the weight should be added to the PGS sum only if there are 2 copies of the effect allele (e.g. it is a recessive allele).",
-    )
-    dosage_0_weight: Optional[str] = Field(
-        default=None,
-        title="Effect weight with 0 copy of the effect allele",
-        description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
-        coerce_numbers_to_str=True,
-    )
-    dosage_1_weight: Optional[str] = Field(
-        default=None,
-        title="Effect weight with 1 copy of the effect allele",
-        description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
-        coerce_numbers_to_str=True,
-    )
-    dosage_2_weight: Optional[str] = Field(
-        default=None,
-        title="Effect weight with 2 copies of the effect allele",
-        description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
-        coerce_numbers_to_str=True,
-    )
+    effect_weight: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Variant Weight",
+            description="Value of the effect that is multiplied by the dosage of the effect allele (effect_allele) when calculating the score. Additional information on how the effect_weight was derived is in the weight_type field of the header, and score development method in the metadata downloads.",
+            coerce_numbers_to_str=True,
+        ),
+    ]
+    is_interaction: Annotated[
+        Optional[bool],
+        Field(
+            default=False,
+            title="FLAG: Interaction",
+            description="This is a TRUE/FALSE variable that flags whether the weight should be multiplied with the dosage of more than one variant. Interactions are demarcated with a _x_ between entries for each of the variants present in the interaction.",
+        ),
+    ]
+    is_dominant: Annotated[
+        Optional[bool],
+        Field(
+            default=False,
+            title="FLAG: Dominant Inheritance Model",
+            description="This is a TRUE/FALSE variable that flags whether the weight should be added to the PGS sum if there is at least 1 copy of the effect allele (e.g. it is a dominant allele).",
+        ),
+    ]
+    is_recessive: Annotated[
+        Optional[bool],
+        Field(
+            default=False,
+            title="FLAG: Recessive Inheritance Model",
+            description="This is a TRUE/FALSE variable that flags whether the weight should be added to the PGS sum only if there are 2 copies of the effect allele (e.g. it is a recessive allele).",
+        ),
+    ]
+    dosage_0_weight: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Effect weight with 0 copy of the effect allele",
+            description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
+            coerce_numbers_to_str=True,
+        ),
+    ]
+    dosage_1_weight: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Effect weight with 1 copy of the effect allele",
+            description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
+            coerce_numbers_to_str=True,
+        ),
+    ]
+    dosage_2_weight: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Effect weight with 2 copies of the effect allele",
+            description="Weights that are specific to different dosages of the effect_allele (e.g. {0, 1, 2} copies) can also be reported when the the contribution of the variants to the score is not encoded as additive, dominant, or recessive. In this case three columns are added corresponding to which variant weight should be applied for each dosage, where the column name is formated as dosage_#_weight where the # sign indicates the number of effect_allele copies.",
+            coerce_numbers_to_str=True,
+        ),
+    ]
 
     # other information
-    OR: Optional[float] = Field(
-        default=None,
-        title="Odds Ratio",
-        description="Author-reported effect sizes can be supplied to the Catalog. If no other effect_weight is given the weight is calculated using the log(OR) or log(HR).",
-    )
-    HR: Optional[float] = Field(
-        default=None,
-        title="Hazard Ratio",
-        description="Author-reported effect sizes can be supplied to the Catalog. If no other effect_weight is given the weight is calculated using the log(OR) or log(HR).",
-    )
-    allelefrequency_effect: Optional[float] = Field(
-        default=None,
-        title="Effect Allele Frequency",
-        description="Reported effect allele frequency, if the associated locus is a haplotype then haplotype frequency will be extracted.",
-    )
+    OR: Annotated[
+        Optional[float],
+        Field(
+            default=None,
+            title="Odds Ratio",
+            description="Author-reported effect sizes can be supplied to the Catalog. If no other effect_weight is given the weight is calculated using the log(OR) or log(HR).",
+        ),
+    ]
+    HR: Annotated[
+        Optional[float],
+        Field(
+            default=None,
+            title="Hazard Ratio",
+            description="Author-reported effect sizes can be supplied to the Catalog. If no other effect_weight is given the weight is calculated using the log(OR) or log(HR).",
+        ),
+    ]
+    allelefrequency_effect: Annotated[
+        Optional[float],
+        Field(
+            default=None,
+            title="Effect Allele Frequency",
+            description="Reported effect allele frequency, if the associated locus is a haplotype then haplotype frequency will be extracted.",
+            ge=0,
+        ),
+    ]
 
     # harmonised files - additional columns
-    hm_source: Optional[str] = Field(
-        default=None,
-        title="Provider of the harmonized variant information",
-        description="Data source of the variant position. Options include: ENSEMBL, liftover, author-reported (if being harmonized to the same build).",
-    )
-    hm_rsID: Optional[str] = Field(
-        default=None,
-        title="Harmonized rsID",
-        description="Current rsID. Differences between this column and the author-reported column (rsID) indicate variant merges and annotation updates from dbSNP.",
-    )
-    hm_chr: Optional[str] = Field(
-        default=None,
-        title="Harmonized chromosome name",
-        description="Chromosome that the harmonized variant is present on, preferring matches to chromosomes over patches present in later builds.",
-    )
-    hm_pos: Optional[int] = Field(
-        ge=0,
-        default=None,
-        title="Harmonized chromosome position",
-        description="Chromosomal position (base pair location) where the variant is located, preferring matches to chromosomes over patches present in later builds.",
-    )
-    hm_inferOtherAllele: Optional[Allele] = Field(
-        default=None,
-        title="Harmonized other alleles",
-        description="If only the effect_allele is given we attempt to infer the non-effect/other allele(s) using Ensembl/dbSNP alleles.",
-    )
-    hm_match_chr: Optional[bool] = Field(
-        default=None,
-        title="FLAG: matching chromosome name",
-        description="Used for QC. Only provided if the scoring file is being harmonized to the same genome build, and where the chromosome name is provided in the column chr_name.",
-    )
-    hm_match_pos: Optional[bool] = Field(
-        default=None,
-        title="FLAG: matching chromosome position",
-        description="Used for QC. Only provided if the scoring file is being harmonized to the same genome build, and where the chromosome name is provided in the column chr_position.",
-    )
-    variant_type: Optional[VariantType] = Field(
-        default=None, title="Complex alleles only: how is the variant name formatted?"
-    )
+    hm_source: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Provider of the harmonized variant information",
+            description="Data source of the variant position. Options include: ENSEMBL, liftover, author-reported (if being harmonized to the same build).",
+        ),
+    ]
+    hm_rsID: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Harmonized rsID",
+            description="Current rsID. Differences between this column and the author-reported column (rsID) indicate variant merges and annotation updates from dbSNP.",
+        ),
+    ]
+    hm_chr: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            title="Harmonized chromosome name",
+            description="Chromosome that the harmonized variant is present on, preferring matches to chromosomes over patches present in later builds.",
+        ),
+    ]
+    hm_pos: Annotated[
+        Optional[int],
+        Field(
+            ge=0,
+            default=None,
+            title="Harmonized chromosome position",
+            description="Chromosomal position (base pair location) where the variant is located, preferring matches to chromosomes over patches present in later builds.",
+        ),
+    ]
+    hm_inferOtherAllele: Annotated[
+        Optional[Allele],
+        Field(
+            default=None,
+            title="Harmonized other alleles",
+            description="If only the effect_allele is given we attempt to infer the non-effect/other allele(s) using Ensembl/dbSNP alleles.",
+        ),
+    ]
+    hm_match_chr: Annotated[
+        Optional[bool],
+        Field(
+            default=None,
+            title="FLAG: matching chromosome name",
+            description="Used for QC. Only provided if the scoring file is being harmonized to the same genome build, and where the chromosome name is provided in the column chr_name.",
+        ),
+    ]
+    hm_match_pos: Annotated[
+        Optional[bool],
+        Field(
+            default=None,
+            title="FLAG: matching chromosome position",
+            description="Used for QC. Only provided if the scoring file is being harmonized to the same genome build, and where the chromosome name is provided in the column chr_position.",
+        ),
+    ]
+    variant_type: Annotated[
+        Optional[VariantType],
+        Field(
+            default=None,
+            title="Complex alleles only: how is the variant name formatted?",
+        ),
+    ]
 
     # helpful class attributes (not used by pydantic to instantiate a class)
-    harmonised_columns: ClassVar[
-        tuple[Literal["hm_rsID"], Literal["hm_chr"], Literal["hm_pos"]]
-    ] = (
-        "hm_rsID",
-        "hm_chr",
-        "hm_pos",
-    )  # it's OK if (""hm_source", "hm_inferOtherAllele", "hm_match_chr", "hm_match_pos") are missing
-    complex_columns: ClassVar[
-        tuple[
-            Literal["is_haplotype"], Literal["is_diplotype"], Literal["is_interaction"]
-        ]
-    ] = (
+    harmonised_columns: ClassVar[tuple[str, str, str]] = ("hm_rsID", "hm_chr", "hm_pos")
+    complex_columns: ClassVar[tuple[str, str, str]] = (
         "is_haplotype",
         "is_diplotype",
         "is_interaction",
     )
-    non_additive_columns: ClassVar[
-        tuple[
-            Literal["dosage_0_weight"],
-            Literal["dosage_1_weight"],
-            Literal["dosage_2_weight"],
-        ]
-    ] = (
+    non_additive_columns: ClassVar[tuple[str, str, str]] = (
         "dosage_0_weight",
         "dosage_1_weight",
         "dosage_2_weight",
@@ -492,21 +567,25 @@ class CatalogScoreVariant(BaseModel):
     def check_extra_fields(self) -> Self:
         """Only allelefrequency_effect_{ancestry} is supported as an extra field
         {ancestry} is dynamic and set by submitters"""
-        extra: list[str] = list(self.model_extra.keys())
-        if extra:
-            field_match: list[bool] = [
-                x.startswith("allelefrequency_effect_") for x in extra
-            ]
-            if not all(field_match):
-                bad_extra_fields: list[str] = list(
-                    itertools.compress(extra, [not x for x in field_match])
-                )
-                raise ValueError(f"Invalid extra fields detected: {bad_extra_fields}")
-            else:
-                for field in extra:
-                    # make sure allele frequency is a float or raise a value error
-                    allelefrequency: float = float(getattr(self, field))
-                    setattr(self, field, allelefrequency)
+        if self.model_extra is not None:
+            extra: list[str] = list(self.model_extra.keys())
+
+            if extra:
+                field_match: list[bool] = [
+                    x.startswith("allelefrequency_effect_") for x in extra
+                ]
+                if not all(field_match):
+                    bad_extra_fields: list[str] = list(
+                        itertools.compress(extra, [not x for x in field_match])
+                    )
+                    raise ValueError(
+                        f"Invalid extra fields detected: {bad_extra_fields}"
+                    )
+                else:
+                    for field in extra:
+                        # make sure allele frequency is a float or raise a value error
+                        allelefrequency: float = float(getattr(self, field))
+                        setattr(self, field, allelefrequency)
 
         return self
 
@@ -604,31 +683,28 @@ class ScoreVariant(CatalogScoreVariant):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    row_nr: int = Field(
-        title="Row number",
-        description="Row number of variant in scoring file (first variant = 0)",
-    )
-    accession: str = Field(title="Accession", description="Accession of score variant")
-    is_duplicated: Optional[bool] = Field(
-        default=False,
-        title="Duplicated variant",
-        description="In a list of variants with the same accession, is ID duplicated?",
-    )
+    row_nr: Annotated[
+        int,
+        Field(
+            title="Row number",
+            description="Row number of variant in scoring file (first variant = 0)",
+            ge=0,
+        ),
+    ]
+    accession: Annotated[
+        str, Field(title="Accession", description="Accession of score variant")
+    ]
+    is_duplicated: Annotated[
+        Optional[bool],
+        Field(
+            default=False,
+            title="Duplicated variant",
+            description="In a list of variants with the same accession, is ID duplicated?",
+        ),
+    ]
 
     # column names for output are used by __iter__ and when writing out
-    output_fields: ClassVar[
-        tuple[
-            Literal["chr_name"],
-            Literal["chr_position"],
-            Literal["effect_allele"],
-            Literal["other_allele"],
-            Literal["effect_weight"],
-            Literal["effect_type"],
-            Literal["is_duplicated"],
-            Literal["accession"],
-            Literal["row_nr"],
-        ]
-    ] = (
+    output_fields: ClassVar[tuple[str, ...]] = (
         "chr_name",
         "chr_position",
         "effect_allele",
@@ -668,11 +744,11 @@ class ScoreHeader(BaseModel):
     77
     """
 
-    pgs_id: str = Field(title="PGS identifier")
-    pgs_name: Optional[str] = Field(description="PGS name", default=None)
-    trait_reported: str = Field(description="Trait name")
+    pgs_id: Annotated[str, Field(title="PGS identifier")]
+    pgs_name: Annotated[Optional[str], Field(description="PGS name", default=None)]
+    trait_reported: Annotated[str, Field(description="Trait name")]
     # genome build is Optional because "NR" is represented internally as None
-    genome_build: Optional[GenomeBuild] = Field(description="Genome build")
+    genome_build: Annotated[Optional[GenomeBuild], Field(description="Genome build")]
 
     _path: Optional[pathlib.Path]
 
@@ -750,33 +826,39 @@ class CatalogScoreHeader(ScoreHeader):
     """
 
     format_version: ScoreFormatVersion
-    trait_mapped: list[str] = Field(description="Trait name")
-    trait_efo: list[str] = Field(
-        description="Ontology trait name, e.g. 'breast carcinoma"
-    )
-    variants_number: int = Field(
-        gt=0, description="Number of variants listed in the PGS", default=None
-    )
+    trait_mapped: Annotated[list[str], Field(description="Trait name")]
+    trait_efo: Annotated[
+        list[str], Field(description="Ontology trait name, e.g. 'breast carcinoma")
+    ]
+    variants_number: Annotated[
+        int,
+        Field(gt=0, description="Number of variants listed in the PGS", default=None),
+    ]
     # note: we'll make sure to serialise None values here and in genome_build as string "NR"
-    weight_type: Optional[str] = Field(description="Variant weight type", default=None)
+    weight_type: Annotated[
+        Optional[str], Field(description="Variant weight type", default=None)
+    ]
 
     ##SOURCE INFORMATION
     pgp_id: str
     citation: str
     ##HARMONIZATION DETAILS
-    HmPOS_build: Optional[GenomeBuild] = Field(default=None)
-    HmPOS_date: Optional[date] = Field(default=None)
-    HmPOS_match_pos: Optional[str] = Field(default=None)
-    HmPOS_match_chr: Optional[str] = Field(default=None)
+    HmPOS_build: Annotated[Optional[GenomeBuild], Field(default=None)]
+    HmPOS_date: Annotated[Optional[date], Field(default=None)]
+    HmPOS_match_pos: Annotated[Optional[str], Field(default=None)]
+    HmPOS_match_chr: Annotated[Optional[str], Field(default=None)]
 
     # note: only included when different from default
-    license: Optional[str] = Field(
-        "PGS obtained from the Catalog should be cited appropriately, and "
-        "used in accordance with any licensing restrictions set by the authors. See "
-        "EBI Terms of Use (https://www.ebi.ac.uk/about/terms-of-use/) for additional "
-        "details.",
-        repr=False,
-    )
+    license: Annotated[
+        Optional[str],
+        Field(
+            "PGS obtained from the Catalog should be cited appropriately, and "
+            "used in accordance with any licensing restrictions set by the authors. See "
+            "EBI Terms of Use (https://www.ebi.ac.uk/about/terms-of-use/) for additional "
+            "details.",
+            repr=False,
+        ),
+    ]
 
     @field_validator("trait_mapped", "trait_efo", mode="before")
     @classmethod
@@ -840,12 +922,27 @@ class CatalogScoreHeader(ScoreHeader):
             return True
 
 
+class VariantLog(BaseModel):
+    """This model consists of variant-level statistics we need to summarise in the ScoreLog
+
+    Can't just reuse ScoreVariants because failed harmonisation can create invalid ScoreVariants (e.g. missing genomic coordinates)
+
+    If ScoreLogs are composed of ScoreVariants then the data would be revalidated on instantiation and raise ValidationErrors
+
+    Instead, just create VariantLogs from a subset of ScoreVariant fields
+    """
+
+    hm_source: Optional[str] = None
+    is_complex: bool
+
+
 class ScoreLog(BaseModel):
     """A log that includes header information and variant summary statistics
 
     >>> header = CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=ScoreFormatVersion.v2, trait_mapped='breast carcinoma', trait_efo='EFO_0000305', variants_number=77, weight_type="NR", pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build="GRCh38", HmPOS_date="2022-07-29")
     >>> harmonised_variant = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "HLA-DQ", "effect_weight": 0.5, "hm_chr": "1", "hm_pos": 1, "hm_rsID": "rs1921", "hm_source": "ENSEMBL",  "row_nr": 0, "accession": "test"})
-    >>> scorelog = ScoreLog(header=header, compatible_effect_type=True, variant_sources=[harmonised_variant.model_dump(include={"hm_source", "is_complex"})])  # doctest: +ELLIPSIS
+    >>> variant_log = harmonised_variant.model_dump(include={"hm_source", "is_complex"})
+    >>> scorelog = ScoreLog(header=header, compatible_effect_type=True, variant_logs=[VariantLog(**variant_log)])  # doctest: +ELLIPSIS
     >>> scorelog
     ScoreLog(header=CatalogScoreHeader(...), compatible_effect_type=True, has_complex_alleles=True, pgs_id='PGS000001', is_harmonised=True, sources=['ENSEMBL'])
 
@@ -877,11 +974,7 @@ class ScoreLog(BaseModel):
     header: Union[ScoreHeader, CatalogScoreHeader] = Field(
         description="Metadata from the scoring file header"
     )
-    # intentionally a vague type (dict) here to prevent revalidating ScoreVariants
-    # failed harmonisation can create ScoreVariants which make field and model validators sad
-    # e.g. missing genomic coordinates
-    # the dict must contain at least "hm_source" and "is_complex" keys
-    variant_sources: Optional[list[dict]] = Field(
+    variant_logs: Optional[list[VariantLog]] = Field(
         description="A list of variants associated with the header. Some may be filtered out during normalisation.",
         exclude=True,
         repr=False,
@@ -895,8 +988,8 @@ class ScoreLog(BaseModel):
     def has_complex_alleles(self) -> bool:
         """Do any variants contain complex alleles? e.g. HLA/APOE"""
         has_complex = False
-        if self.variant_sources is not None:
-            has_complex = any(x["is_complex"] for x in self.variant_sources)
+        if self.variant_logs is not None:
+            has_complex = any(x.is_complex for x in self.variant_logs)
         return has_complex
 
     @computed_field  # type: ignore
@@ -913,10 +1006,8 @@ class ScoreLog(BaseModel):
     @cached_property
     def sources(self) -> Optional[list[str]]:
         unique_sources: Optional[list[str]] = None
-        if self.variant_sources is not None:
-            sources: list[Optional[str]] = [
-                x.get("hm_source") for x in self.variant_sources
-            ]
+        if self.variant_logs is not None:
+            sources: list[Optional[str]] = [x.hm_source for x in self.variant_logs]
             filtered_sources = [x for x in sources if x is not None]
             if not filtered_sources:
                 unique_sources = None
@@ -927,8 +1018,8 @@ class ScoreLog(BaseModel):
     @property
     def n_actual_variants(self) -> Optional[int]:
         # this distinction is useful if variants have been filtered out
-        if self.variant_sources is not None:
-            return len(self.variant_sources)
+        if self.variant_logs is not None:
+            return len(self.variant_logs)
         else:
             return None
 
