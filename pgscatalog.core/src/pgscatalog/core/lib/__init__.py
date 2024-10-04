@@ -1,11 +1,15 @@
-from ._config import Config
-from .effecttype import EffectType
-from .genomebuild import GenomeBuild
-from .catalogapi import ScoreQueryResult, CatalogQuery, CatalogCategory
-from .scorefiles import ScoringFiles, ScoringFile
-from ._relabel import RelabelArgs, relabel, relabel_write
-from ._sortpaths import effect_type_keyfunc, chrom_keyfunc
-from .pgsexceptions import (
+from pgscatalog.core.lib._config import Config
+from pgscatalog.core.lib.effecttype import EffectType
+from pgscatalog.core.lib.genomebuild import GenomeBuild
+from pgscatalog.core.lib.catalogapi import (
+    ScoreQueryResult,
+    CatalogQuery,
+    CatalogCategory,
+)
+from pgscatalog.core.lib.scorefiles import ScoringFiles, ScoringFile
+from pgscatalog.core.lib._relabel import RelabelArgs, relabel, relabel_write
+from pgscatalog.core.lib._sortpaths import effect_type_keyfunc, chrom_keyfunc
+from pgscatalog.core.lib.pgsexceptions import (
     BasePGSException,
     MatchError,
     DuplicateMatchError,
@@ -26,7 +30,7 @@ from .pgsexceptions import (
     SamplesheetFormatError,
 )
 
-from . import models
+from pgscatalog.core.lib import models
 
 __all__ = [
     "BasePGSException",

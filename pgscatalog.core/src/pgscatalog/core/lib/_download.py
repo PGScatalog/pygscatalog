@@ -12,8 +12,8 @@ import urllib
 import tenacity
 import httpx
 
-from .pgsexceptions import ScoreDownloadError, ScoreChecksumError
-from ._config import Config
+from pgscatalog.core.lib.pgsexceptions import ScoreDownloadError, ScoreChecksumError
+from pgscatalog.core.lib._config import Config
 
 logger = logging.getLogger(__name__)
 

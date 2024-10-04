@@ -6,9 +6,9 @@ import logging
 import httpx
 import tenacity
 
-from .pgsexceptions import QueryError, InvalidAccessionError
-from .genomebuild import GenomeBuild
-from ._config import Config
+from pgscatalog.core.lib.pgsexceptions import QueryError, InvalidAccessionError
+from pgscatalog.core.lib.genomebuild import GenomeBuild
+from pgscatalog.core.lib._config import Config
 
 
 logger = logging.getLogger(__name__)

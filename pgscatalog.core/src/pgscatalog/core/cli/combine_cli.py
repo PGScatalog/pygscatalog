@@ -8,10 +8,10 @@ from typing import Optional
 
 from tqdm import tqdm
 
-from ..lib.models import ScoreLog, ScoreLogs, ScoreVariant, VariantLog
-from ..lib import GenomeBuild, ScoringFile, EffectTypeError
+from pgscatalog.core.lib.models import ScoreLog, ScoreLogs, ScoreVariant, VariantLog
+from pgscatalog.core.lib import GenomeBuild, ScoringFile, EffectTypeError
 
-from ._combine import TextFileWriter
+from pgscatalog.core.cli._combine import TextFileWriter
 
 logger = logging.getLogger(__name__)
 

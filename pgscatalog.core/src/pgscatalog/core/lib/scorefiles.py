@@ -10,17 +10,13 @@ import pathlib
 from pydantic import ValidationError
 from xopen import xopen
 
-from .models import ScoreHeader, CatalogScoreHeader
-from .catalogapi import ScoreQueryResult, CatalogQuery
-from ._normalise import normalise
-from ._download import https_download
-from ._config import Config
-from .pgsexceptions import ScoreFormatError
-from ._read import (
-    read_rows_lazy,
-    get_columns,
-    detect_wide,
-)
+from pgscatalog.core.lib import models
+from pgscatalog.core.lib.catalogapi import ScoreQueryResult, CatalogQuery
+from pgscatalog.core.lib._normalise import normalise
+from pgscatalog.core.lib._download import https_download
+from pgscatalog.core.lib._config import Config
+from pgscatalog.core.lib.pgsexceptions import ScoreFormatError
+from pgscatalog.core.lib._read import read_rows_lazy, get_columns, detect_wide
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +32,7 @@ class ScoringFile:
 
     You can make ``ScoringFiles`` with a path to a scoring file with minimal metadata:
 
-    >>> from ..lib import GenomeBuild
+    >>> from pgscatalog.core.lib.genomebuild import GenomeBuild
     >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "data" / "custom.txt")
     >>> sf # doctest: +ELLIPSIS
     ScoringFile('.../custom.txt', target_build=None)
@@ -83,7 +79,7 @@ class ScoringFile:
     ...     break
     Traceback (most recent call last):
     ...
-    core.lib.pgsexceptions.ScoreFormatError: Local file is missing. Did you .download()?
+    pgscatalog.core.lib.pgsexceptions.ScoreFormatError: Local file is missing. Did you .download()?
 
     A ``ScoringFile`` can also be constructed with a ``ScoreQueryResult`` if you want
     to be polite to the PGS Catalog API. Just add the ``query_result`` parameter:
@@ -99,7 +95,7 @@ class ScoringFile:
     ...     ScoringFile("potato", GenomeBuild.GRCh38).download(tmp_dir)
     Traceback (most recent call last):
     ...
-    core.lib.pgsexceptions.InvalidAccessionError: Invalid accession: 'potato'
+    pgscatalog.core.lib.pgsexceptions.InvalidAccessionError: Invalid accession: 'potato'
 
     The same exception is raised if you provide a well formatted identifier that doesn't exist:
 
@@ -107,7 +103,7 @@ class ScoringFile:
     ...     ScoringFile("PGS000000", GenomeBuild.GRCh38).download(tmp_dir)
     Traceback (most recent call last):
     ...
-    core.lib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGS000000'
+    pgscatalog.core.lib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGS000000'
     """
 
     def __init__(self, identifier, target_build=None, query_result=None, **kwargs):
@@ -120,14 +116,14 @@ class ScoringFile:
 
         try:
             # let's try parsing a PGS Catalog header
-            self._header = CatalogScoreHeader.from_path(self._identifier)
+            self._header = models.CatalogScoreHeader.from_path(self._identifier)
             logger.info(f"{identifier}: Valid PGS Catalog header")
             self.local_path = pathlib.Path(self._identifier)
             self._init_from_path(target_build=target_build)
         except ValidationError:
             logger.warning("PGS Catalog header not detected in scoring file")
             # that didn't work, let's try parsing a basic score header
-            self._header = ScoreHeader.from_path(self._identifier)
+            self._header = models.ScoreHeader.from_path(self._identifier)
             logger.info(f"{identifier}: Valid simple score header")
             self.local_path = pathlib.Path(self._identifier)
             self._init_from_path(target_build=target_build)
@@ -283,7 +279,7 @@ class ScoringFile:
         :returns: None
 
         >>> import tempfile, os
-        >>> from ..lib import GenomeBuild
+        >>> from pgscatalog.core.lib import GenomeBuild
 
         >>> with tempfile.TemporaryDirectory() as tmp_dir:
         ...     ScoringFile("PGS000001").download(tmp_dir)
@@ -390,7 +386,7 @@ class ScoringFiles:
 
     You can use publications or trait accessions to instantiate:
 
-    >>> from ..lib import GenomeBuild
+    >>> from pgscatalog.core.lib import GenomeBuild
     >>> ScoringFiles("PGP000001", target_build=GenomeBuild.GRCh37)
     ScoringFiles('PGS000001', 'PGS000002', 'PGS000003', target_build=GenomeBuild.GRCh37)
 
@@ -459,7 +455,7 @@ class ScoringFiles:
     >>> ScoringFiles("PGPpotato")
     Traceback (most recent call last):
     ...
-    core.lib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGPpotato'
+    pgscatalog.core.lib.pgsexceptions.InvalidAccessionError: No Catalog result for accession 'PGPpotato'
 
     Local files can also be used to instantiate :class:`ScoringFiles`:
 

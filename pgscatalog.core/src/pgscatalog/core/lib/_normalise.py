@@ -8,10 +8,10 @@ import pathlib
 
 import pyliftover
 
-from .genomebuild import GenomeBuild
-from .models import Allele
-from .pgsexceptions import LiftoverError, EffectTypeError
-from .effecttype import EffectType
+from pgscatalog.core.lib.genomebuild import GenomeBuild
+from pgscatalog.core.lib.models import Allele
+from pgscatalog.core.lib.pgsexceptions import LiftoverError, EffectTypeError
+from pgscatalog.core.lib.effecttype import EffectType
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ def check_duplicates(variants):
 def drop_hla(variants):
     """Drop HLA alleles from a list of ScoreVariants
 
-    >>> from .models import ScoreVariant
+    >>> from pgscatalog.core.lib.models import ScoreVariant
     >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(drop_hla([variant])) # doctest: +ELLIPSIS
     [ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), ...
@@ -127,7 +127,7 @@ def drop_hla(variants):
 def assign_other_allele(variants):
     """Check if there's more than one possible other allele, remove if true
 
-    >>> from .models import ScoreVariant
+    >>> from pgscatalog.core.lib.models import ScoreVariant
     >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "1", "effect_allele": "A", "effect_weight": 5, "other_allele": "A", "row_nr": 0, "accession": "test"})
     >>> list(assign_other_allele([variant]))[0] # doctest: +ELLIPSIS
     ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=Allele(allele='A', is_snp=True), ...)
@@ -154,7 +154,7 @@ def remap_harmonised(variants, harmonised, target_build):
     In this case chr_name, chr_position, and other allele are missing.
     Perhaps authors submitted rsID and effect allele originally:
 
-    >>> from .models import ScoreVariant
+    >>> from pgscatalog.core.lib.models import ScoreVariant
     >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "2", "effect_allele": "A", "effect_weight": 5, "accession": "test", "hm_chr": "1", "hm_pos": 100, "hm_rsID": "testrsid", "hm_inferOtherAllele": "A", "row_nr": 0})
     >>> variant
     ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=None, ...
@@ -184,11 +184,11 @@ def check_effect_allele(variants, drop_missing=False):
     """
     Odd effect allele:
 
-    >>> from .models import ScoreVariant
-    >>> variant = ScoreVariant(**{"effect_allele": "Z", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
+    >>> from pgscatalog.core.lib import models
+    >>> variant = models.ScoreVariant(**{"effect_allele": "Z", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(check_effect_allele([variant], drop_missing=True)) # doctest: +ELLIPSIS
     []
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
+    >>> variant = models.ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(check_effect_allele([variant], drop_missing=True)) # doctest: +ELLIPSIS
     [ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), ...)]
     """
@@ -273,7 +273,7 @@ def lift(
 def load_chain(*, current_build, target_build, chain_dir):
     """Only supports loading GRCh37 and GRCh38 chain files
 
-    >>> from ._config import Config
+    >>> from pgscatalog.core.lib import Config
     >>> chain_dir = Config.ROOT_DIR / "tests" / "data" / "chain"
     >>> load_chain(current_build=GenomeBuild.GRCh37, target_build=GenomeBuild.GRCh38, chain_dir=chain_dir) # doctest: +ELLIPSIS
     <pyliftover.liftover.LiftOver object at...

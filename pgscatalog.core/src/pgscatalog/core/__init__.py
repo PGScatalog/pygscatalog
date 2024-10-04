@@ -3,7 +3,7 @@
 import logging
 import importlib.metadata
 
-from .lib import (
+from pgscatalog.core.lib import (
     Config,
     ScoreQueryResult,
     CatalogQuery,

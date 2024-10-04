@@ -30,11 +30,14 @@ from pydantic import (
 )
 from xopen import xopen
 
-from ..lib import EffectType, GenomeBuild
+from pgscatalog.core.lib.genomebuild import GenomeBuild
+from pgscatalog.core.lib.effecttype import EffectType
 
 
 class Allele(BaseModel):
-    """A class that represents an allele found in PGS Catalog scoring files
+    """
+    A class that represents an allele found in PGS Catalog scoring files
+
     >>> simple_ea = Allele(**{"allele": "A"})
     >>> simple_ea
     Allele(allele='A', is_snp=True)

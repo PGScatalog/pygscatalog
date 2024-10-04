@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tqdm import tqdm
 
-from ..lib import ScoringFiles, GenomeBuild, Config
+from pgscatalog.core.lib import ScoringFiles, GenomeBuild, Config
 
 logger = logging.getLogger(__name__)
 

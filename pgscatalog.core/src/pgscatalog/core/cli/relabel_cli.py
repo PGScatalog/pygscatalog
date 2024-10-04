@@ -2,7 +2,7 @@ import argparse
 import logging
 import pathlib
 
-from ..lib import relabel, relabel_write, RelabelArgs
+from pgscatalog.core.lib import relabel, relabel_write, RelabelArgs
 
 logger = logging.getLogger(__name__)
 

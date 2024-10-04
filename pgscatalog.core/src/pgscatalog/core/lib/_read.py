@@ -6,7 +6,7 @@ from typing import Generator, Iterator
 
 from xopen import xopen
 
-from .models import ScoreVariant
+from pgscatalog.core.lib.models import ScoreVariant
 
 logger = logging.getLogger(__name__)
 
