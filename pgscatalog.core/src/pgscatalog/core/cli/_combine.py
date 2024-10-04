@@ -41,7 +41,6 @@ class TextFileWriter(DataWriter):
             logger.info("Writing with gzip")
             self.open_function = functools.partial(gzip.open, compresslevel=6)
         else:
-            logger.info("Writing text file")
             self.open_function = open
 
     def write(self, batch):
@@ -56,9 +55,11 @@ class TextFileWriter(DataWriter):
             )
             match mode:
                 case "wt":
+                    logger.info("Writing variants to new file")
                     writer.writeheader()
                     writer.writerows(batch)
                 case "at":
+                    logger.info("Appending variants to existing file")
                     writer.writerows(batch)
                 case _:
                     raise ValueError(f"Invalid {mode=}")
