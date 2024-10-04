@@ -29,15 +29,15 @@ def read_rows_lazy(
             ]
             for i, weight_name in zip(ew_col_idxs, [fields[i] for i in ew_col_idxs]):
                 yield ScoreVariant(
-                    **variant,
-                    **{
+                    **variant,  # type: ignore
+                    **{  # type: ignore
                         "accession": weight_name,
                         "row_nr": row_nr,
                         "effect_weight": variant[weight_name],
                     },
                 )
         else:
-            yield ScoreVariant(**variant, **{"accession": name, "row_nr": row_nr})
+            yield ScoreVariant(**variant, **{"accession": name, "row_nr": row_nr})  # type: ignore
 
         row_nr += 1
 
