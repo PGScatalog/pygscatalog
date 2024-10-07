@@ -5,8 +5,14 @@
 
 This Python package contains:
 
-* CLI applications to aggregate and adjust calculated PGS in the context of genetic ancestry similarity
+* CLI applications to aggregate and adjust calculated polygenic scores (PGS) in the context of genetic ancestry similarity
 * library classes and functions for working with calculated PGS and PCA data
+
+> [!NOTE]  
+> * This package doesn't contain functionality to calculate a PGS from target genomes and scoring files
+> * If you want software that does that, check out the [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc)
+> * This package is focused on PGS aggregation and normalisation, and is used internally by the PGS Catalog Calculator
+
 
 | Application                  | Description                                              | Link                                                                                |
 |------------------------------|----------------------------------------------------------|-------------------------------------------------------------------------------------|
@@ -14,8 +20,6 @@ This Python package contains:
 | `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/ancestry.html)  |
 
 If you want to write Python code to work with PGS data, the library may be helpful for you.
-
-Please note this package doesn't contain functionality to calculate a PGS from target genomes and scoring files. Instead, it's focused on aggregation and normalisation. If you want to do automatic PGS calculation check out the [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc), which uses these tools internally.
 
 ## Installation 
 
