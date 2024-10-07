@@ -42,7 +42,8 @@ def run():
         include_children=args.efo_include_children,
     )
 
-    with ThreadPoolExecutor() as executor:
+    # EBI FTP rate limits ~25 connections per IP
+    with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
         for scorefile in sfs:
             logger.info(f"Submitting {scorefile!r} download")
