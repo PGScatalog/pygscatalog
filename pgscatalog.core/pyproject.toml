@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pgscatalog.core"
-version = "0.2.2"
+version = "0.3.0"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 license = "Apache-2.0"
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
@@ -22,11 +22,13 @@ pyliftover = "^0.4"
 xopen = {version = "^1.8.0", extras = ["zstd"]}
 tqdm = "^4.66.1"
 natsort = "^8.4.0"
+pydantic = "^2.9.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"
 sphinx-autoapi = "^3.0.0"
 pytest-cov = "^4.1.0"
+mypy = "^1.11.2"
 
 [build-system]
 requires = ["poetry-core"]

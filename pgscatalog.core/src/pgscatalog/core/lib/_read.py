@@ -2,18 +2,23 @@
 These functions aren't really meant to be imported outside corelib"""
 
 import logging
-import pathlib
+from typing import Generator, Iterator
 
 from xopen import xopen
 
-from .scorevariant import ScoreVariant
+from .models import ScoreVariant
 
 logger = logging.getLogger(__name__)
 
 
 def read_rows_lazy(
-    *, csv_reader, fields: list[str], name: str, wide: bool, row_nr: int
-):
+    *,
+    csv_reader: Iterator[list[str]],
+    fields: list[str],
+    name: str,
+    wide: bool,
+    row_nr: int,
+) -> Generator[ScoreVariant, None, None]:
     """Read rows from an open scoring file and instantiate them as ScoreVariants"""
     for row in csv_reader:
         variant = dict(zip(fields, row))
@@ -24,34 +29,17 @@ def read_rows_lazy(
             ]
             for i, weight_name in zip(ew_col_idxs, [fields[i] for i in ew_col_idxs]):
                 yield ScoreVariant(
-                    **variant,
-                    **{
+                    **variant,  # type: ignore
+                    **{  # type: ignore
                         "accession": weight_name,
                         "row_nr": row_nr,
                         "effect_weight": variant[weight_name],
                     },
                 )
         else:
-            yield ScoreVariant(**variant, **{"accession": name, "row_nr": row_nr})
+            yield ScoreVariant(**variant, **{"accession": name, "row_nr": row_nr})  # type: ignore
 
         row_nr += 1
-
-
-def generate_header_lines(f):
-    """Header lines in a PGS Catalog scoring file are structured like:
-
-    #pgs_id=PGS000348
-    #pgs_name=PRS_PrCa
-
-    Files can be big, so we want to only read header lines and stop immediately
-    """
-    for line in f:
-        if line.startswith("#"):
-            if "=" in line:
-                yield line.strip()
-        else:
-            # stop reading lines
-            break
 
 
 def get_columns(path):
@@ -79,17 +67,3 @@ def detect_wide(cols: list[str]) -> bool:
         return True
     else:
         return False
-
-
-def read_header(path: pathlib.Path):
-    """Parses the header of a PGS Catalog format scoring file into a dictionary"""
-    header = {}
-
-    with xopen(path, "rt") as f:
-        header_text = generate_header_lines(f)
-
-        for item in header_text:
-            key, value = item.split("=")
-            header[key[1:]] = value  # drop # character from key
-
-    return header

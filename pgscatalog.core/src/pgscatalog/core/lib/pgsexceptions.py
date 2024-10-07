@@ -105,6 +105,10 @@ class LiftoverError(CombineError):
     """Raised when liftover has failed to convert genomic coordinates well"""
 
 
+class EffectTypeError(CombineError):
+    """Raised when non-supported effect types are present"""
+
+
 class CatalogError(BasePGSException):
     """The base class for errors when querying or downloading from the PGS Catalog"""
 

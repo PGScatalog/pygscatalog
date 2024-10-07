@@ -9,8 +9,9 @@ import pathlib
 import pyliftover
 
 from .genomebuild import GenomeBuild
-from .scorevariant import EffectType, ScoreVariant, EffectAllele
-from .pgsexceptions import LiftoverError
+from .models import Allele
+from .pgsexceptions import LiftoverError, EffectTypeError
+from .effecttype import EffectType
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def normalise(
     if liftover:
         variants = lift(
             scoring_file=scoring_file,
-            harmonised=scoring_file.harmonised,
+            harmonised=scoring_file.is_harmonised,
             current_build=scoring_file.genome_build,
             target_build=target_build,
             chain_dir=chain_dir,
@@ -39,14 +40,12 @@ def normalise(
     else:
         variants = scoring_file.variants
 
-    variants = remap_harmonised(variants, scoring_file.harmonised, target_build)
-    variants = check_bad_variant(variants, drop_missing)
+    variants = remap_harmonised(variants, scoring_file.is_harmonised, target_build)
 
     if drop_missing:
         variants = drop_hla(variants)
 
-    variants = assign_effect_type(variants)
-    variants = check_effect_weight(variants)
+    variants = check_effect_type(variants)
     variants = assign_other_allele(variants)
     variants = check_effect_allele(variants, drop_missing)
     variants = detect_complex(variants)
@@ -58,6 +57,14 @@ def normalise(
     variants = check_duplicates(variants)
 
     return variants
+
+
+def check_effect_type(variants):
+    """Check for non-additive variants and complain if found"""
+    for variant in variants:
+        if variant.effect_type == EffectType.NONADDITIVE:
+            raise EffectTypeError(f"{variant.variant_id=} has unsupported effect type")
+        yield variant
 
 
 def check_duplicates(variants):
@@ -75,19 +82,11 @@ def check_duplicates(variants):
             seen_ids = {}
             current_accession = accession
 
-        # None other allele -> empty string
-        variant_id: str = ":".join(
-            [
-                str(getattr(variant, k) or "")
-                for k in ["chr_name", "chr_position", "effect_allele", "other_allele"]
-            ]
-        )
-
-        if variant_id in seen_ids:
+        if variant.variant_id in seen_ids:
             variant.is_duplicated = True
             n_duplicates += 1
 
-        seen_ids[variant_id] = True
+        seen_ids[variant.variant_id] = True
 
         yield variant
         n_variants += 1
@@ -101,18 +100,22 @@ def check_duplicates(variants):
 def drop_hla(variants):
     """Drop HLA alleles from a list of ScoreVariants
 
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
+    >>> from .models import ScoreVariant
+    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(drop_hla([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(effect_allele='A',...)]
+    [ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), ...
 
-    >>> variant = ScoreVariant(**{"effect_allele": "P", "effect_weight": 5, "accession": "test", "row_nr": 0})
+    >>> variant = ScoreVariant(**{"effect_allele": "P", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(drop_hla([variant]))
     []
     """
     n_dropped = 0
+    p = Allele(allele="P")
+    n = Allele(allele="N")
+
     for variant in variants:
         match variant:
-            case _ if variant.effect_allele in (EffectAllele("P"), EffectAllele("N")):
+            case _ if variant.effect_allele in (p, n):
                 n_dropped += 1
                 continue
             case _:
@@ -121,89 +124,27 @@ def drop_hla(variants):
     logger.warning(f"{n_dropped} HLA alleles detected and dropped")
 
 
-def check_effect_weight(variants):
-    """Check that effect weights are valid floats. Effect weights are intentionally
-    left as strings during processing.
-
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
-    >>> list(check_effect_weight([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(effect_allele='A',effect_weight=5,...)]
-
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": "potato", "accession": "test", "row_nr": 0})
-    >>> list(check_effect_weight([variant])) # doctest: +ELLIPSIS
-    Traceback (most recent call last):
-    ...
-    ValueError
-    """
-    for variant in variants:
-        try:
-            float(variant.effect_weight)
-        except ValueError as e:
-            logger.critical(f"{variant} has bad effect weight")
-            raise ValueError from e
-        else:
-            yield variant
-
-
 def assign_other_allele(variants):
     """Check if there's more than one possible other allele, remove if true
 
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "other_allele": "A"})
-    >>> list(assign_other_allele([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(effect_allele='A',...,other_allele='A',...)]
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "other_allele": "A/C"})
-    >>> list(assign_other_allele([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(effect_allele='A',...,other_allele=None,...)]
+    >>> from .models import ScoreVariant
+    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "1", "effect_allele": "A", "effect_weight": 5, "other_allele": "A", "row_nr": 0, "accession": "test"})
+    >>> list(assign_other_allele([variant]))[0] # doctest: +ELLIPSIS
+    ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=Allele(allele='A', is_snp=True), ...)
+    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "1", "effect_allele": "A", "effect_weight": 5, "other_allele": "A/C", "row_nr": 0, "accession": "test"})
+    >>> list(assign_other_allele([variant]))[0] # doctest: +ELLIPSIS
+    ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=None, ...)
     """
     n_dropped = 0
     for variant in variants:
-        try:
-            if "/" in variant.other_allele:
-                n_dropped += 1
-                variant.other_allele = None
-        except TypeError:
-            pass  # other allele is already missing
-        finally:
-            yield variant
+        if getattr(variant.other_allele, "has_multiple_alleles", False):
+            n_dropped += 1
+            variant.other_allele = None
+        yield variant
 
     if n_dropped > 0:
         logger.warning(f"Multiple other_alleles detected in {n_dropped} variants")
         logger.warning("Other allele for these variants is set to missing")
-
-
-def assign_effect_type(variants):
-    """Convert PGS Catalog effect type columns to EffectType enums
-
-    The most common type of effect type is additive:
-
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "False", "is_dominant": "False"})
-    >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(...,effect_type=EffectType.ADDITIVE,...)]
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "True", "is_dominant": "False"})
-    >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(...,effect_type=EffectType.RECESSIVE,...)]
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "is_recessive": "False", "is_dominant": "True"})
-    >>> list(assign_effect_type([variant])) # doctest: +ELLIPSIS
-    [ScoreVariant(...,effect_type=EffectType.DOMINANT,...)]
-
-    is_recessive and is_dominant fields are parsed from strings to bools during __init__.
-    """
-    for variant in variants:
-        match (variant.is_recessive, variant.is_dominant):
-            case (None, None) | (False, False) | (None, False) | (False, None):
-                # none is OK because is_recessive or is_dominant column may be missing
-                # default value is already set to additive, so just yield the variant
-                pass
-            case (False, True) | (None, True):
-                # none is OK because is_recessive column may be missing
-                variant.effect_type = EffectType.DOMINANT
-            case (True, False) | (True, None):
-                # none is OK because is_dominant column may be missing
-                variant.effect_type = EffectType.RECESSIVE
-            case _:
-                logger.critical(f"Bad effect type setting: {variant}")
-                raise Exception
-        yield variant
 
 
 def remap_harmonised(variants, harmonised, target_build):
@@ -213,9 +154,13 @@ def remap_harmonised(variants, harmonised, target_build):
     In this case chr_name, chr_position, and other allele are missing.
     Perhaps authors submitted rsID and effect allele originally:
 
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "hm_chr": 1, "hm_pos": 100, "hm_inferOtherAllele": "A"})
+    >>> from .models import ScoreVariant
+    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "2", "effect_allele": "A", "effect_weight": 5, "accession": "test", "hm_chr": "1", "hm_pos": 100, "hm_rsID": "testrsid", "hm_inferOtherAllele": "A", "row_nr": 0})
+    >>> variant
+    ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=None, ...
+
     >>> list(remap_harmonised([variant], harmonised=True, target_build=GenomeBuild.GRCh38)) # doctest: +ELLIPSIS
-    [ScoreVariant(...,chr_name=1,chr_position=100,...other_allele='A'...)]
+    [ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=Allele(allele='A', is_snp=True), ...
     """
     if harmonised:
         for variant in variants:
@@ -235,49 +180,17 @@ def remap_harmonised(variants, harmonised, target_build):
             yield variant
 
 
-def check_bad_variant(variants, drop_missing=False):
-    """
-    Missing effect allele:
-
-    >>> variant = ScoreVariant(**{"effect_allele": None, "effect_weight": 5, "accession": "test", "row_nr": 0})
-    >>> list(check_bad_variant([variant], drop_missing=True)) # doctest: +ELLIPSIS
-    []
-
-    Missing chromosome name and position:
-
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
-    >>> list(check_bad_variant([variant], drop_missing=True)) # doctest: +ELLIPSIS
-    []
-    """
-    n_bad = 0
-    for variant in variants:
-        match variant:
-            case (
-                ScoreVariant(chr_name=None)
-                | ScoreVariant(chr_position=None)
-                | ScoreVariant(effect_allele=None)
-            ):
-                # (effect weight checked separately)
-                n_bad += 1
-                if not drop_missing:
-                    yield variant
-            case _:
-                yield variant
-
-    if n_bad > 1:
-        logger.warning(f"{n_bad} bad variants")
-
-
 def check_effect_allele(variants, drop_missing=False):
     """
     Odd effect allele:
 
-    >>> variant = ScoreVariant(**{"effect_allele": "Z", "effect_weight": 5, "accession": "test", "row_nr": 0})
+    >>> from .models import ScoreVariant
+    >>> variant = ScoreVariant(**{"effect_allele": "Z", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(check_effect_allele([variant], drop_missing=True)) # doctest: +ELLIPSIS
     []
-    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0})
+    >>> variant = ScoreVariant(**{"effect_allele": "A", "effect_weight": 5, "accession": "test", "row_nr": 0, "chr_name": "1", "chr_position": 1})
     >>> list(check_effect_allele([variant], drop_missing=True)) # doctest: +ELLIPSIS
-    [ScoreVariant(effect_allele='A'...)]
+    [ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), ...)]
     """
     n_bad = 0
     for variant in variants:

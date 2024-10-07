@@ -2,11 +2,12 @@ import collections
 import csv
 import gzip
 import itertools
+import json
 from unittest.mock import patch
 import pytest
 
 from pgscatalog.core.cli.combine_cli import run
-from pgscatalog.core.lib import ScoringFile
+from pgscatalog.core import ScoringFile
 
 
 @pytest.fixture(scope="package")
@@ -21,6 +22,16 @@ def harmonised_scorefiles(request):
     pgs000001 = request.path.parent / "data" / f"PGS000001_hmPOS_{request.param}.txt.gz"
     pgs000002 = request.path.parent / "data" / f"PGS000002_hmPOS_{request.param}.txt.gz"
     return (request.param, pgs000001), (request.param, pgs000002)
+
+
+@pytest.fixture(scope="package")
+def non_additive_scorefile_grch38(request):
+    return request.path.parent / "data" / "PGS004255_hmPOS_GRCh38.txt.gz"
+
+
+@pytest.fixture(scope="package")
+def pgs000001_grch38(request):
+    return request.path.parent / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
 
 
 @pytest.fixture(scope="package", params=("GRCh37", "GRCh38"))
@@ -72,19 +83,62 @@ def lift_scorefiles(request):
     )
 
 
-def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
-    """Test combining unharmonised files.
-    Genome build is missing from these files, so it should fail."""
+def test_combine_nonadditive(tmp_path, non_additive_scorefile_grch38):
+    """Test normalising a single non-additive scoring file fails."""
     out_path = tmp_path / "combined.txt.gz"
-    paths = [str(x) for _, x in scorefiles]
-    build = [str(x) for x, _ in scorefiles][0]
+    path = [str(non_additive_scorefile_grch38)]
 
-    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", build)]
+    args = [("pgscatalog-combine", "-s"), path, ("-o", str(out_path), "-t", "GRCh38")]
     flargs = list(itertools.chain(*args))
 
     with pytest.raises(ValueError):
         with patch("sys.argv", flargs):
             run()
+
+
+def test_combine_skip(
+    tmp_path, non_additive_scorefile_grch38, pgs000001_grch38, n_variants
+):
+    """Test that combining skips non-additive files but otherwise completes successfully."""
+    out_path = tmp_path / "combined.txt.gz"
+    paths = [str(non_additive_scorefile_grch38), str(pgs000001_grch38)]
+
+    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", "GRCh38")]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run()
+
+    with gzip.open(out_path, mode="rt") as f:
+        csv_reader = csv.DictReader(f, delimiter="\t")
+        results = list(csv_reader)
+
+    # split to remove harmonisation suffix hmPOS_GRCh3X
+    pgs = collections.Counter([x["accession"].split("_")[0] for x in results])
+    assert pgs["PGS000001"] == n_variants["PGS000001"]
+
+    # the log should contain records of two scoring files though:
+    with open(tmp_path / "log_combined.json") as f:
+        log = json.load(f)
+        assert len(log) == 2, "Missing scorefile from log"
+        assert sum(x["compatible_effect_type"] is True for x in log) == 1
+        assert sum(x["compatible_effect_type"] is False for x in log) == 1
+
+
+def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
+    """Test combining unharmonised files.
+    Genome build is missing from these files, so it should fail."""
+    out_path = tmp_path / "combined.txt.gz"
+    paths = [str(x) for _, x in scorefiles]
+    build = "GRCh38"
+
+    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", build)]
+    flargs = list(itertools.chain(*args))
+
+    with pytest.raises(ValueError) as excinfo:
+        with patch("sys.argv", flargs):
+            run()
+        assert "Can't combine files with missing build" in str(excinfo.value)
 
 
 def test_combine_score_harmonised(
@@ -111,6 +165,8 @@ def test_combine_score_harmonised(
     assert pgs == n_variants
     assert all([expected_fields == tuple(variant.keys()) for variant in results])
 
+    assert (tmp_path / "log_combined.json").exists(), "Missing log output"
+
 
 def test_combine_fail(tmp_path, harmonised_scorefiles):
     """Test combining files with the same build but the wrong target build.
@@ -132,9 +188,10 @@ def test_combine_fail(tmp_path, harmonised_scorefiles):
     ]
     flargs = list(itertools.chain(*args))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as excinfo:
         with patch("sys.argv", flargs):
             run()
+        assert "without --liftover" in str(excinfo.value)
 
 
 def test_combine_custom(tmp_path, custom_scorefiles):

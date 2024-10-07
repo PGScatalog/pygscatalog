@@ -2,23 +2,14 @@
 standardised format, combining them, and calculating some statistics. Only really
 useful for the CLI, not good for importing elsewhere."""
 
-import collections
 import csv
 import functools
 import gzip
 import logging
 import os
 
-from ..lib.scorevariant import ScoreVariant
 
 logger = logging.getLogger(__name__)
-
-
-def get_variant_log(batch):
-    # these statistics can only be generated while iterating through variants
-    n_variants = collections.Counter("n_variants" for item in batch)
-    hm_source = collections.Counter(getattr(item, "hm_source") for item in batch)
-    return n_variants + hm_source
 
 
 class DataWriter:
@@ -50,18 +41,25 @@ class TextFileWriter(DataWriter):
             logger.info("Writing with gzip")
             self.open_function = functools.partial(gzip.open, compresslevel=6)
         else:
-            logger.info("Writing text file")
             self.open_function = open
 
     def write(self, batch):
         mode = "at" if os.path.exists(self.filename) else "wt"
         with self.open_function(self.filename, mode) as f:
-            writer = csv.writer(
+            writer = csv.DictWriter(
                 f,
                 delimiter="\t",
                 lineterminator="\n",
+                fieldnames=self.fieldnames,
+                extrasaction="ignore",
             )
-            if mode == "wt":
-                writer.writerow(ScoreVariant.output_fields)
-
-            writer.writerows(batch)
+            match mode:
+                case "wt":
+                    logger.info("Writing variants to new file")
+                    writer.writeheader()
+                    writer.writerows(batch)
+                case "at":
+                    logger.info("Appending variants to existing file")
+                    writer.writerows(batch)
+                case _:
+                    raise ValueError(f"Invalid {mode=}")
