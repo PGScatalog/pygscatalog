@@ -13,7 +13,7 @@ packages = [
 python = ">=3.10"
 "pgscatalog.calc" = "^0.3.0"
 "pgscatalog.core" =  "^0.3.1"
-"pgscatalog.match" =  "^0.3.2"
+"pgscatalog.match" =  "^0.3.3"
 
 [build-system]
 requires = ["poetry-core"]

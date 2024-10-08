@@ -437,13 +437,13 @@ xopen = {version = ">=1.8.0,<2.0.0", extras = ["zstd"]}
 
 [[package]]
 name = "pgscatalog-match"
-version = "0.3.2"
+version = "0.3.3"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "pgscatalog_match-0.3.2-py3-none-any.whl", hash = "sha256:8818247330e5c88cbffa35b9cdb6bd45b8203c8252db4a498be93dfc434b483e"},
-    {file = "pgscatalog_match-0.3.2.tar.gz", hash = "sha256:58aa6d60fbf66fe439051133d7a10b5018be8c59b4d8e47dec3fc830b60e9107"},
+    {file = "pgscatalog_match-0.3.3-py3-none-any.whl", hash = "sha256:270a3cecd37e727d5bba2b2aed7203299da10154ff36d8499b49ac4d8dcb7876"},
+    {file = "pgscatalog_match-0.3.3.tar.gz", hash = "sha256:d927fa227917d3e03fb06370dfadc6a5fe4b85f0008f303909f0d7b2d1c48c61"},
 ]
 
 [package.dependencies]
@@ -1073,4 +1073,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10"
-content-hash = "0522fb16c963d1eaa491e38a7c44d8bfa5ffec91ccbd9b42e6789d8d9f6c76cc"
+content-hash = "6f37f6c1e21120997626d56f2ed6889d64023b3f0b546b241e6166b836060f21"
