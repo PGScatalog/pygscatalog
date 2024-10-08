@@ -6,7 +6,7 @@ import pathlib
 from unittest.mock import patch
 import pytest
 
-from pgscatalog.core import ZeroMatchesError
+from pgscatalog.core.lib.pgsexceptions import ZeroMatchesError
 from pgscatalog.match.cli.match_cli import run_match
 
 

@@ -9,7 +9,7 @@ import textwrap
 
 import polars as pl
 
-from .. import (
+from pgscatalog.match import (
     VariantFrame,
     ScoringFileFrame,
     match_variants,
@@ -17,8 +17,8 @@ from .. import (
     MatchResults,
 )
 
-from ._config import Config
-from ._write import write_matches
+from pgscatalog.match.cli._config import Config
+from pgscatalog.match.cli._write import write_matches
 
 logger = logging.getLogger(__name__)
 

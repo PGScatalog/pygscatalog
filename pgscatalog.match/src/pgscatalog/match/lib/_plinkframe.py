@@ -6,7 +6,7 @@ import collections.abc
 import gzip
 import pathlib
 
-from ._match.plink import plinkify, pivot_score
+from pgscatalog.match.lib._match.plink import plinkify, pivot_score
 
 
 class PlinkFrame:

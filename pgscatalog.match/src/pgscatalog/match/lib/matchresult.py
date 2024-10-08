@@ -3,12 +3,12 @@ import logging
 
 import polars as pl
 
-from pgscatalog.core import ZeroMatchesError, MatchRateError
+from pgscatalog.core.lib.pgsexceptions import ZeroMatchesError, MatchRateError
 
-from ._plinkframe import PlinkFrames
-from ._match.label import label_matches
-from ._match.filter import filter_scores
-from ._match.log import make_logs, check_log_count, make_summary_log
+from pgscatalog.match.lib._plinkframe import PlinkFrames
+from pgscatalog.match.lib._match.label import label_matches
+from pgscatalog.match.lib._match.filter import filter_scores
+from pgscatalog.match.lib._match.log import make_logs, check_log_count, make_summary_log
 
 logger = logging.getLogger(__name__)
 

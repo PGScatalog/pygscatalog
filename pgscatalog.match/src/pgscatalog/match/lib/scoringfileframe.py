@@ -4,12 +4,12 @@ import shutil
 
 import polars as pl
 
-from pgscatalog.core import NormalisedScoringFile
+from pgscatalog.match.lib.normalisedscoringfile import NormalisedScoringFile
 
-from ._arrow import loose
-from ._match.preprocess import complement_valid_alleles
-from ._match.match import get_all_matches
-from .matchresult import MatchResult
+from pgscatalog.match.lib._arrow import loose
+from pgscatalog.match.lib._match.preprocess import complement_valid_alleles
+from pgscatalog.match.lib._match.match import get_all_matches
+from pgscatalog.match.lib.matchresult import MatchResult
 
 logger = logging.getLogger(__name__)
 

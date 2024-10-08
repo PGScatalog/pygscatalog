@@ -6,12 +6,15 @@ pgscatalog.core's implementation with csv.DictReader is slow with hundreds of mi
 """
 import pathlib
 import tempfile
+from typing import Optional
 
 import polars as pl
 from functools import singledispatch
 
-import polars.exceptions
-from pgscatalog.core import NormalisedScoringFile, TargetVariants, TargetType
+from polars.io.csv import BatchedCsvReader
+
+from pgscatalog.match.lib.normalisedscoringfile import NormalisedScoringFile
+from pgscatalog.match.lib.targetvariants import TargetVariants, TargetType
 
 
 @singledispatch
@@ -25,7 +28,7 @@ def loose(path, tmpdir=None):
 
 
 @loose.register
-def _(path: NormalisedScoringFile, tmpdir=None):
+def _(path: NormalisedScoringFile, tmpdir=None):  # type: ignore
     """Write NormalisedScoringFiles to a list of arrow IPC files"""
     if tmpdir is None:
         tmpdir = tempfile.mkdtemp()
@@ -47,7 +50,7 @@ def _(path: NormalisedScoringFile, tmpdir=None):
 
 
 @loose.register
-def _(path: TargetVariants, tmpdir=None):
+def _(path: TargetVariants, tmpdir=None):  # type: ignore
     """Writes TargetVariants to a list of arrow IPC files"""
     if tmpdir is None:
         tmpdir = tempfile.mkdtemp()
@@ -63,7 +66,14 @@ def _(path: TargetVariants, tmpdir=None):
                 "column_5": pl.String,
                 "column_6": pl.String,
             }
-            new_colnames = ["#CHROM", "ID", "CM", "POS", "REF", "ALT"]
+            new_colnames: Optional[list[str]] = [
+                "#CHROM",
+                "ID",
+                "CM",
+                "POS",
+                "REF",
+                "ALT",
+            ]
             header = False
             comment = None
         case TargetType.PVAR:
@@ -94,7 +104,9 @@ def _(path: TargetVariants, tmpdir=None):
     return batch_read(reader, tmpdir=tmpdir, cols_keep=cols_keep)
 
 
-def batch_read(reader, tmpdir, cols_keep) -> list[pathlib.Path]:
+def batch_read(
+    reader: BatchedCsvReader, tmpdir: pathlib.Path, cols_keep: list[str]
+) -> list[pathlib.Path]:
     """Read a CSV in batches and write them to temporary files"""
     arrowpaths = []
     # batch_size should be >= thread pool size, so tasks will be distributed amongst workers

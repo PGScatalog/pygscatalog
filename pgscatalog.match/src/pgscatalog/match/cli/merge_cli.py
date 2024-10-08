@@ -4,10 +4,10 @@ import logging
 import pathlib
 import shutil
 
-from ._config import Config
-from ._write import write_matches
+from pgscatalog.match.cli._config import Config
+from pgscatalog.match.cli._write import write_matches
 
-from ..lib import ScoringFileFrame, MatchResult, MatchResults
+from pgscatalog.match.lib import ScoringFileFrame, MatchResult, MatchResults
 
 import polars as pl
 

@@ -4,10 +4,10 @@ import shutil
 
 import polars as pl
 
-from pgscatalog.core import TargetVariants
+from pgscatalog.match.lib.targetvariants import TargetVariants
 
-from ._arrow import loose
-from ._match.preprocess import filter_target, annotate_multiallelic
+from pgscatalog.match.lib._arrow import loose
+from pgscatalog.match.lib._match.preprocess import filter_target, annotate_multiallelic
 
 logger = logging.getLogger(__name__)
 

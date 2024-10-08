@@ -4,7 +4,7 @@ import pytest
 
 from glob import glob
 
-from pgscatalog.core import ZeroMatchesError
+from pgscatalog.core.lib.pgsexceptions import ZeroMatchesError
 from pgscatalog.match.cli.merge_cli import run_merge
 
 

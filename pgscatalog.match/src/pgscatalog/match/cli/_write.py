@@ -6,11 +6,11 @@ It expects Config class attributes to be set up before being called
 import gzip
 import itertools
 
-from pgscatalog.core import MatchRateError
+from pgscatalog.core.lib.pgsexceptions import MatchRateError
 
-from ..lib.plinkscorefiles import PlinkScoreFiles
+from pgscatalog.match.lib.plinkscorefiles import PlinkScoreFiles
 
-from ._config import Config
+from pgscatalog.match.cli._config import Config
 
 
 def write_matches(matchresults, score_df):

@@ -12,18 +12,18 @@ import pathlib
 import polars as pl
 from xopen import xopen
 
-from .preprocess import complement_valid_alleles
+from pgscatalog.match.lib._match.preprocess import complement_valid_alleles
 
 logger = logging.getLogger(__name__)
 
 
 def label_matches(
     df: pl.LazyFrame,
-    keep_first_match,
-    remove_ambiguous,
-    remove_multiallelic,
-    skip_flip,
-    filter_IDs,
+    keep_first_match: bool,
+    remove_ambiguous: bool,
+    remove_multiallelic: bool,
+    skip_flip: bool,
+    filter_IDs: pathlib.Path,
 ) -> pl.LazyFrame:
     """Label match candidates with additional metadata. Column definitions:
 
@@ -220,7 +220,9 @@ def _label_duplicate_id(df: pl.LazyFrame, keep_first_match: bool) -> pl.LazyFram
     )
 
 
-def _label_biallelic_ambiguous(df: pl.LazyFrame, remove_ambiguous) -> pl.LazyFrame:
+def _label_biallelic_ambiguous(
+    df: pl.LazyFrame, remove_ambiguous: bool
+) -> pl.LazyFrame:
     """
     Identify ambiguous variants (A/T & C/G SNPs)
 
