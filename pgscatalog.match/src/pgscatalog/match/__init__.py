@@ -1,10 +1,10 @@
 import logging
 import importlib.metadata
 
-from .lib import VariantFrame
-from .lib import ScoringFileFrame, match_variants
-from .lib import MatchResult, MatchResults
-from .lib import PlinkScoreFiles
+from pgscatalog.match.lib import VariantFrame
+from pgscatalog.match.lib import ScoringFileFrame, match_variants
+from pgscatalog.match.lib import MatchResult, MatchResults
+from pgscatalog.match.lib import PlinkScoreFiles
 
 
 log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"
