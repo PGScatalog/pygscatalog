@@ -55,7 +55,7 @@ class TargetVariants:
     """A container of :class:`TargetVariant`
     :raises: FileNotFoundError
 
-    >>> from pgscatalog.core import Config  # ignore, only to load test data
+    >>> from pgscatalog.match.lib._config import Config  # ignore, only to load test data
     >>> pvar = TargetVariants(Config.ROOT_DIR / "tests" / "data" / "hapnest.pvar")
     >>> pvar.ftype
     <TargetType.PVAR: 1>
