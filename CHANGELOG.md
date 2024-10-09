@@ -1,3 +1,38 @@
+## 2024-10-08
+
+Patch release [pgscatalog-utils-1.4.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.4.1)
+
+* Fix missing imports
+* Bump dependencies
+
+Patch release [pgscatalog-match-0.3.3](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.3.3)
+
+* Migrate classes deleted in `pgscatalog.core` to `pgscatalog.match`
+* Add missing test data
+
+Patch release [pgscatalog-utils-1.4.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.4.0)
+
+* Bump dependencies
+ 
+## 2024-10-07
+
+Patch release [pgscatalog-match-0.3.2](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.match-0.3.2)
+
+* Bumps `pgscatalog.core` dependency
+  
+Minor release [pgscatalog-calc-0.3.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.calc-0.3.0)
+
+* Add `--verify_variants` CLI option to `pgscatalog-aggregate` to confirm that scoring file variants (input) match the scored variants perfectly during score calculation 
+
+Patch release  [pgscatalog-core-0.3.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.core-0.3.1)
+
+* Convert all relative imports to absolute to fix broken autoapi documentation
+
+Minor release  [pgscatalog-core-0.3.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.core-0.3.0)
+
+* Implements unified PGS Catalog data models with pydantic (used in `pgscatalog-combine`)
+* Rate limits `pgscatalog-download` to prevent throttling
+
 ## 2024-08-05
 
 Patch release  [pgscatalog-utils-1.3.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.3.1)
