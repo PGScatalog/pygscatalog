@@ -1,0 +1,23 @@
+###PGS CATALOG SCORING FILE - see https://www.pgscatalog.org/downloads/#dl_ftp_scoring for additional information
+#format_version=2.0
+##POLYGENIC SCORE (PGS) INFORMATION
+#pgs_id=PGS003581
+#pgs_name=MTAG.Envs.LifetimeMDD
+#trait_reported=Major Depressive Disorder (Lifetime)
+#trait_mapped=major depressive disorder
+#trait_efo=MONDO_0002009
+#genome_build=GRCh37
+#variants_number=4861398
+#weight_type=beta
+##SOURCE INFORMATION
+#pgp_id=PGP000461
+#citation=Dahl A et al. bioRxiv (2022). doi:10.1101/2022.08.15.503980
+##HARMONIZATION DETAILS
+#HmPOS_build=GRCh38
+#HmPOS_date=2023-04-12
+#HmPOS_match_chr={""True"": null, ""False"": null}
+#HmPOS_match_pos={""True"": null, ""False"": null}
+rsID	effect_allele	other_allele	effect_weight	allelefrequency_effect	variant_description	hm_source	hm_rsID	hm_chr	hm_pos	hm_inferOtherAllele
+.	T	C	0.004040743	0.329683	VARIANT_ID=1:2556125_C_T	Unknown				
+.	T	C	0.004025092	0.329689	VARIANT_ID=1:2556548_C_T	Unknown				
+.	A	G	0.004013246	0.329686	VARIANT_ID=1:2556709_G_A	Unknown				

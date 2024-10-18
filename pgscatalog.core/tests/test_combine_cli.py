@@ -4,6 +4,8 @@ import gzip
 import itertools
 import json
 from unittest.mock import patch
+
+import pydantic
 import pytest
 
 from pgscatalog.core.cli.combine_cli import run
@@ -81,6 +83,50 @@ def lift_scorefiles(request):
             request.path.parent / "data" / "lift" / "PGS000001_hmPOS_GRCh38.txt",
         ),
     )
+
+
+@pytest.fixture(scope="package")
+def fail_harmonised(request):
+    """This scoring file only contains variants that failed harmonisation."""
+    return request.path.parent / "data" / "bad_harmonised.txt"
+
+
+@pytest.fixture(scope="package")
+def invalid_scorefile(request):
+    """This scoring file contains invalid variants missing mandatory fields"""
+    return request.path.parent / "data" / "invalid_scorefile.txt"
+
+
+def test_invalid_scorefile(tmp_path, invalid_scorefile):
+    """There's nothing that can be done for this file, except explode loudly"""
+    out_path = tmp_path / "combined.txt"
+    path = [str(invalid_scorefile)]
+
+    args = [("pgscatalog-combine", "-s"), path, ("-o", str(out_path), "-t", "GRCh37")]
+    flargs = list(itertools.chain(*args))
+
+    # make sure the correct exception type is being raised by the CLI
+    with pytest.raises(pydantic.ValidationError):
+        with patch("sys.argv", flargs):
+            run()
+
+
+def test_fail_harmonised(tmp_path, fail_harmonised):
+    """Variants that have failed harmonisation will be missing mandatory fields, but we should accept them as a special case and write out like normal"""
+    out_path = tmp_path / "combined.txt"
+    path = [str(fail_harmonised)]
+
+    args = [("pgscatalog-combine", "-s"), path, ("-o", str(out_path), "-t", "GRCh38")]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run()
+
+    # https://github.com/PGScatalog/pygscatalog/issues/55
+    assert out_path.exists()
+    with open(out_path, mode="rt") as f:
+        x = list(csv.reader(f, delimiter="\t"))
+        assert len(x) == 4  # 3 variants + header
 
 
 def test_combine_nonadditive(tmp_path, non_additive_scorefile_grch38):
