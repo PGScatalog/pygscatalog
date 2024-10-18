@@ -531,6 +531,7 @@ class CatalogScoreVariant(BaseModel):
         "chr_position",
         "is_haplotype",
         "is_diplotype",
+        "hm_rsID",
         "hm_chr",
         "hm_pos",
         "hm_match_chr",
@@ -545,7 +546,7 @@ class CatalogScoreVariant(BaseModel):
             return None
         return v
 
-    @field_validator("rsID", mode="after")
+    @field_validator("rsID", "hm_rsID", mode="after")
     @classmethod
     def check_rsid_format(cls, rsid: Optional[str]) -> Optional[str]:
         if rsid == ".":

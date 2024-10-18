@@ -155,7 +155,7 @@ def remap_harmonised(variants, harmonised, target_build):
     Perhaps authors submitted rsID and effect allele originally:
 
     >>> from pgscatalog.core.lib.models import ScoreVariant
-    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "2", "effect_allele": "A", "effect_weight": 5, "accession": "test", "hm_chr": "1", "hm_pos": 100, "hm_rsID": "testrsid", "hm_inferOtherAllele": "A", "row_nr": 0})
+    >>> variant = ScoreVariant(**{"chr_position": 1, "rsID": None, "chr_name": "2", "effect_allele": "A", "effect_weight": 5, "accession": "test", "hm_chr": "1", "hm_pos": 100, "hm_rsID": "rsTEST", "hm_inferOtherAllele": "A", "row_nr": 0})
     >>> variant
     ScoreVariant(..., effect_allele=Allele(allele='A', is_snp=True), other_allele=None, ...
 
