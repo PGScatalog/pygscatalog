@@ -83,6 +83,30 @@ def lift_scorefiles(request):
     )
 
 
+@pytest.fixture(scope="package")
+def fail_harmonised(request):
+    """This scoring file only contains variants that failed harmonisation."""
+    return request.path.parent / "data" / "bad_harmonised.txt"
+
+
+def test_fail_harmonised(tmp_path, fail_harmonised):
+    """Variants that have failed harmonisation will be missing mandatory fields, but we should accept them as a special case and write out like normal"""
+    out_path = tmp_path / "combined.txt"
+    path = [str(fail_harmonised)]
+
+    args = [("pgscatalog-combine", "-s"), path, ("-o", str(out_path), "-t", "GRCh38")]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run()
+
+    # https://github.com/PGScatalog/pygscatalog/issues/55
+    assert out_path.exists()
+    with open(out_path, mode="rt") as f:
+        x = list(csv.reader(f, delimiter="\t"))
+        assert len(x) == 4  # 3 variants + header
+
+
 def test_combine_nonadditive(tmp_path, non_additive_scorefile_grch38):
     """Test normalising a single non-additive scoring file fails."""
     out_path = tmp_path / "combined.txt.gz"
