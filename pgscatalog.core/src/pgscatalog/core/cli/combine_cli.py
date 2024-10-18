@@ -6,6 +6,7 @@ import sys
 import textwrap
 from typing import Optional
 
+import pydantic
 from tqdm import tqdm
 
 from pgscatalog.core.lib.models import ScoreLog, ScoreLogs, ScoreVariant, VariantLog
@@ -39,7 +40,9 @@ def _combine(
             {"accession", "row_nr", "hm_source", "is_complex"}
         )
         # it's important to create the list here to raise EffectTypeErrors
-        # for the largest scoring files this can use quite a lot of memory (~16GB)
+        # for the largest scoring files this can use quite a lot of memory (~32GB)
+        # TODO: materialise and write these variants in batches to reduce memory usage
+        # don't forget to think about deleting a partially written file (i.e. bad batch?)
         dumped_variants = list(x.model_dump(include=fields) for x in normalised_score)
         logger.info(f"Finished processing {scorefile.pgs_id}")
     except EffectTypeError:
@@ -47,27 +50,34 @@ def _combine(
             f"Unsupported non-additive effect types in {scorefile=}, skipping"
         )
         is_compatible = False
+    except pydantic.ValidationError:
+        logger.critical(
+            f"{scorefile.pgs_id} contains invalid data, stopping and exploding"
+        )
+        raise
     else:
+        # no exceptions found, good to write out
         logger.info("Writing variants to file")
         writer = TextFileWriter(compress=compress_output, filename=out_path)
         writer.write(dumped_variants)
         logger.info("Finished writing")
-    finally:
-        variant_logs: Optional[list[VariantLog]] = None
-        if dumped_variants is not None:
-            variant_logs = [VariantLog(**x) for x in dumped_variants]
 
-        log: ScoreLog = ScoreLog(
-            header=scorefile.header,
-            variant_logs=variant_logs,
-            compatible_effect_type=is_compatible,
+    # (don't use finally clause here, it was hiding helpful exceptions)
+    variant_logs: Optional[list[VariantLog]] = None
+    if dumped_variants is not None:
+        variant_logs = [VariantLog(**x) for x in dumped_variants]
+
+    log: ScoreLog = ScoreLog(
+        header=scorefile.header,
+        variant_logs=variant_logs,
+        compatible_effect_type=is_compatible,
+    )
+    if log.variants_are_missing:
+        logger.warning(
+            f"{log.variant_count_difference} fewer variants in output compared to original file"
         )
-        if log.variants_are_missing:
-            logger.warning(
-                f"{log.variant_count_difference} fewer variants in output compared to original file"
-            )
-        logger.info("Normalisation complete, returning score log")
-        return log
+    logger.info("Normalisation complete, returning score log")
+    return log
 
 
 def run():
