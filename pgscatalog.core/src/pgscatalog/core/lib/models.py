@@ -424,7 +424,12 @@ class CatalogScoreVariant(BaseModel):
     ]
 
     # helpful class attributes (not used by pydantic to instantiate a class)
-    harmonised_columns: ClassVar[tuple[str, str, str]] = ("hm_rsID", "hm_chr", "hm_pos")
+    harmonised_columns: ClassVar[tuple[str, str, str, str]] = (
+        "hm_source",
+        "hm_rsID",
+        "hm_chr",
+        "hm_pos",
+    )
     complex_columns: ClassVar[tuple[str, str, str]] = (
         "is_haplotype",
         "is_diplotype",
@@ -455,6 +460,14 @@ class CatalogScoreVariant(BaseModel):
         for x in self.harmonised_columns:
             if getattr(self, x) is not None:
                 return True
+        return False
+
+    @cached_property
+    def is_hm_bad(self) -> bool:
+        """Was harmonisation OK?"""
+        # not a computed field because never used in serialisation
+        if self.is_harmonised and self.hm_source == "Unknown":
+            return True
         return False
 
     @computed_field  # type: ignore
@@ -617,7 +630,8 @@ class CatalogScoreVariant(BaseModel):
                 # mandatory rsid with optional coordinates
                 pass
             case _:
-                if self.is_complex:
+                if self.is_complex or self.is_hm_bad:
+                    # harmonisation may fail and create variants with bad coordinates
                     # complex variants can have odd non-standard positions
                     # e.g. e2 allele of APOE gene
                     pass
@@ -682,6 +696,18 @@ class ScoreVariant(CatalogScoreVariant):
     >>> variant_complex = ScoreVariant(**{"rsID": None, "chr_name": "1", "chr_position": 1, "effect_allele": "A", "effect_weight": 0.5, "is_haplotype": True,  "row_nr": 0, "accession": "test"})
     >>> variant_complex.is_complex
     True
+
+    The harmonisation process might fail, so variants can be missing mandatory fields.
+
+    This must be supported by the model:
+
+    >>> bad_hm_variant = ScoreVariant(**{"rsID": "rs6674751", "chr_name": None, "chr_position": None, "effect_allele": "G", "effect_weight": 0.5, "hm_chr": None, "hm_pos": None, "hm_rsID": None, "hm_source": "Unknown",  "row_nr": 0, "accession": "test"})
+    >>> bad_hm_variant.is_harmonised
+    True
+    >>> bad_hm_variant.is_hm_bad
+    True
+    >>> harmonised_variant.is_hm_bad
+    False
     """
 
     model_config = ConfigDict(use_enum_values=True)
@@ -1043,7 +1069,10 @@ class ScoreLog(BaseModel):
 
     @property
     def variants_are_missing(self) -> bool:
-        return self.variant_count_difference != 0
+        return (
+            self.variant_count_difference is not None
+            and self.variant_count_difference != 0
+        )
 
 
 class ScoreLogs(RootModel):
