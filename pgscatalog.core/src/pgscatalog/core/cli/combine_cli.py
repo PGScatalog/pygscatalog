@@ -87,7 +87,7 @@ def run():
         logger.setLevel(logging.DEBUG)
         logger.debug("Verbose logging enabled")
 
-    out_path = pathlib.Path(args.outfile)
+    out_path = pathlib.Path(args.outfile).resolve()
 
     if out_path.exists():
         logger.critical(f"Output file already exists: {args.outfile}")
@@ -165,7 +165,7 @@ def run():
                 )
             variant_log.append(log)
 
-    if n_finished == 0:
+    if n_finished == 0 or not out_path.exists():
         raise ValueError(
             "Couldn't process any scoring files. Did they all have non-additive weights?"
         )
