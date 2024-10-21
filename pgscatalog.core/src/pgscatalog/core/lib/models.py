@@ -548,19 +548,29 @@ class CatalogScoreVariant(BaseModel):
 
     @field_validator("rsID", "hm_rsID", mode="after")
     @classmethod
-    def check_rsid_format(cls, rsid: Optional[str]) -> Optional[str]:
+    def set_missing_rsid(cls, rsid: Optional[str]) -> Optional[str]:
+        # rsID is a special case where . means missing
         if rsid == ".":
             rsid = None
 
-        if (
-            rsid is None
-            or rsid.startswith("rs")
-            or rsid.startswith("ss")
-            or rsid.startswith("HLA")
-        ):
-            return rsid
-        else:
-            raise ValueError("rsid field must start with rs or ss or HLA")
+        return rsid
+
+    @model_validator(mode="after")
+    def check_rsid_format(self) -> Self:
+        if self.is_hm_bad:
+            # disable this check when harmonisation fails
+            return self
+
+        for x in (self.rsID, self.hm_rsID):
+            if not (
+                x is None
+                or x.startswith("rs")
+                or x.startswith("ss")
+                or x.startswith("HLA")
+            ):
+                raise ValueError("rsid field must start with rs or ss or HLA")
+
+        return self
 
     @field_validator(
         "effect_weight",
@@ -702,13 +712,18 @@ class ScoreVariant(CatalogScoreVariant):
 
     This must be supported by the model:
 
-    >>> bad_hm_variant = ScoreVariant(**{"rsID": "rs6674751", "chr_name": None, "chr_position": None, "effect_allele": "G", "effect_weight": 0.5, "hm_chr": None, "hm_pos": None, "hm_rsID": None, "hm_source": "Unknown",  "row_nr": 0, "accession": "test"})
+    >>> bad_hm_variant = ScoreVariant(**{"rsID": "a_weird_rsid", "chr_name": None, "chr_position": None, "effect_allele": "G", "effect_weight": 0.5, "hm_chr": None, "hm_pos": None, "hm_rsID": None, "hm_source": "Unknown",  "row_nr": 0, "accession": "test"})
     >>> bad_hm_variant.is_harmonised
     True
     >>> bad_hm_variant.is_hm_bad
     True
     >>> harmonised_variant.is_hm_bad
     False
+
+    rsID format validation (i.e. starts with rs, ss...) is disabled when harmonisation fails:
+
+    >>> bad_hm_variant.rsID
+    'a_weird_rsid'
     """
 
     model_config = ConfigDict(use_enum_values=True)
