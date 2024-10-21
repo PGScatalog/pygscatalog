@@ -557,8 +557,9 @@ class CatalogScoreVariant(BaseModel):
 
     @model_validator(mode="after")
     def check_rsid_format(self) -> Self:
-        if self.is_hm_bad:
+        if self.is_hm_bad or self.hm_source == "liftover":
             # disable this check when harmonisation fails
+            # variants that have been harmonised by liftover will put coordinates in rsID column
             return self
 
         for x in (self.rsID, self.hm_rsID):
