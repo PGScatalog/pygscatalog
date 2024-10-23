@@ -363,9 +363,9 @@ files = [
 
 [package.dependencies]
 numpy = [
+    {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
     {version = ">=1.22.4", markers = "python_version < \"3.11\""},
     {version = ">=1.23.2", markers = "python_version == \"3.11\""},
-    {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
@@ -417,13 +417,13 @@ scipy = ">=1.12.0,<2.0.0"
 
 [[package]]
 name = "pgscatalog-core"
-version = "0.3.1"
+version = "0.3.2"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "pgscatalog_core-0.3.1-py3-none-any.whl", hash = "sha256:8606af5a3a2fe8b9b1713f6fcee76610e164e7b1a6c083895ec39d433f972f85"},
-    {file = "pgscatalog_core-0.3.1.tar.gz", hash = "sha256:612cc10afc4bea0dc5edfc6b279fc92b76e6833a9152e5bd63a7f98da4a125ad"},
+    {file = "pgscatalog_core-0.3.2-py3-none-any.whl", hash = "sha256:5811416955cee72c1080cbc8aee65d7a648b9ac1feb9923d39f6dc2b428b5165"},
+    {file = "pgscatalog_core-0.3.2.tar.gz", hash = "sha256:a91d1d20692af7473ca55a3a40c96b43cb65890fe3f1516a394e52c0fa515f34"},
 ]
 
 [package.dependencies]
@@ -564,8 +564,8 @@ files = [
 annotated-types = ">=0.6.0"
 pydantic-core = "2.23.4"
 typing-extensions = [
-    {version = ">=4.6.1", markers = "python_version < \"3.13\""},
     {version = ">=4.12.2", markers = "python_version >= \"3.13\""},
+    {version = ">=4.6.1", markers = "python_version < \"3.13\""},
 ]
 
 [package.extras]
@@ -1073,4 +1073,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10"
-content-hash = "6f37f6c1e21120997626d56f2ed6889d64023b3f0b546b241e6166b836060f21"
+content-hash = "a25f856c2666dcd2c193a10a046c33354e100737ff41a33deb6a5a993ede4a70"
