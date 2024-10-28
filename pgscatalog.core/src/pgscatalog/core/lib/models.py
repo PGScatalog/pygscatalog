@@ -555,24 +555,6 @@ class CatalogScoreVariant(BaseModel):
 
         return rsid
 
-    @model_validator(mode="after")
-    def check_rsid_format(self) -> Self:
-        if self.is_hm_bad or self.hm_source == "liftover":
-            # disable this check when harmonisation fails
-            # variants that have been harmonised by liftover will put coordinates in rsID column
-            return self
-
-        for x in (self.rsID, self.hm_rsID):
-            if not (
-                x is None
-                or x.startswith("rs")
-                or x.startswith("ss")
-                or x.startswith("HLA")
-            ):
-                raise ValueError("rsid field must start with rs or ss or HLA")
-
-        return self
-
     @field_validator(
         "effect_weight",
         "dosage_0_weight",
