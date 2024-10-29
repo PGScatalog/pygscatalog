@@ -1,3 +1,13 @@
+## 2024-10-29
+
+Patch release [pgscatalog-utils-1.4.2](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.4.2)
+
+* Bump core dependency
+
+Patch release [pgscatalog-core-0.3.3](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog.core-0.3.3)
+
+* Remove rsID format check from `CatalogScoreVariant` model
+
 ## 2024-10-08
 
 Patch release [pgscatalog-utils-1.4.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.4.1)
