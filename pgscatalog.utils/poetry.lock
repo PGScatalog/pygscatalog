@@ -417,13 +417,13 @@ scipy = ">=1.12.0,<2.0.0"
 
 [[package]]
 name = "pgscatalog-core"
-version = "0.3.2"
+version = "0.3.3"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "pgscatalog_core-0.3.2-py3-none-any.whl", hash = "sha256:5811416955cee72c1080cbc8aee65d7a648b9ac1feb9923d39f6dc2b428b5165"},
-    {file = "pgscatalog_core-0.3.2.tar.gz", hash = "sha256:a91d1d20692af7473ca55a3a40c96b43cb65890fe3f1516a394e52c0fa515f34"},
+    {file = "pgscatalog_core-0.3.3-py3-none-any.whl", hash = "sha256:2796f5408fc12ac6f941bf8a4b5004a0436a72fa7b364a39f72204201dad3e75"},
+    {file = "pgscatalog_core-0.3.3.tar.gz", hash = "sha256:5b2851860e3dda29ec4863701cf2acb9e1007549960b24e1dcdfec4258f6792f"},
 ]
 
 [package.dependencies]
@@ -1073,4 +1073,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10"
-content-hash = "a25f856c2666dcd2c193a10a046c33354e100737ff41a33deb6a5a993ede4a70"
+content-hash = "3f04590e1d0a2ba975f0e813a5c33b419d234eb58f04b9cb963975a6ce52a6e7"
