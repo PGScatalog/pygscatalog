@@ -42,9 +42,9 @@ If you write Python code to work with PGS, the underlying libraries for the apps
 
 | Library            | Description                                              | Link                                                                                              |
 |--------------------|----------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| `pgscatalog.core`  | Core classes and functions to work with PGS data         | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/core/index.html)  |
-| `pgscatalog.match` | Variant matching across scoring files and target genomes | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/match/index.html) |
-| `pgscatalog.calc`  | Genetic ancestry similarity estimation and normalisation | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/calc/index.html)  |
+| `pgscatalog.core`  | Core classes and functions to work with PGS data         | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/core/lib/index.html)  |
+| `pgscatalog.match` | Variant matching across scoring files and target genomes | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/match/lib/index.html) |
+| `pgscatalog.calc`  | Genetic ancestry similarity estimation and normalisation | [API reference](https://pygscatalog.readthedocs.io/en/latest/autoapi/calc/lib/index.html)  |
 
 ## Documentation
 
