@@ -538,6 +538,8 @@ class CatalogScoreVariant(BaseModel):
         "hm_match_pos",
         "allelefrequency_effect",
         "variant_type",
+        "OR",
+        "HR",
         mode="before",
     )
     @classmethod
