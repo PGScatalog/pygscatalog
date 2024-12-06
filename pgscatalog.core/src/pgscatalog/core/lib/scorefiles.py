@@ -6,17 +6,19 @@ import csv
 import itertools
 import logging
 import pathlib
+from contextlib import contextmanager
+from typing import Iterator, Generator
 
 from pydantic import ValidationError
 from xopen import xopen
 
+from pgscatalog.core.lib import GenomeBuild
 from pgscatalog.core.lib import models
 from pgscatalog.core.lib.catalogapi import ScoreQueryResult, CatalogQuery
 from pgscatalog.core.lib._normalise import normalise
 from pgscatalog.core.lib._download import https_download
-from pgscatalog.core.lib._config import Config
+from pgscatalog.core.lib.models import ScoreVariant
 from pgscatalog.core.lib.pgsexceptions import ScoreFormatError
-from pgscatalog.core.lib._read import read_rows_lazy, get_columns, detect_wide
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ class ScoringFile:
     You can make ``ScoringFiles`` with a path to a scoring file with minimal metadata:
 
     >>> from pgscatalog.core.lib.genomebuild import GenomeBuild
+    >>> from pgscatalog.core.lib._config import Config
     >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "data" / "custom.txt")
     >>> sf # doctest: +ELLIPSIS
     ScoringFile('.../custom.txt', target_build=None)
@@ -79,7 +82,7 @@ class ScoringFile:
     ...     break
     Traceback (most recent call last):
     ...
-    pgscatalog.core.lib.pgsexceptions.ScoreFormatError: Local file is missing. Did you .download()?
+    FileNotFoundError: self.local_path=None: did you remember to .download()?
 
     A ``ScoringFile`` can also be constructed with a ``ScoreQueryResult`` if you want
     to be polite to the PGS Catalog API. Just add the ``query_result`` parameter:
@@ -108,7 +111,6 @@ class ScoringFile:
 
     def __init__(self, identifier, target_build=None, query_result=None, **kwargs):
         self._target_build = target_build
-
         if query_result is None:
             self._identifier = identifier
         else:
@@ -131,21 +133,6 @@ class ScoringFile:
             # was it an accession?
             self.include_children = kwargs.get("include_children", None)
             self._init_from_accession(self._identifier, target_build=target_build)
-
-        # set up local file attributes
-        try:
-            start_line, fields = get_columns(self.local_path)
-        except TypeError:
-            # remote file hasn't been downloaded yet
-            self.is_wide = None
-            self._start_line = None
-            self._fields = None
-            self._directory = None
-        else:
-            self.is_wide = detect_wide(fields)
-            self._start_line = start_line
-            self._fields = fields
-            self._directory = self.local_path.parent
 
     def _init_from_accession(self, accession, target_build):
         logger.debug("Instantiating ScoringFile from accession")
@@ -192,15 +179,20 @@ class ScoringFile:
         self._pgs_id = self._header.pgs_id
 
     @property
-    def pgs_id(self):
+    def is_wide(self) -> bool:
+        # TODO: temporarily disabled because wide scoring files are so far untested and undocumented
+        return False
+
+    @property
+    def pgs_id(self) -> str:
         return self._pgs_id
 
     @property
-    def is_harmonised(self):
+    def is_harmonised(self) -> bool:
         return self._header.is_harmonised
 
     @property
-    def genome_build(self):
+    def genome_build(self) -> GenomeBuild:
         if self.is_harmonised:
             return self._header.HmPOS_build
         else:
@@ -210,44 +202,24 @@ class ScoringFile:
     def header(self):
         return self._header
 
-    def _generate_variants(self):
-        """Yields rows from a scoring file as ScoreVariant objects"""
-
-        row_nr = 0
-
-        with xopen(self.local_path, mode="rt") as f:
-            for _ in range(self._start_line + 1):
-                # skip header
-                next(f)
-
-            while True:
-                batch = list(itertools.islice(f, Config.BATCH_SIZE))
-                if not batch:
-                    break
-
-                csv_reader = csv.reader(batch, delimiter="\t")
-                yield from read_rows_lazy(
-                    csv_reader=csv_reader,
-                    fields=self._fields,
-                    name=self.pgs_id,
-                    wide=self.is_wide,
-                    row_nr=row_nr,
-                )
-                # this is important because row_nr resets for each batch
-                row_nr += len(batch)
-
     @property
-    def variants(self):
+    def variants(self) -> Generator[ScoreVariant, None, None]:
         """A generator that yields rows from the scoring file as ``ScoreVariants``,
         if a local file is available (i.e. after downloading). Always available for
-        class instances that have a valid local path."""
-        if self.local_path is not None:
-            return self._generate_variants()
-        else:
-            raise ScoreFormatError("Local file is missing. Did you .download()?")
+        class instances that have a valid local path.
+
+        >>> from pgscatalog.core.lib._config import Config
+        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000802_hmPOS_GRCh37.txt"
+        >>> sf = ScoringFile(testpath)
+        >>> for variant in sf.variants:
+        ...     variant
+        ...     break
+        ScoreVariant(rsID='rs10936599', chr_name='3', chr_position=170974795...
+        """
+        return self.read_variants()
 
     @property
-    def target_build(self):
+    def target_build(self) -> GenomeBuild:
         """The ``GenomeBuild`` you want a ``ScoringFile`` to align to. Useful when using PGS
         Catalog accessions to instantiate this class."""
         return self._target_build
@@ -295,9 +267,12 @@ class ScoringFile:
         ['PGS000001_hmPOS_GRCh38.txt.gz']
 
         """
-        self._directory = pathlib.Path(directory)
-        fn = pathlib.Path(self.path).name
-        out_path = self._directory / fn
+        directory = pathlib.Path(directory)
+
+        if not directory.is_dir():
+            raise NotADirectoryError(directory)
+
+        out_path = directory / pathlib.Path(self.path).name
 
         logger.debug(f"Downloading {self.path} to {out_path}")
 
@@ -305,15 +280,11 @@ class ScoringFile:
             url=self.path,
             out_path=out_path,
             overwrite=overwrite,
-            directory=self._directory,
+            directory=directory,
         )
 
         # update local file attributes
         self.local_path = out_path
-        start_line, fields = get_columns(self.local_path)
-        self.is_wide = detect_wide(fields)
-        self._start_line = start_line
-        self._fields = fields
 
     def normalise(
         self, liftover=False, drop_missing=False, chain_dir=None, target_build=None
@@ -322,7 +293,8 @@ class ScoringFile:
 
         Takes care of quality control.
 
-        >>> from ..lib import GenomeBuild
+        >>> from pgscatalog.core.lib import GenomeBuild
+        >>> from pgscatalog.core.lib._config import Config
         >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
         >>> variants = ScoringFile(testpath).normalise()
         >>> for x in variants: # doctest: +ELLIPSIS
@@ -379,6 +351,72 @@ class ScoringFile:
             chain_dir=chain_dir,
             target_build=target_build,
         )
+
+    @contextmanager
+    def read(self) -> Iterator[csv.DictReader]:
+        """A simple method of reading variants from a scoring file.
+
+        Returns a csv.DictReader, so each row is a variant in a dictionary.
+
+        No data validation is done. Combine the returned dictionaries with the pydantic models if you want to do that (CatalogScoreVariants).
+
+        This method must be called with a context manager:
+
+        >>> from pgscatalog.core.lib._config import Config
+        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000802_hmPOS_GRCh37.txt"
+        >>> sf = ScoringFile(testpath)
+        >>> with sf.read() as reader:
+        ...     for variant in reader:
+        ...         variant
+        ...         break
+        {'rsID': 'rs10936599', 'chr_name': '3', 'chr_position': '170974795', 'effect_allele': 'T', 'other_allele': 'C', 'effect_weight': '0.123', 'allelefrequency_effect': '0.377', 'is_dominant': 'True', 'is_recessive': 'False', 'locus_name': 'MYNN', 'hm_source': 'ENSEMBL', 'hm_rsID': 'rs10936599', 'hm_chr': '3', 'hm_pos': '169492101', 'hm_inferOtherAllele': ''}
+
+        Calling this method directly isn't helpful:
+
+        >>> sf.read()
+        <contextlib._GeneratorContextManager object ...>
+
+        Only local scoring files can be read (download them first):
+
+        >>> sf = ScoringFile("PGS001229")
+        >>> with sf.read() as f:
+        ...     pass
+        Traceback (most recent call last):
+        ...
+        FileNotFoundError: self.local_path=None: did you remember to .download()?
+        """
+        if self.local_path is None:
+            raise FileNotFoundError(
+                f"{self.local_path=}: did you remember to .download()?"
+            )
+
+        with xopen(self.local_path) as f:
+            yield csv.DictReader(
+                (line for line in f if not line.startswith("#")), delimiter="\t"
+            )
+
+    def read_variants(self) -> Generator[ScoreVariant, None, None]:
+        """Yields rows from a scoring file as ScoreVariants
+
+        ScoreVariants are pydantic models with data validation (PGS Catalog standards)
+
+        >>> from pgscatalog.core.lib._config import Config
+        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000802_hmPOS_GRCh37.txt"
+        >>> sf = ScoringFile(testpath)
+        >>> variants = sf.read_variants()
+        >>> for i, variant in enumerate(variants):
+        ...     variant
+        ...     if i == 2:
+        ...         break
+        ScoreVariant(rsID='rs10936599', chr_name='3', ...
+        ScoreVariant(rsID='rs6061231', chr_name='20', ...
+        ScoreVariant(rsID='rs10774214', chr_name='12', ...
+        """
+        with self.read() as reader:
+            for row_nr, variant in enumerate(reader):
+                yield ScoreVariant(
+                    **variant, **{"accession": self.pgs_id, "row_nr": row_nr}
+                )
 
 
 class ScoringFiles:
