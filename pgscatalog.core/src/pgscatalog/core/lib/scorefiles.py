@@ -6,6 +6,8 @@ import csv
 import itertools
 import logging
 import pathlib
+from contextlib import contextmanager
+from typing import Iterator
 
 from pydantic import ValidationError
 from xopen import xopen
@@ -379,6 +381,48 @@ class ScoringFile:
             chain_dir=chain_dir,
             target_build=target_build,
         )
+
+    @contextmanager
+    def read(self) -> Iterator[csv.DictReader]:
+        """A simple method of reading variants from a scoring file.
+
+        Returns a csv.DictReader, so each row is a variant in a dictionary.
+
+        No data validation is done. Combine the returned dictionaries with the pydantic models if you want to do that (CatalogScoreVariants).
+
+        This method must be called with a context manager:
+
+        >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000802_hmPOS_GRCh37.txt"
+        >>> sf = ScoringFile(testpath)
+        >>> with sf.read() as reader:
+        ...     for variant in reader:
+        ...         variant
+        ...         break
+        {'rsID': 'rs10936599', 'chr_name': '3', 'chr_position': '170974795', 'effect_allele': 'T', 'other_allele': 'C', 'effect_weight': '0.123', 'allelefrequency_effect': '0.377', 'is_dominant': 'True', 'is_recessive': 'False', 'locus_name': 'MYNN', 'hm_source': 'ENSEMBL', 'hm_rsID': 'rs10936599', 'hm_chr': '3', 'hm_pos': '169492101', 'hm_inferOtherAllele': ''}
+
+        Calling this method directly isn't helpful:
+
+        >>> sf.read()
+        <contextlib._GeneratorContextManager object ...>
+
+        Only local scoring files can be read (download them first):
+
+        >>> sf = ScoringFile("PGS001229")
+        >>> with sf.read() as f:
+        ...     pass
+        Traceback (most recent call last):
+        ...
+        FileNotFoundError: self.local_path=None: did you remember to .download()?
+        """
+        if self.local_path is None:
+            raise FileNotFoundError(
+                f"{self.local_path=}: did you remember to .download()?"
+            )
+
+        with xopen(self.local_path) as f:
+            yield csv.DictReader(
+                (line for line in f if not line.startswith("#")), delimiter="\t"
+            )
 
 
 class ScoringFiles:
