@@ -35,6 +35,7 @@ class ScoringFile:
     You can make ``ScoringFiles`` with a path to a scoring file with minimal metadata:
 
     >>> from pgscatalog.core.lib.genomebuild import GenomeBuild
+    >>> from pgscatalog.core.lib._config import Config
     >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "data" / "custom.txt")
     >>> sf # doctest: +ELLIPSIS
     ScoringFile('.../custom.txt', target_build=None)
@@ -207,6 +208,7 @@ class ScoringFile:
         if a local file is available (i.e. after downloading). Always available for
         class instances that have a valid local path.
 
+        >>> from pgscatalog.core.lib._config import Config
         >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000802_hmPOS_GRCh37.txt"
         >>> sf = ScoringFile(testpath)
         >>> for variant in sf.variants:
@@ -291,7 +293,8 @@ class ScoringFile:
 
         Takes care of quality control.
 
-        >>> from ..lib import GenomeBuild
+        >>> from pgscatalog.core.lib import GenomeBuild
+        >>> from pgscatalog.core.lib._config import Config
         >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
         >>> variants = ScoringFile(testpath).normalise()
         >>> for x in variants: # doctest: +ELLIPSIS
@@ -359,6 +362,7 @@ class ScoringFile:
 
         This method must be called with a context manager:
 
+        >>> from pgscatalog.core.lib._config import Config
         >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000802_hmPOS_GRCh37.txt"
         >>> sf = ScoringFile(testpath)
         >>> with sf.read() as reader:
@@ -396,6 +400,7 @@ class ScoringFile:
 
         ScoreVariants are pydantic models with data validation (PGS Catalog standards)
 
+        >>> from pgscatalog.core.lib._config import Config
         >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000802_hmPOS_GRCh37.txt"
         >>> sf = ScoringFile(testpath)
         >>> variants = sf.read_variants()
