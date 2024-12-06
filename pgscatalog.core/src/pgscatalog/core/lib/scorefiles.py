@@ -407,13 +407,11 @@ class ScoringFile:
         ScoreVariant(rsID='rs6061231', chr_name='20', ...
         ScoreVariant(rsID='rs10774214', chr_name='12', ...
         """
-        row_nr = 0
         with self.read() as reader:
-            for variant in reader:
+            for row_nr, variant in enumerate(reader):
                 yield ScoreVariant(
                     **variant, **{"accession": self.pgs_id, "row_nr": row_nr}
-                )  # type: ignore
-                row_nr += 1
+                )
 
 
 class ScoringFiles:
