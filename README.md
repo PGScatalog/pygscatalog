@@ -25,16 +25,17 @@ the workflow is the easiest method.
 > [!TIP]
 > If you want to use all of the applications listed below, you can install the package `pgscatalog-utils` with [pip](https://pypi.org/project/pgscatalog-utils/) or [bioconda](http://bioconda.github.io/recipes/pgscatalog-utils/README.html)
 
-| Application                  | Description                                                            | Install                         | Link                                 |
-|------------------------------|------------------------------------------------------------------------|---------------------------------|--------------------------------------|
-| `pgscatalog-download`        | Download scoring files from the PGS Catalog in specific genome builds  | `pipx install pgscatalog.core`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/download.html)  |
-| `pgscatalog-combine`         | Combine multiple scoring files into a consistent structure             | `pipx install pgscatalog.core`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/combine.html)  |
-| `pgscatalog-relabel`         | Relabel values in a column based on values in a column in another file | `pipx install pgscatalog.core`  | [README](pgscatalog.core/README.md)  |
-| `pgscatalog-match`           | Match structured scoring file to variants in target genomes            | `pipx install pgscatalog.match` | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/match.html) |
-| `pgscatalog-matchmerge`      | Merge variant match results, useful on larger datasets                 | `pipx install pgscatalog.match` | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/match.html) |
-| `pgscatalog-intersect`       | Match variants across two different variant information files (e.g. reference & target genomes) | `pipx install pgscatalog.match` | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/intersect.html) |
-| `pgscatalog-aggregate`       | Aggregate calculated PGS split across multiple files                   | `pipx install pgscatalog.calc`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/aggregate.html)  |
-| `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry               | `pipx install pgscatalog.calc`  | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/ancestry.html)  |
+| Application                  | Description                                                                                     | Install                            | Link                                                                                |
+|------------------------------|-------------------------------------------------------------------------------------------------|------------------------------------|-------------------------------------------------------------------------------------|
+| `pgscatalog-download`        | Download scoring files from the PGS Catalog in specific genome builds                           | `pipx install pgscatalog.core`     | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/download.html)  |
+| `pgscatalog-combine`         | Combine multiple scoring files into a consistent structure                                      | `pipx install pgscatalog.core`     | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/combine.html)   |
+| `pgscatalog-relabel`         | Relabel values in a column based on values in a column in another file                          | `pipx install pgscatalog.core`     | [README](pgscatalog.core/README.md)                                                 |
+| `pgscatalog-match`           | Match structured scoring file to variants in target genomes                                     | `pipx install pgscatalog.match`    | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/match.html)     |
+| `pgscatalog-matchmerge`      | Merge variant match results, useful on larger datasets                                          | `pipx install pgscatalog.match`    | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/match.html)     |
+| `pgscatalog-intersect`       | Match variants across two different variant information files (e.g. reference & target genomes) | `pipx install pgscatalog.match`    | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/intersect.html) |
+| `pgscatalog-aggregate`       | Aggregate calculated PGS split across multiple files                                            | `pipx install pgscatalog.calc`     | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/aggregate.html) |
+| `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry                                        | `pipx install pgscatalog.calc`     | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/ancestry.html)  |
+| `pgscatalog-validate`        | Check if the scoring files match the PGS Catalog scoring file format                            | `pipx install pgscatalog.validate` | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/validate.html)  |
 
 ## Developer libraries
 
