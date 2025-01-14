@@ -10,7 +10,7 @@ val_types = ('formatted', 'hm_pos')
 logging.basicConfig(level=logging.INFO, format='(%(levelname)s): %(message)s')
 
 
-def validate_scorefile() -> None:
+def run() -> None:
     global data_sum, score_dir
     args = _parse_args()
     _check_args(args)
@@ -168,4 +168,4 @@ def _parse_args(args=None) -> argparse.Namespace:
 
 
 if __name__ == '__main__':
-    validate_scorefile()
+    run()

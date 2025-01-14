@@ -19,7 +19,7 @@ pandas = "^2.2.0"
 pandas-schema = "^0.3.6"
 
 [tool.poetry.scripts]
-pgscatalog-validate = 'pgscatalog.validate.cli.validate_scorefile:validate_scorefile'
+pgscatalog-validate = 'pgscatalog.validate.cli.validate_scorefile:run'
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
