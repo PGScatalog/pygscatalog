@@ -10,4 +10,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
         with:
-          args: "--exclude pgscatalog.validate/*.py"
+          args: "check --exclude pgscatalog.validate/*.py"
