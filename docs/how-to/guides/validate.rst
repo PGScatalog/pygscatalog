@@ -11,9 +11,37 @@ It can validate:
 Installation
 -------------
 
+Download the source code:
 ::
+    $ git clone https://github.com/PGScatalog/pygscatalog.git
+    $ cd pygscatalog/pygscatalog.validate
 
-    $ pip install pgscatalog-validate
+Install the dependencies:
+::
+    $ poetry install
+
+Run with a virtual environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Start a new local virtual envrironment:
+::
+    $ poetry shell
+    $ pgscatalog-validate --help
+
+Or install the package in the current environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Build the wheel package:
+::
+    $ poetry build
+
+Install the built package in the current environment via pip:
+::
+    $ pip install dist/pgscatalog_validate-0.1-py3-none-any.whl
+
+Run
+::
+    pgscatalog-validate --help
 
 Usage
 -----
