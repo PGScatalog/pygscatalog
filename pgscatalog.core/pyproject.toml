@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pgscatalog.core"
-version = "0.3.3"
+version = "0.4.0"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 license = "Apache-2.0"
 authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
