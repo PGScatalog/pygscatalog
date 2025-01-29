@@ -35,4 +35,4 @@ addopts = "-ra -q --doctest-modules"
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ['src/pgscatalog/calc']
+source = ['src/pgscatalog/calc', "tests"]

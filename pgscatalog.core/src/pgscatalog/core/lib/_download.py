@@ -50,8 +50,8 @@ def ftp_fallback(retry_state):
     ...     kwargs = {"url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000001/ScoringFiles/PGS000001.txt.gz", "directory": d, "out_path": out_path}
     ...     retry_state = tenacity.RetryCallState(retry_object=None, fn=None, args=None, kwargs=kwargs)
     ...     ftp_fallback(retry_state)
-    ...     assert (pathlib.Path(d) / pathlib.Path(out_path)).exists()
-
+    ...     (pathlib.Path(d) / pathlib.Path(out_path)).exists()
+    True
     """
     url = retry_state.kwargs.get("url")
     directory = retry_state.kwargs.get("directory")
@@ -85,6 +85,16 @@ def ftp_fallback(retry_state):
         # no exceptions thrown, move the temporary file to the final output path
         os.rename(score_f.name, out_path)
         logger.info(f"FTP download OK, {out_path} checksum validation passed")
+    finally:
+        try:
+            # if an exception was thrown, get rid of the temporary file
+            os.remove(score_f.name)
+            logger.info(
+                f"FTP download failed, deleting {score_f.name}"
+            )  # pragma: no cover
+        except OSError:
+            # file has been renamed, that's OK
+            pass
 
 
 @tenacity.retry(
@@ -95,7 +105,8 @@ def ftp_fallback(retry_state):
 )
 def https_download(*, url, out_path, directory, overwrite):
     """Download a file from the PGS Catalog over HTTPS, with automatic retries and
-    waiting. md5 checksums are automatically validated."""
+    waiting. md5 checksums are automatically validated.
+    """
     try:
         if Config.FTP_EXCLUSIVE:
             logger.warning("HTTPS downloads disabled by Config.FTP_EXCLUSIVE")
@@ -129,3 +140,11 @@ def https_download(*, url, out_path, directory, overwrite):
         # no exceptions thrown, move the temporary file to the final output path
         os.rename(f.name, out_path)
         logger.info(f"HTTPS download OK, {out_path} checksum validation passed")
+    finally:
+        try:
+            # if an exception was thrown, get rid of the temporary file
+            os.remove(f.name)
+            logger.info(f"HTTPS download failed, deleting {f.name}")  # pragma: no cover
+        except OSError:
+            # file has been renamed, that's OK
+            pass

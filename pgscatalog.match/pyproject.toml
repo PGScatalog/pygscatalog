@@ -33,4 +33,4 @@ addopts = "-ra -q --doctest-modules"
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ['src/pgscatalog/match']
+source = ["src/pgscatalog/match", "tests"]
