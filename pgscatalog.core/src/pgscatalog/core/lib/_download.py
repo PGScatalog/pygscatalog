@@ -129,3 +129,11 @@ def https_download(*, url, out_path, directory, overwrite):
         # no exceptions thrown, move the temporary file to the final output path
         os.rename(f.name, out_path)
         logger.info(f"HTTPS download OK, {out_path} checksum validation passed")
+    finally:
+        try:
+            # if an exception was thrown, get rid of the temporary file
+            os.remove(f.name)
+            logger.info(f"HTTPS download failed, deleting {f.name}")
+        except OSError:
+            # file has been renamed, that's OK
+            pass
