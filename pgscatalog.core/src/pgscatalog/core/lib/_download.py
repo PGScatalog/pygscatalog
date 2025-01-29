@@ -89,7 +89,9 @@ def ftp_fallback(retry_state):
         try:
             # if an exception was thrown, get rid of the temporary file
             os.remove(score_f.name)
-            logger.info(f"FTP download failed, deleting {score_f.name}")
+            logger.info(
+                f"FTP download failed, deleting {score_f.name}"
+            )  # pragma: no cover
         except OSError:
             # file has been renamed, that's OK
             pass
@@ -103,7 +105,8 @@ def ftp_fallback(retry_state):
 )
 def https_download(*, url, out_path, directory, overwrite):
     """Download a file from the PGS Catalog over HTTPS, with automatic retries and
-    waiting. md5 checksums are automatically validated."""
+    waiting. md5 checksums are automatically validated.
+    """
     try:
         if Config.FTP_EXCLUSIVE:
             logger.warning("HTTPS downloads disabled by Config.FTP_EXCLUSIVE")
@@ -141,7 +144,7 @@ def https_download(*, url, out_path, directory, overwrite):
         try:
             # if an exception was thrown, get rid of the temporary file
             os.remove(f.name)
-            logger.info(f"HTTPS download failed, deleting {f.name}")
+            logger.info(f"HTTPS download failed, deleting {f.name}")  # pragma: no cover
         except OSError:
             # file has been renamed, that's OK
             pass
