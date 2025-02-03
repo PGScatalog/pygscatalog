@@ -1,4 +1,4 @@
-name: Run pytest on pgscatalog.match
+name: Run CI on pgscatalog.match
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - 'pgscatalog.match/**.py'
 
 jobs:
-  pytest-match:
-    uses: ./.github/workflows/pytest.yaml
+  ci-match:
+    uses: ./.github/workflows/ci.yaml
     with:
       package-directory: "pgscatalog.match"
