@@ -32,3 +32,19 @@ $ pipx install pgscatalog.core
 
 Documentation is available at https://pygscatalog.readthedocs.io/.
 
+## Developer instructions
+
+You'll need [`nox`](https://nox.thea.codes/en/stable/index.html) and [`uv`](https://github.com/astral-sh/uv) installed. 
+
+To get set up with a development environment run:
+
+```
+$ nox -s dev
+$ source .venv/bin/activate
+```
+
+`nox` can also be used to run tests and lint the package:
+
+```
+$ nox
+```
