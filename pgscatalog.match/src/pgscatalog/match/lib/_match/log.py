@@ -5,7 +5,9 @@ import polars as pl
 logger = logging.getLogger(__name__)
 
 
-def make_logs(scorefile: pl.LazyFrame, match_candidates: pl.LazyFrame, dataset: str):
+def make_logs(
+    scorefile: pl.LazyFrame, match_candidates: pl.LazyFrame, dataset: str
+) -> pl.LazyFrame:
     # summary log -> aggregated from best matches (one per scoring file line)
     # big log -> unaggregated, written to compressed gzip, possibly multiple matches per scoring file line
     big_log = _join_match_candidates(
@@ -50,7 +52,7 @@ def make_summary_log(
     )
 
 
-def check_log_count(scorefile: pl.LazyFrame, summary_log: pl.LazyFrame):
+def check_log_count(scorefile: pl.LazyFrame, summary_log: pl.LazyFrame) -> bool:
     """Check aggregated counts vs original from scoring file"""
     summary_count: pl.LazyFrame = summary_log.group_by("accession").agg(pl.sum("count"))
 

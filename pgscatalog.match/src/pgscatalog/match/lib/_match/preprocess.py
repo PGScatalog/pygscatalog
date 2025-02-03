@@ -42,7 +42,7 @@ def complement_valid_alleles(df: pl.LazyFrame, flip_cols: list[str]) -> pl.LazyF
 def annotate_multiallelic(df: pl.LazyFrame) -> pl.LazyFrame:
     """Identify variants that are multiallelic with a column flag"""
     # plink2 pvar multi-alleles are comma-separated
-    df: pl.LazyFrame = df.with_columns(
+    df = df.with_columns(
         pl.when(pl.col("ALT").str.contains(","))
         .then(pl.lit(True))
         .otherwise(pl.lit(False))

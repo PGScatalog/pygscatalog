@@ -18,6 +18,7 @@ def tests(session):
 
 
 @nox.session
+@nox.parametrize("python", ["3.10"])
 def lint(session):
     """Run linting checks"""
     # https://nox.thea.codes/en/stable/cookbook.html#using-a-lockfile
