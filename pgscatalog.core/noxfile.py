@@ -18,17 +18,6 @@ def tests(session):
 
 
 @nox.session
-def coverage(session):
-    """Run pytest and output a coverage report"""
-    session.run_install(
-        "uv",
-        "sync",
-        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
-    )
-    session.run("pytest", "--ignore", "noxfile.py", "--cov", "--cov-report", "xml")
-
-
-@nox.session
 def lint(session):
     """Run linting checks"""
     # https://nox.thea.codes/en/stable/cookbook.html#using-a-lockfile
@@ -40,6 +29,20 @@ def lint(session):
     )
     session.run("ruff", "check")
     session.run("mypy", ".")
+
+
+@nox.session(default=False)
+def coverage(session):
+    """Run pytest and output a coverage report.
+
+    Not default for codecov.io integration with GitHub actions
+    """
+    session.run_install(
+        "uv",
+        "sync",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+    session.run("pytest", "--ignore", "noxfile.py", "--cov", "--cov-report", "xml")
 
 
 # nox cookbook: https://nox.thea.codes/en/stable/cookbook.html
