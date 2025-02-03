@@ -3,10 +3,10 @@ name: Run checks
 on:
   push:
     paths:
-      - 'pgscatalog.core/**.py'
+      - 'pgscatalog.core/**'
   pull_request:
     paths:
-      - 'pgscatalog.core/**.py'
+      - 'pgscatalog.core/**'
   workflow_call:
     inputs:
       package-directory:
