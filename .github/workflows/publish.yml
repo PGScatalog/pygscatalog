@@ -1,4 +1,4 @@
-name: Publish pgscatalog.core
+name: Publish packages
 
 on:
   workflow_dispatch:
@@ -7,38 +7,29 @@ on:
         type: choice
         options:
           - pgscatalog.core
-      python-version:
-        required: false
-        type: choice
-        options:
-          - "3.11"
+	  - pgscatalog.match
+	  - pgscatalog.calc
+	  - pgscatalog.utils
     
 jobs:
   publish:
-    name: build and publish core package
+    name: build and publish package
     runs-on: ubuntu-latest
     environment: release
+    
     permissions:
       id-token: write
       contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup python
-        id: setup-python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python-version }}
-            
-      - name: Python Poetry Action
-        uses: abatilo/actions-poetry@v3.0.0
+      - uses: wntrblm/nox@main
 
       - name: Build package
-        run: poetry build --no-interaction
-        working-directory: ${{inputs.package-directory}}
-
+        run: nox -s build
+        working-directory: ${{ inputs.package-directory }}
+        
       - name: Publish package distributions
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
