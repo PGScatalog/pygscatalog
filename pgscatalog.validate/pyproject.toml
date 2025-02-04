@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "pgscatalog.validate"
+version = "0.1"
+description = "Tools for checking that the scoring files and harmonized scoring files match the PGS Catalog scoring file formats"
+authors = [
+    "Benjamin Wingfield <bwingfield@ebi.ac.uk>",
+    "Samuel Lambert <sl925@medschl.cam.ac.uk>",
+    "Laurent Gil <lg10@sanger.ac.uk>",
+    "Florent Yvon <fy279@cam.ac.uk>"
+]
+readme = "README.md"
+packages = [
+    { include = "pgscatalog", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+pandas = "^2.2.0"
+pandas-schema = "^0.3.6"
+
+[tool.poetry.scripts]
+pgscatalog-validate = 'pgscatalog.validate.cli.validate_scorefile:run'
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.coverage.run]
+source = ['src/pgscatalog/validate']
