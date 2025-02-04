@@ -6,17 +6,17 @@ on:
       package-directory:
         type: choice
         options:
-          - pgscatalog.core
-	  - pgscatalog.match
-	  - pgscatalog.calc
-	  - pgscatalog.utils
-    
+        - pgscatalog.core
+        - pgscatalog.match
+        - pgscatalog.calc
+        - pgscatalog.utils
+
 jobs:
   publish:
     name: build and publish package
     runs-on: ubuntu-latest
     environment: release
-    
+
     permissions:
       id-token: write
       contents: write
@@ -29,16 +29,15 @@ jobs:
       - name: Build package
         run: nox -s build
         working-directory: ${{ inputs.package-directory }}
-        
+
       - name: Publish package distributions
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: ${{inputs.package-directory}}/dist
-          skip-existing: false          
+          skip-existing: false
 
       - name: Read package version
-        run: |
-          echo "TAG_NAME=$(poetry version | tr -s ' ' '-')" >> $GITHUB_ENV
+        run: echo "TAG_NAME=$(poetry version | tr -s ' ' '-')" >> $GITHUB_ENV
         working-directory: ${{inputs.package-directory}}
 
       - name: Create tag
@@ -51,5 +50,4 @@ jobs:
                 ref: 'refs/tags/${{ env.TAG_NAME }}',
                 sha: context.sha
               })
-       
-      
+
