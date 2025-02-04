@@ -43,6 +43,12 @@ $ nox -s dev
 $ source .venv/bin/activate
 ```
 
+This will create a virtual environment in the current directory.
+
+```
+$ pgscatalog-download --help
+```
+
 `nox` can also be used to run tests and lint the package:
 
 ```

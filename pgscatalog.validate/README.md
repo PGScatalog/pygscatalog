@@ -14,41 +14,55 @@ If you want to write Python code to work with PGS data, the library may be helpf
 Please note that this tool validates formatted scoring files which are expected to contain the PGS-Catalog standard header.
 This header is not necessary for new scoring files submission from authors.
 
-## Installation 
+## Developer instructions
 
-Install and run from source code via poetry and pip:
+You'll need [`nox`](https://nox.thea.codes/en/stable/index.html) and [`uv`](https://github.com/astral-sh/uv) installed. 
+
+To get set up with a development environment run:
 
 ```
 # Download the source code
-git clone https://github.com/PGScatalog/pygscatalog.git
-cd pygscatalog/pygscatalog.validate
-
-# Install the dependencies
-poetry install
+$ git clone https://github.com/PGScatalog/pygscatalog.git
+$ cd pygscatalog/pgscatalog.validate
+$ nox -s dev
+$ source .venv/bin/activate
 ```
-
-### Run with a virtual environment
-
-From the directory where `poetry install` was executed:
+This creates a virtual environment in the same directory.
 
 ```
-poetry shell
-pgscatalog-validate --help
+$ pgscatalog-validate --help
 ```
 
 ### Or install the package in the current environment
 
 ```
 # Build the wheel package
-poetry build
+$ nox -s build
 
 # Install the built package in the current environment via pip
-pip install dist/pgscatalog_validate-0.1-py3-none-any.whl
+$ pip install dist/pgscatalog_validate-0.1-py3-none-any.whl
 
 # Run
-pgscatalog-validate --help
+$ pgscatalog-validate --help
 ```
 
 ## Documentation
 
 Documentation is available at https://pygscatalog.readthedocs.io/.
+
+## Developer instructions
+
+You'll need [`nox`](https://nox.thea.codes/en/stable/index.html) and [`uv`](https://github.com/astral-sh/uv) installed. 
+
+To get set up with a development environment run:
+
+```
+$ nox -s dev
+$ source .venv/bin/activate
+```
+
+This will create a virtual environment in the current directory.
+
+```
+$ pgscatalog-download --help
+```

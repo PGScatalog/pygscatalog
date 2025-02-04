@@ -65,7 +65,7 @@ pythonpath = [
 consider_namespace_packages = true
 
 [tool.coverage.run]
-source = ["src/pgscatalog/core", "tests"]
+source = ["src/pgscatalog/calc", "tests"]
 concurrency = ["multiprocessing"]
 parallel = true
 sigterm = true
