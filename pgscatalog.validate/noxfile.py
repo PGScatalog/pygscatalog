@@ -3,9 +3,6 @@ import nox
 nox.options.error_on_external_run = True
 nox.options.default_venv_backend = "uv"
 
-# explicit default for things like building, linting, development
-DEFAULT_PYTHON_VERSION = "3.12"
-
 
 # nox cookbook: https://nox.thea.codes/en/stable/cookbook.html
 # It's a good idea to keep your dev session out of the default list
@@ -19,8 +16,6 @@ def dev(session: nox.Session) -> None:
     session.run(
         "uv",
         "sync",
-        "--python",
-        DEFAULT_PYTHON_VERSION,
     )
 
 
@@ -32,8 +27,6 @@ def build(session):
     session.run(
         "uv",
         "sync",
-        "--python",
-        DEFAULT_PYTHON_VERSION,
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
     session.run("uv", "build")
