@@ -1,4 +1,4 @@
-name: Run pytest on pgscatalog.core
+name: Run CI on pgscatalog.core
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - 'pgscatalog.core/**.py'
 
 jobs:
-  pytest-core:
-    uses: ./.github/workflows/pytest.yaml
+  ci-core:
+    uses: ./.github/workflows/ci.yaml
     with:
       package-directory: "pgscatalog.core"

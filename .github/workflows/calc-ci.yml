@@ -1,4 +1,4 @@
-name: Run pytest on pgscatalog.calc
+name: Run CI on pgscatalog.calc
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - 'pgscatalog.calc/**.py'
 
 jobs:
-  pytest-calc:
-    uses: ./.github/workflows/pytest.yaml
+  calc-ci:
+    uses: ./.github/workflows/ci.yaml
     with:
       package-directory: "pgscatalog.calc"

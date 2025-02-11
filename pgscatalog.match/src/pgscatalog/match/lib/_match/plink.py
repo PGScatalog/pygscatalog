@@ -99,7 +99,7 @@ def pivot_score(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _check_column_types(matches: pl.LazyFrame):
+def _check_column_types(matches: pl.LazyFrame) -> None:
     logger.debug("Checking column types")
     # these columns are most important for writing out
     correct_schema = {

@@ -26,8 +26,9 @@ def filter_scores(
     for accession, rate in zip(
         fail_rates["accession"].to_list(), fail_rates["fail_rate"].to_list()
     ):
+        df: pl.DataFrame
         if rate <= (1 - min_overlap):
-            df: pl.DataFrame = pl.DataFrame(
+            df = pl.DataFrame(
                 {
                     "accession": [accession],
                     "score_pass": [True],
@@ -39,7 +40,7 @@ def filter_scores(
             )
             scores.append(df.with_columns(pl.col("accession").cast(pl.Categorical)))
         else:
-            df: pl.DataFrame = pl.DataFrame(
+            df = pl.DataFrame(
                 {
                     "accession": [accession],
                     "score_pass": [False],

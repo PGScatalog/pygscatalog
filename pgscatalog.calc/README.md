@@ -34,3 +34,26 @@ $ pipx install pgscatalog.calc
 ## Documentation
 
 Documentation is available at https://pygscatalog.readthedocs.io/.
+
+## Developer instructions
+
+You'll need [`nox`](https://nox.thea.codes/en/stable/index.html) and [`uv`](https://github.com/astral-sh/uv) installed. 
+
+To get set up with a development environment run:
+
+```
+$ nox -s dev
+$ source .venv/bin/activate
+```
+
+This will create a virtual environment in the current directory.
+
+```
+$ pgscatalog-aggregate --help
+```
+
+`nox` can also be used to run tests and lint the package:
+
+```
+$ nox
+```

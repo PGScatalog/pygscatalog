@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+
 import logging
 import pandas as pd
 import numpy as np
@@ -342,7 +344,9 @@ def pgs_adjust(
         if np.var(results_ref[sum_col]) == 0:
             scorecols_drop.add(c_pgs)
             logger.warning(
-                "Skipping adjustment: {} has 0 variance in PGS SUM [REFERENCE]".format(c_pgs)
+                "Skipping adjustment: {} has 0 variance in PGS SUM [REFERENCE]".format(
+                    c_pgs
+                )
             )
 
     # Report PGS values with respect to distribution of PGS in the most similar reference population

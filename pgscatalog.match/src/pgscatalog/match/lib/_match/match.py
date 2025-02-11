@@ -11,7 +11,7 @@ def get_all_matches(
     scorefile_oa = scorefile.filter(pl.col("other_allele").is_not_null())
     scorefile_no_oa = scorefile.filter(pl.col("other_allele").is_null())
 
-    matches: list[pl.LazyFrame()] = []
+    matches: list[pl.LazyFrame] = []
     col_order = [
         "row_nr",
         "chr_name",
