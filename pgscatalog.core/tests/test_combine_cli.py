@@ -3,6 +3,7 @@ import csv
 import gzip
 import itertools
 import json
+import pathlib
 from unittest.mock import patch
 
 import pydantic
@@ -174,7 +175,7 @@ def test_combine_skip(
 def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
     """Test combining unharmonised files.
     Genome build is missing from these files, so it should fail."""
-    out_path = tmp_path / "combined.txt.gz"
+    out_path = tmp_path
     paths = [str(x) for _, x in scorefiles]
     build = "GRCh38"
 
@@ -192,7 +193,7 @@ def test_combine_score_harmonised(
 ):
     """Test combining harmonised data: PGS000001 and PGS000002.
     The genome build always matches across both files, so combining should work."""
-    out_path = tmp_path / "combined.txt.gz"
+    out_path = tmp_path
     paths = [str(x) for _, x in harmonised_scorefiles]
     build = [str(x) for x, _ in harmonised_scorefiles][0]
 
@@ -202,9 +203,11 @@ def test_combine_score_harmonised(
     with patch("sys.argv", flargs):
         run()
 
-    with gzip.open(out_path, mode="rt") as f:
-        csv_reader = csv.DictReader(f, delimiter="\t")
-        results = list(csv_reader)
+    results = []
+    for path in [pathlib.Path(x).name for x in paths]:
+        with gzip.open(out_path / ("normalised_" + path), mode="rt") as f:
+            csv_reader = csv.DictReader(f, delimiter="\t")
+            results.extend(list(csv_reader))
 
     # split to remove harmonisation suffix hmPOS_GRCh3X
     pgs = collections.Counter([x["accession"].split("_")[0] for x in results])

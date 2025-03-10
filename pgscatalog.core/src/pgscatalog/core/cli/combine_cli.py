@@ -1,82 +1,114 @@
 import argparse
 import concurrent.futures
+import csv
 import logging
 import pathlib
 import sys
+import tempfile
 import textwrap
-from typing import Optional
 
 import pydantic
 from tqdm import tqdm
+from xopen import xopen
 
-from pgscatalog.core.lib.models import ScoreLog, ScoreLogs, ScoreVariant, VariantLog
+from itertools import islice
+from pgscatalog.core.lib.models import ScoreLog, ScoreLogs, VariantLog
 from pgscatalog.core.lib import GenomeBuild, ScoringFile, EffectTypeError
 
-from pgscatalog.core.cli._combine import TextFileWriter
 
 logger = logging.getLogger(__name__)
+
+
+def batched(iterable, n):
+    """
+    Batch data into lists of length n. The last batch may be shorter.
+
+    itertools.batched was introduced in Python 3.12
+    """
+    # batched('ABCDEFG', 3) --> ABC DEF G
+    it = iter(iterable)
+    while True:
+        batch = tuple(islice(it, n))
+        if not batch:
+            return
+        yield batch
 
 
 def _combine(
     scorefile: ScoringFile,
     target_build: GenomeBuild,
     drop_missing: bool,
-    compress_output: bool,
     out_path: pathlib.Path,
     liftover_kwargs: dict,
+    batch_size: int = 100_000,
 ) -> ScoreLog:
     """This function normalises a single scoring file to a consistent structure and returns a summary log generated from the score header and variant statistics"""
     logger.info(f"Started processing {scorefile.pgs_id}")
-    dumped_variants: Optional[list[dict]] = None
+    variant_log: list[VariantLog] = []
     is_compatible: bool = True
-    try:
+
+    # suffix is important for xopen to compress output
+    with tempfile.NamedTemporaryFile(suffix=".txt.gz") as temp:
+        temp_path = pathlib.Path(temp.name)
         normalised_score = scorefile.normalise(
             drop_missing=drop_missing,
             **liftover_kwargs,
             target_build=target_build,
         )
-        # these fields are important for dumping and analysing output variants
-        fields: set[str] = set(ScoreVariant.output_fields).union(
-            {"accession", "row_nr", "hm_source", "is_complex"}
-        )
-        # it's important to create the list here to raise EffectTypeErrors
-        # for the largest scoring files this can use quite a lot of memory (~32GB)
-        # TODO: materialise and write these variants in batches to reduce memory usage
-        # don't forget to think about deleting a partially written file (i.e. bad batch?)
-        dumped_variants = list(x.model_dump(include=fields) for x in normalised_score)
-        logger.info(f"Finished processing {scorefile.pgs_id}")
-    except EffectTypeError:
-        logger.warning(
-            f"Unsupported non-additive effect types in {scorefile=}, skipping"
-        )
-        is_compatible = False
-    except pydantic.ValidationError:
-        logger.critical(
-            f"{scorefile.pgs_id} contains invalid data, stopping and exploding"
-        )
-        raise
-    else:
-        # no exceptions found, good to write out
-        logger.info("Writing variants to file")
-        writer = TextFileWriter(compress=compress_output, filename=out_path)
-        writer.write(dumped_variants)
-        logger.info("Finished writing")
+        score_batches = batched(normalised_score, n=batch_size)
 
-    # (don't use finally clause here, it was hiding helpful exceptions)
-    variant_logs: Optional[list[VariantLog]] = None
-    if dumped_variants is not None:
-        variant_logs = [VariantLog(**x) for x in dumped_variants]
+        try:
+            with xopen(temp_path, mode="w") as out_csv:
+                logger.info("Opening file for writing")
+                output_field_order = [
+                    "chr_name",
+                    "chr_position",
+                    "effect_allele",
+                    "other_allele",
+                    "effect_weight",
+                    "effect_type",
+                    "is_duplicated",
+                    "accession",
+                    "row_nr",
+                ]
+                writer = csv.DictWriter(
+                    out_csv,
+                    fieldnames=output_field_order,
+                    delimiter="\t",
+                    extrasaction="ignore",
+                )
+                writer.writeheader()
+                for batch in score_batches:
+                    variant_batch = [x.model_dump() for x in batch]
+                    variant_log.extend([VariantLog(**x) for x in variant_batch])
+                    logger.info(f"Writing variant batch (size: {batch_size}) to file")
+                    writer.writerows(variant_batch)
+        except EffectTypeError:
+            logger.warning(
+                f"Unsupported non-additive effect types in {scorefile=}, skipping"
+            )
+            is_compatible = False
+        except pydantic.ValidationError:
+            logger.critical(
+                f"{scorefile.pgs_id} contains invalid data, stopping and exploding"
+            )
+            raise
+        else:
+            logger.info(f"Finished processing {scorefile.pgs_id}")
+            temp_path.rename(out_path)
+            logger.info(f"Written normalised score to {out_path=}")
 
     log: ScoreLog = ScoreLog(
         header=scorefile.header,
-        variant_logs=variant_logs,
+        variant_logs=variant_log,
         compatible_effect_type=is_compatible,
     )
+
     if log.variants_are_missing:
         logger.warning(
             f"{log.variant_count_difference} fewer variants in output compared to original file"
         )
-    logger.info("Normalisation complete, returning score log")
+
     return log
 
 
@@ -87,19 +119,10 @@ def run():
         logger.setLevel(logging.DEBUG)
         logger.debug("Verbose logging enabled")
 
-    out_path = pathlib.Path(args.outfile).resolve()
+    out_dir = pathlib.Path(args.outfile).resolve()
 
-    if out_path.exists():
-        logger.critical(f"Output file already exists: {args.outfile}")
-        raise FileExistsError
-
-    match x := out_path.name:
-        case _ if x.endswith("gz"):
-            logger.debug("Compressing output with gzip")
-            compress_output = True
-        case _:
-            logger.debug("Not compressing output")
-            compress_output = False
+    if not out_dir.is_dir():
+        raise NotADirectoryError
 
     paths = list(set(args.scorefiles))  # unique paths only
     scoring_files = sorted([ScoringFile(x) for x in paths], key=lambda x: x.pgs_id)
@@ -138,6 +161,7 @@ def run():
     with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
         futures = []
         for scorefile in scoring_files:
+            out_path = out_dir / ("normalised_" + scorefile.path.name)
             futures.append(
                 executor.submit(
                     _combine,
@@ -145,7 +169,6 @@ def run():
                     target_build=target_build,
                     liftover_kwargs=liftover_kwargs,
                     drop_missing=args.drop_missing,
-                    compress_output=compress_output,
                     out_path=out_path,
                 )
             )
@@ -165,7 +188,7 @@ def run():
                 )
             variant_log.append(log)
 
-    if n_finished == 0 or not out_path.exists():
+    if n_finished == 0 or not out_dir.exists():
         raise ValueError(
             "Couldn't process any scoring files. Did they all have non-additive weights?"
         )
@@ -173,7 +196,7 @@ def run():
     if n_finished != len(scoring_files):
         logger.warning(f"{len(scoring_files) - n_finished} scoring files were skipped")
 
-    log_out_path = pathlib.Path(args.outfile).parent / args.logfile
+    log_out_path = pathlib.Path(args.outfile) / args.logfile
     with open(log_out_path, "w") as f:
         logger.info(f"Writing log to {f.name}")
         f.write(ScoreLogs(variant_log).model_dump_json())
