@@ -1,115 +1,17 @@
 import argparse
 import concurrent.futures
-import csv
 import logging
 import pathlib
 import sys
-import tempfile
 import textwrap
 
-import pydantic
 from tqdm import tqdm
-from xopen import xopen
 
-from itertools import islice
-from pgscatalog.core.lib.models import ScoreLog, ScoreLogs, VariantLog
-from pgscatalog.core.lib import GenomeBuild, ScoringFile, EffectTypeError
-
+from pgscatalog.core.cli.normalise import write_normalised
+from pgscatalog.core.lib.models import ScoreLog, ScoreLogs
+from pgscatalog.core.lib import GenomeBuild, ScoringFile
 
 logger = logging.getLogger(__name__)
-
-
-def batched(iterable, n):
-    """
-    Batch data into lists of length n. The last batch may be shorter.
-
-    itertools.batched was introduced in Python 3.12
-    """
-    # batched('ABCDEFG', 3) --> ABC DEF G
-    it = iter(iterable)
-    while True:
-        batch = tuple(islice(it, n))
-        if not batch:
-            return
-        yield batch
-
-
-def _combine(
-    scorefile: ScoringFile,
-    target_build: GenomeBuild,
-    drop_missing: bool,
-    out_path: pathlib.Path,
-    liftover_kwargs: dict,
-    batch_size: int = 100_000,
-) -> ScoreLog:
-    """This function normalises a single scoring file to a consistent structure and returns a summary log generated from the score header and variant statistics"""
-    logger.info(f"Started processing {scorefile.pgs_id}")
-    variant_log: list[VariantLog] = []
-    is_compatible: bool = True
-
-    # suffix is important for xopen to compress output
-    with tempfile.NamedTemporaryFile(suffix=".txt.gz") as temp:
-        temp_path = pathlib.Path(temp.name)
-        normalised_score = scorefile.normalise(
-            drop_missing=drop_missing,
-            **liftover_kwargs,
-            target_build=target_build,
-        )
-        score_batches = batched(normalised_score, n=batch_size)
-
-        try:
-            with xopen(temp_path, mode="w") as out_csv:
-                logger.info("Opening file for writing")
-                output_field_order = [
-                    "chr_name",
-                    "chr_position",
-                    "effect_allele",
-                    "other_allele",
-                    "effect_weight",
-                    "effect_type",
-                    "is_duplicated",
-                    "accession",
-                    "row_nr",
-                ]
-                writer = csv.DictWriter(
-                    out_csv,
-                    fieldnames=output_field_order,
-                    delimiter="\t",
-                    extrasaction="ignore",
-                )
-                writer.writeheader()
-                for batch in score_batches:
-                    variant_batch = [x.model_dump() for x in batch]
-                    variant_log.extend([VariantLog(**x) for x in variant_batch])
-                    logger.info(f"Writing variant batch (size: {batch_size}) to file")
-                    writer.writerows(variant_batch)
-        except EffectTypeError:
-            logger.warning(
-                f"Unsupported non-additive effect types in {scorefile=}, skipping"
-            )
-            is_compatible = False
-        except pydantic.ValidationError:
-            logger.critical(
-                f"{scorefile.pgs_id} contains invalid data, stopping and exploding"
-            )
-            raise
-        else:
-            logger.info(f"Finished processing {scorefile.pgs_id}")
-            temp_path.rename(out_path)
-            logger.info(f"Written normalised score to {out_path=}")
-
-    log: ScoreLog = ScoreLog(
-        header=scorefile.header,
-        variant_logs=variant_log,
-        compatible_effect_type=is_compatible,
-    )
-
-    if log.variants_are_missing:
-        logger.warning(
-            f"{log.variant_count_difference} fewer variants in output compared to original file"
-        )
-
-    return log
 
 
 def run():
@@ -157,19 +59,26 @@ def run():
 
     n_finished = 0
 
-    # TODO: max_workers=1: ready to parallelise and write to separate files
-    with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
         futures = []
         for scorefile in scoring_files:
+            if scorefile.path.name.endswith(".gz"):
+                gzip_output = True
+            else:
+                gzip_output = False
+
             out_path = out_dir / ("normalised_" + scorefile.path.name)
+
             futures.append(
                 executor.submit(
-                    _combine,
+                    write_normalised,
                     scorefile=scorefile,
                     target_build=target_build,
                     liftover_kwargs=liftover_kwargs,
                     drop_missing=args.drop_missing,
                     out_path=out_path,
+                    gzip_output=gzip_output,
+                    batch_size=args.batch_size,
                 )
             )
 
@@ -299,6 +208,20 @@ def parse_args(args=None):
         dest="verbose",
         action="store_true",
         help="<Optional> Extra logging information",
+    )
+    parser.add_argument(
+        "--batch_size",
+        dest="batch_size",
+        type=int,
+        default=100_000,
+        help="<Optional> Number of records to process in each batch",
+    )
+    parser.add_argument(
+        "--threads",
+        dest="threads",
+        type=int,
+        default=1,
+        help="<Optional> Number of Python worker processes to use",
     )
 
     return parser.parse_args(args)
