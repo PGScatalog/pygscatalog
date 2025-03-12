@@ -52,55 +52,59 @@ def write_normalised(
     # suffix is important for xopen to automatically compress output
     suffix = ".txt.gz" if gzip_output else ".txt"
 
-    with tempfile.NamedTemporaryFile(suffix=suffix) as temp:
-        temp_path = pathlib.Path(temp.name)
-        normalised_score = scorefile.normalise(
-            drop_missing=drop_missing,
-            **liftover_kwargs,
-            target_build=target_build,
-        )
-        score_batches = batched(normalised_score, n=batch_size)
+    temp_path = pathlib.Path(
+        tempfile.NamedTemporaryFile(suffix=suffix, delete=False).name
+    )
 
-        try:
-            with xopen(temp_path, mode="w") as out_csv:
-                logger.info("Opening file for writing")
-                output_field_order = [
-                    "chr_name",
-                    "chr_position",
-                    "effect_allele",
-                    "other_allele",
-                    "effect_weight",
-                    "effect_type",
-                    "is_duplicated",
-                    "accession",
-                    "row_nr",
-                ]
-                writer = csv.DictWriter(
-                    out_csv,
-                    fieldnames=output_field_order,
-                    delimiter="\t",
-                    extrasaction="ignore",
-                )
-                writer.writeheader()
-                for batch in score_batches:
-                    variant_batch = [x.model_dump() for x in batch]
-                    variant_log.extend([VariantLog(**x) for x in variant_batch])
-                    logger.info(f"Writing variant batch (size: {batch_size}) to file")
-                    writer.writerows(variant_batch)
-        except EffectTypeError:
-            logger.warning(
-                f"Unsupported non-additive effect types in {scorefile=}, skipping"
+    normalised_score = scorefile.normalise(
+        drop_missing=drop_missing,
+        **liftover_kwargs,
+        target_build=target_build,
+    )
+    score_batches = batched(normalised_score, n=batch_size)
+
+    try:
+        with xopen(temp_path, mode="w") as out_csv:
+            logger.info("Opening file for writing")
+            output_field_order = [
+                "chr_name",
+                "chr_position",
+                "effect_allele",
+                "other_allele",
+                "effect_weight",
+                "effect_type",
+                "is_duplicated",
+                "accession",
+                "row_nr",
+            ]
+            writer = csv.DictWriter(
+                out_csv,
+                fieldnames=output_field_order,
+                delimiter="\t",
+                extrasaction="ignore",
             )
-            is_compatible = False
-        except pydantic.ValidationError:
-            logger.critical(
-                f"{scorefile.pgs_id} contains invalid data, stopping and exploding"
-            )
-            raise
-        else:
-            logger.info(f"Finished processing {scorefile.pgs_id}")
-            temp_path.rename(out_path)
-            logger.info(f"Written normalised score to {out_path=}")
+            writer.writeheader()
+            for batch in score_batches:
+                variant_batch = [x.model_dump() for x in batch]
+                variant_log.extend([VariantLog(**x) for x in variant_batch])
+                logger.info(f"Writing variant batch (size: {batch_size}) to file")
+                writer.writerows(variant_batch)
+    except EffectTypeError:
+        logger.warning(
+            f"Unsupported non-additive effect types in {scorefile=}, skipping"
+        )
+        is_compatible = False
+    except pydantic.ValidationError:
+        logger.critical(
+            f"{scorefile.pgs_id} contains invalid data, stopping and exploding"
+        )
+        raise
+    else:
+        logger.info(f"Finished processing {scorefile.pgs_id}")
+        temp_path.rename(out_path)
+        logger.info(f"Written normalised score to {out_path=}")
+    finally:
+        temp_path.unlink(missing_ok=True)
 
     log: ScoreLog = ScoreLog(
         header=scorefile.header,
