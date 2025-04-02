@@ -342,3 +342,42 @@ def test_match_fail(tmp_path_factory, bad_scorefile, good_variants):
     with pytest.raises(ZeroMatchesError):
         with patch("sys.argv", flargs):
             run_match()
+
+
+@pytest.fixture(scope="module")
+def multiple_scorefiles(request):
+    return [
+        request.path.parent / "data" / "normalised_PGS000001_hmPOS_GRCh38.txt.gz",
+        request.path.parent / "data" / "normalised_PGS000866_hmPOS_GRCh38.txt.gz",
+    ]
+
+
+def test_multiple_scorefiles(
+    tmp_path_factory, multiple_scorefiles, good_scorefile, good_variants
+):
+    """Test that multiple scoring files can be used with pgscatalog-match"""
+    outdir = tmp_path_factory.mktemp("outdir")
+
+    args = [
+        (
+            "pgscatalog-match",
+            "-d",
+            "test",
+            "-s",
+            *[str(x) for x in multiple_scorefiles + [good_scorefile]],
+            "-t",
+            str(good_variants),
+            "--outdir",
+            str(outdir),
+            "--min_overlap",
+            "0.01",
+        )
+    ]
+
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run_match()
+
+    assert (outdir / "test_log.csv.gz").exists()
+    assert (outdir / "test_summary.csv").exists()

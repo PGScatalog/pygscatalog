@@ -34,7 +34,7 @@ class ScoringFileFrame:
     >>> path = Config.ROOT_DIR.parent / "pgscatalog.core" / "tests" / "data" / "combined.txt.gz"
     >>> x = ScoringFileFrame(path)
     >>> x  # doctest: +ELLIPSIS
-    ScoringFileFrame(NormalisedScoringFile('.../combined.txt.gz'))
+    ScoringFileFrame([NormalisedScoringFile('.../combined.txt.gz')])
 
     Using a context manager is important to prepare a polars dataframe:
 
@@ -52,8 +52,14 @@ class ScoringFileFrame:
     MatchResult(dataset=hapnest, matchresult=[<LazyFrame ...
     """
 
-    def __init__(self, path, chrom=None, cleanup=True, tmpdir=None):
-        self.scoringfile = NormalisedScoringFile(path)
+    def __init__(self, paths, chrom=None, cleanup=True, tmpdir=None):
+        try:
+            iter(paths)  # Check if paths is iterable
+        except TypeError:
+            paths = [paths]  # Wrap single Path in a list
+        finally:
+            self.scoringfiles = [NormalisedScoringFile(x) for x in paths]
+
         # used for filtering the scoring file if the target contains a single chromosome
         self.chrom = chrom
         self._cleanup = cleanup
@@ -69,7 +75,7 @@ class ScoringFileFrame:
         if not self._loosed:
             logger.debug(f"Converting {self!r} to feather format")
             self.arrowpaths = loose(
-                self.scoringfile,
+                self.scoringfiles,
                 tmpdir=self._tmpdir,
             )
             self._loosed = True
@@ -111,7 +117,7 @@ class ScoringFileFrame:
         pl.disable_string_cache()
 
     def __repr__(self):
-        return f"{type(self).__name__}({repr(self.scoringfile)})"
+        return f"{type(self).__name__}({repr(self.scoringfiles)})"
 
     def save_ipc(self, destination):
         """Save the dataframe prepared by the context manager to an Arrow IPC file
