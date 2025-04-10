@@ -3,13 +3,13 @@ name: Run CI on pgscatalog.match
 on:
   push:
     paths:
-      - 'pgscatalog.match/**.py'
+      - 'pgscatalog.utils/packages/pgscatalog.match/**.py'
   pull_request:
     paths:
-      - 'pgscatalog.match/**.py'
+      - 'pgscatalog.utils/packages/pgscatalog.match/**.py'
 
 jobs:
   ci-match:
     uses: ./.github/workflows/ci.yaml
     with:
-      package-directory: "pgscatalog.match"
+      package-directory: "pgscatalog.utils/packages/pgscatalog.match"

@@ -29,7 +29,7 @@ jobs:
     - id: set-matrix
       shell: bash
       run: echo session=$(nox --json -l | jq -c '[.[].session]') | tee --append $GITHUB_OUTPUT
-      working-directory: ${{ inputs.package-directory }}
+      working-directory: pgscatalog.utils/packages/${{ inputs.package-directory }}
 
   checks:
     name: Session ${{ matrix.session }}
@@ -49,7 +49,7 @@ jobs:
       uses: astral-sh/setup-uv@v5
 
     - run: nox -s "${{ matrix.session }}"
-      working-directory: ${{ inputs.package-directory }}
+      working-directory: pgscatalog.utils/packages/${{ inputs.package-directory }}
 
   coverage:
     runs-on: ubuntu-latest
@@ -69,7 +69,7 @@ jobs:
 
       - name: Make coverage report
         run: nox -s coverage
-        working-directory: ${{ inputs.package-directory }}
+        working-directory: pgscatalog.utils/packages/${{ inputs.package-directory }}
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4

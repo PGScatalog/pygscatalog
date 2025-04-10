@@ -3,13 +3,13 @@ name: Run CI on pgscatalog.core
 on:
   push:
     paths:
-      - 'pgscatalog.core/**.py'
+      - 'pgscatalog.utils/packages/pgscatalog.core/**.py'
   pull_request:
     paths:
-      - 'pgscatalog.core/**.py'
+      - 'pgscatalog.utils/packages/pgscatalog.core/**.py'
 
 jobs:
   ci-core:
     uses: ./.github/workflows/ci.yaml
     with:
-      package-directory: "pgscatalog.core"
+      package-directory: "pgscatalog.utils/packages/pgscatalog.core"
