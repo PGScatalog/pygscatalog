@@ -1,10 +1,11 @@
-""" Functions for combine_cli.py """
+"""Convenience functions for pgscatalog-format"""
 
 import csv
 import logging
 import pathlib
 import tempfile
 from itertools import islice
+from typing import Optional
 
 import pydantic
 from xopen import xopen
@@ -32,7 +33,7 @@ def batched(iterable, n):
         yield batch
 
 
-def write_normalised(
+def format_and_write(
     scorefile: ScoringFile,
     target_build: GenomeBuild,
     drop_missing: bool,
@@ -40,7 +41,7 @@ def write_normalised(
     liftover_kwargs: dict,
     batch_size: int = 100_000,
     gzip_output: bool = False,
-) -> ScoreLog:
+) -> Optional[ScoreLog]:
     """Take a PGS Catalog scoring file and write a subset of fields to a consistent structure
 
     Returns a score log generated from the score header and variant statistics

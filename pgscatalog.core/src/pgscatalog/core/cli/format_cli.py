@@ -7,7 +7,7 @@ import textwrap
 
 from tqdm import tqdm
 
-from pgscatalog.core.cli.normalise import write_normalised
+from pgscatalog.core.cli.format import format_and_write
 from pgscatalog.core.lib.models import ScoreLog, ScoreLogs
 from pgscatalog.core.lib import GenomeBuild, ScoringFile
 
@@ -20,6 +20,15 @@ def run():
         logging.getLogger("pgscatalog.core").setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
         logger.debug("Verbose logging enabled")
+
+    if pathlib.Path(sys.argv[0]).stem == "pgscatalog-combine":
+        logger.warning("pgscatalog-combine is deprecated")
+        logger.warning(
+            "It has been renamed to pgscatalog-format to clarify its purpose"
+        )
+        logger.warning(
+            "This script will be removed in a future release, please use pgscatalog-format instead"
+        )
 
     out_dir = pathlib.Path(args.outfile).resolve()
 
@@ -71,7 +80,7 @@ def run():
 
             futures.append(
                 executor.submit(
-                    write_normalised,
+                    format_and_write,
                     scorefile=scorefile,
                     target_build=target_build,
                     liftover_kwargs=liftover_kwargs,
@@ -115,9 +124,10 @@ def run():
 
 _description_text = textwrap.dedent(
     """
-    Combine multiple scoring files in PGS Catalog format (see 
-    https://www.pgscatalog.org/downloads/ for details) to a 'long' table of columns 
-    needed for variant matching and subsequent calculation.
+    Format multiple scoring files in PGS Catalog format (see 
+    https://www.pgscatalog.org/downloads/ for details) to a standard column set 
+    needed for variant matching and subsequent calculation. During this process Variants 
+    are checked to make sure they pass data validation using the PGS Catalog standard data models. 
 
     Custom scorefiles in PGS Catalog format can be combined with PGS Catalog scoring files, and 
     optionally liftover genomic coordinates to GRCh37 or GRCh38. The script can accept a mix of
@@ -129,8 +139,7 @@ _description_text = textwrap.dedent(
 
 _epilog_text = textwrap.dedent(
     """
-    The long table is used to simplify intersecting variants in target genotyping datasets 
-    and the scoring files with the match_variants program.
+    The standard column set is used by other PGS Catalog applications such as pgscatalog-match.
     """
 )
 

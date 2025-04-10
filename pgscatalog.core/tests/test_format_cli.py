@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pydantic
 import pytest
 
-from pgscatalog.core.cli.combine_cli import run
+from pgscatalog.core.cli.format_cli import run
 from pgscatalog.core import ScoringFile
 
 
@@ -102,7 +102,7 @@ def test_invalid_scorefile(tmp_path, invalid_scorefile):
     """There's nothing that can be done for this file, except explode loudly"""
     path = [str(invalid_scorefile)]
 
-    args = [("pgscatalog-combine", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh37")]
+    args = [("pgscatalog-format", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh37")]
     flargs = list(itertools.chain(*args))
 
     # make sure the correct exception type is being raised by the CLI
@@ -115,7 +115,7 @@ def test_fail_harmonised(tmp_path, fail_harmonised):
     """Variants that have failed harmonisation will be missing mandatory fields, but we should accept them as a special case and write out like normal"""
     path = [str(fail_harmonised)]
 
-    args = [("pgscatalog-combine", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh38")]
+    args = [("pgscatalog-format", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh38")]
     flargs = list(itertools.chain(*args))
 
     with patch("sys.argv", flargs):
@@ -132,7 +132,7 @@ def test_combine_nonadditive(tmp_path, non_additive_scorefile_grch38):
     """Test normalising a single non-additive scoring file fails."""
     path = [str(non_additive_scorefile_grch38)]
 
-    args = [("pgscatalog-combine", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh38")]
+    args = [("pgscatalog-format", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh38")]
     flargs = list(itertools.chain(*args))
 
     with pytest.raises(ValueError):
@@ -146,7 +146,7 @@ def test_combine_skip(
     """Test that combining skips non-additive files but otherwise completes successfully."""
     paths = [str(non_additive_scorefile_grch38), str(pgs000001_grch38)]
 
-    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(tmp_path), "-t", "GRCh38")]
+    args = [("pgscatalog-format", "-s"), paths, ("-o", str(tmp_path), "-t", "GRCh38")]
     flargs = list(itertools.chain(*args))
 
     with patch("sys.argv", flargs):
@@ -176,7 +176,7 @@ def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
     paths = [str(x) for _, x in scorefiles]
     build = "GRCh38"
 
-    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(tmp_path), "-t", build)]
+    args = [("pgscatalog-format", "-s"), paths, ("-o", str(tmp_path), "-t", build)]
     flargs = list(itertools.chain(*args))
 
     with pytest.raises(ValueError) as excinfo:
@@ -193,7 +193,7 @@ def test_combine_score_harmonised(
     paths = [str(x) for _, x in harmonised_scorefiles]
     build = [str(x) for x, _ in harmonised_scorefiles][0]
 
-    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(tmp_path), "-t", build)]
+    args = [("pgscatalog-format", "-s"), paths, ("-o", str(tmp_path), "-t", build)]
     flargs = list(itertools.chain(*args))
 
     with patch("sys.argv", flargs):
@@ -226,7 +226,7 @@ def test_combine_fail(tmp_path, harmonised_scorefiles):
         target_build = "GRCh37"
 
     args = [
-        ("pgscatalog-combine", "-s"),
+        ("pgscatalog-format", "-s"),
         paths,
         ("-o", str(tmp_path), "-t", target_build),
     ]
@@ -243,7 +243,7 @@ def test_combine_custom(tmp_path, custom_scorefiles):
     target_build = "GRCh37"
 
     args = [
-        ("pgscatalog-combine", "-s"),
+        ("pgscatalog-format", "-s"),
         (str(x) for x in custom_scorefiles),
         ("-o", str(tmp_path), "-t", target_build),
     ]
@@ -291,7 +291,7 @@ def test_liftover(tmp_path, chain_dir, lift_scorefiles):
     target_build, path = lift_scorefiles[0]
     _, grch38_path = lift_scorefiles[1]
     args = [
-        ("pgscatalog-combine", "-s", str(path)),
+        ("pgscatalog-format", "-s", str(path)),
         ("-o", str(tmp_path), "-t", target_build),
         ("--liftover", "--chain_dir", str(chain_dir)),
     ]

@@ -11,7 +11,8 @@ packages = [
 
 [tool.poetry.scripts]
 pgscatalog-download = 'pgscatalog.core.cli.download_cli:run'
-pgscatalog-combine = 'pgscatalog.core.cli.combine_cli:run'
+pgscatalog-combine = 'pgscatalog.core.cli.format_cli:run' # deprecated
+pgscatalog-format = 'pgscatalog.core.cli.format_cli:run'
 pgscatalog-relabel = 'pgscatalog.core.cli.relabel_cli:run'
 
 [tool.poetry.dependencies]
