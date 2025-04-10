@@ -15,7 +15,7 @@ jobs:
         uses: docker/login-action@v3
         with:        
           registry: dockerhub.ebi.ac.uk
-          username: gitlab-action
+          username: pygscatalog-action
           password: ${{ secrets.GITLAB_TOKEN }}
           
       -
