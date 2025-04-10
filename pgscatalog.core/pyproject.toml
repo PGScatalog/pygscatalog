@@ -1,6 +1,6 @@
 [project]
 name = "pgscatalog.core"
-version = "0.4.0"
+version = "1.0.0"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 license = {text = "Apache License (2.0)"}
 authors = [
@@ -36,7 +36,8 @@ dependencies = [
 # https://peps.python.org/pep-0621/
 [project.scripts]
 pgscatalog-download = 'pgscatalog.core.cli.download_cli:run'
-pgscatalog-combine = 'pgscatalog.core.cli.combine_cli:run'
+pgscatalog-combine = 'pgscatalog.core.cli.format_cli:run' # deprecated
+pgscatalog-format = 'pgscatalog.core.cli.format_cli:run'
 pgscatalog-relabel = 'pgscatalog.core.cli.relabel_cli:run'
 
 # https://peps.python.org/pep-0735/

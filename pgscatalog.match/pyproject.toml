@@ -1,6 +1,6 @@
 [project]
 name = "pgscatalog.match"
-version = "0.3.3"
+version = "0.4.0"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
 license = {text = "Apache License (2.0)"}
 authors = [

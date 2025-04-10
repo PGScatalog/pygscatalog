@@ -44,7 +44,7 @@ def run_match():
     Config.CLEANUP = args.cleanup
     Config.OUTDIR = pathlib.Path(args.outdir)
 
-    Config.SCOREFILE = pathlib.Path(args.scorefile)
+    Config.SCOREFILE = [pathlib.Path(x) for x in args.scorefile]
 
     if not Config.OUTDIR.exists():
         raise FileNotFoundError(f"{Config.OUTDIR} does not exist")
@@ -77,7 +77,7 @@ def run_match():
 
     # start doing the work
     with ScoringFileFrame(
-        path=Config.SCOREFILE,
+        paths=Config.SCOREFILE,
         chrom=Config.CHROM,
         cleanup=Config.CLEANUP,
         tmpdir=Config.TMPDIR,
@@ -147,7 +147,9 @@ def parse_args(args=None):
         "--scorefiles",
         dest="scorefile",
         required=True,
-        help="<Required> Combined scorefile path (output of read_scorefiles.py)",
+        nargs="+",
+        default=[],
+        help="<Required> Path to scorefile. Multiple paths supported",
     )
     parser.add_argument(
         "-t",
