@@ -71,7 +71,7 @@ def run():
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
         futures = []
         for scorefile in scoring_files:
-            logger.debug(f"Submitting {scorefile.local_path.name} to executor")
+            logger.info(f"Submitting {scorefile.local_path.name} to executor")
 
             if scorefile.path.name.endswith(".gz"):
                 gzip_output = True

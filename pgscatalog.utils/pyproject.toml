@@ -65,11 +65,13 @@ sigterm = true
 [tool.uv]
 default-groups = ["test", "lint"]
 
+[tool.uv.workspace]
+members = ["packages/*"]
+
 [tool.uv.sources]
 pgscatalog-core = { workspace = true }
 pgscatalog-calc = { workspace = true }
 pgscatalog-match = { workspace = true }
-
 
 [tool.mypy]
 files = ["src/**/*.py"]
@@ -81,7 +83,3 @@ disallow_incomplete_defs = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-
-[tool.uv.workspace]
-members = ["../pgscatalog.core", "../pgscatalog.calc", "../pgscatalog.match"]
