@@ -13,6 +13,7 @@ from functools import singledispatch
 
 from polars.io.csv import BatchedCsvReader
 
+from pgscatalog.match.lib.normalisedscoringfile import NormalisedScoringFile
 from pgscatalog.match.lib.targetvariants import TargetVariants, TargetType
 
 
@@ -27,13 +28,10 @@ def loose(path, tmpdir=None):
 
 
 @loose.register
-def _(paths: list, tmpdir=None):  # type: ignore
+def _(path: NormalisedScoringFile, tmpdir=None):  # type: ignore
     """Write NormalisedScoringFiles to a list of arrow IPC files"""
-    # TODO: assumes NormalisedScoringFiles are lists. this isn't nice and needs fixed.
-
     if tmpdir is None:
         tmpdir = tempfile.mkdtemp()
-
     # alleles are first read as strings and converted to categoricals later
     dtypes = {
         "chr_name": pl.Categorical,
@@ -47,14 +45,8 @@ def _(paths: list, tmpdir=None):  # type: ignore
         "row_nr": pl.UInt64,
     }
 
-    arrowpaths = []
-    for path in paths:
-        reader = pl.read_csv_batched(path.path, dtypes=dtypes, separator="\t")
-        arrowpaths.extend(
-            batch_read(reader, tmpdir=tmpdir, cols_keep=list(dtypes.keys()))
-        )
-
-    return arrowpaths
+    reader = pl.read_csv_batched(path.path, dtypes=dtypes, separator="\t")
+    return batch_read(reader, tmpdir=tmpdir, cols_keep=pl.all())
 
 
 @loose.register

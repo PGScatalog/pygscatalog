@@ -3,13 +3,12 @@ import csv
 import gzip
 import itertools
 import json
-import pathlib
 from unittest.mock import patch
 
 import pydantic
 import pytest
 
-from pgscatalog.core.cli.format_cli import run
+from pgscatalog.core.cli.combine_cli import run
 from pgscatalog.core import ScoringFile
 
 
@@ -100,9 +99,10 @@ def invalid_scorefile(request):
 
 def test_invalid_scorefile(tmp_path, invalid_scorefile):
     """There's nothing that can be done for this file, except explode loudly"""
+    out_path = tmp_path / "combined.txt"
     path = [str(invalid_scorefile)]
 
-    args = [("pgscatalog-format", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh37")]
+    args = [("pgscatalog-combine", "-s"), path, ("-o", str(out_path), "-t", "GRCh37")]
     flargs = list(itertools.chain(*args))
 
     # make sure the correct exception type is being raised by the CLI
@@ -113,26 +113,28 @@ def test_invalid_scorefile(tmp_path, invalid_scorefile):
 
 def test_fail_harmonised(tmp_path, fail_harmonised):
     """Variants that have failed harmonisation will be missing mandatory fields, but we should accept them as a special case and write out like normal"""
+    out_path = tmp_path / "combined.txt"
     path = [str(fail_harmonised)]
 
-    args = [("pgscatalog-format", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh38")]
+    args = [("pgscatalog-combine", "-s"), path, ("-o", str(out_path), "-t", "GRCh38")]
     flargs = list(itertools.chain(*args))
 
     with patch("sys.argv", flargs):
         run()
 
     # https://github.com/PGScatalog/pygscatalog/issues/55
-    assert (tmp_path / "normalised_bad_harmonised.txt").exists()
-    with open(tmp_path / "normalised_bad_harmonised.txt", mode="rt") as f:
+    assert out_path.exists()
+    with open(out_path, mode="rt") as f:
         x = list(csv.reader(f, delimiter="\t"))
         assert len(x) == 4  # 3 variants + header
 
 
 def test_combine_nonadditive(tmp_path, non_additive_scorefile_grch38):
     """Test normalising a single non-additive scoring file fails."""
+    out_path = tmp_path / "combined.txt.gz"
     path = [str(non_additive_scorefile_grch38)]
 
-    args = [("pgscatalog-format", "-s"), path, ("-o", str(tmp_path), "-t", "GRCh38")]
+    args = [("pgscatalog-combine", "-s"), path, ("-o", str(out_path), "-t", "GRCh38")]
     flargs = list(itertools.chain(*args))
 
     with pytest.raises(ValueError):
@@ -144,17 +146,16 @@ def test_combine_skip(
     tmp_path, non_additive_scorefile_grch38, pgs000001_grch38, n_variants
 ):
     """Test that combining skips non-additive files but otherwise completes successfully."""
+    out_path = tmp_path / "combined.txt.gz"
     paths = [str(non_additive_scorefile_grch38), str(pgs000001_grch38)]
 
-    args = [("pgscatalog-format", "-s"), paths, ("-o", str(tmp_path), "-t", "GRCh38")]
+    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", "GRCh38")]
     flargs = list(itertools.chain(*args))
 
     with patch("sys.argv", flargs):
         run()
 
-    with gzip.open(
-        tmp_path / "normalised_PGS000001_hmPOS_GRCh38.txt.gz", mode="rt"
-    ) as f:
+    with gzip.open(out_path, mode="rt") as f:
         csv_reader = csv.DictReader(f, delimiter="\t")
         results = list(csv_reader)
 
@@ -173,10 +174,11 @@ def test_combine_skip(
 def test_combine_score(tmp_path, scorefiles, expected_fields, n_variants):
     """Test combining unharmonised files.
     Genome build is missing from these files, so it should fail."""
+    out_path = tmp_path / "combined.txt.gz"
     paths = [str(x) for _, x in scorefiles]
     build = "GRCh38"
 
-    args = [("pgscatalog-format", "-s"), paths, ("-o", str(tmp_path), "-t", build)]
+    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", build)]
     flargs = list(itertools.chain(*args))
 
     with pytest.raises(ValueError) as excinfo:
@@ -190,20 +192,19 @@ def test_combine_score_harmonised(
 ):
     """Test combining harmonised data: PGS000001 and PGS000002.
     The genome build always matches across both files, so combining should work."""
+    out_path = tmp_path / "combined.txt.gz"
     paths = [str(x) for _, x in harmonised_scorefiles]
     build = [str(x) for x, _ in harmonised_scorefiles][0]
 
-    args = [("pgscatalog-format", "-s"), paths, ("-o", str(tmp_path), "-t", build)]
+    args = [("pgscatalog-combine", "-s"), paths, ("-o", str(out_path), "-t", build)]
     flargs = list(itertools.chain(*args))
 
     with patch("sys.argv", flargs):
         run()
 
-    results = []
-    for path in [pathlib.Path(x).name for x in paths]:
-        with gzip.open(tmp_path / ("normalised_" + path), mode="rt") as f:
-            csv_reader = csv.DictReader(f, delimiter="\t")
-            results.extend(list(csv_reader))
+    with gzip.open(out_path, mode="rt") as f:
+        csv_reader = csv.DictReader(f, delimiter="\t")
+        results = list(csv_reader)
 
     # split to remove harmonisation suffix hmPOS_GRCh3X
     pgs = collections.Counter([x["accession"].split("_")[0] for x in results])
@@ -216,6 +217,7 @@ def test_combine_score_harmonised(
 def test_combine_fail(tmp_path, harmonised_scorefiles):
     """Test combining files with the same build but the wrong target build.
     Local files are in GRCh38, but we say we want GRCh37 (and vice versa)"""
+    out_path = tmp_path / "combined.txt.gz"
     paths = [str(x) for _, x in harmonised_scorefiles]
     build = [str(x) for x, _ in harmonised_scorefiles][0]
 
@@ -226,9 +228,9 @@ def test_combine_fail(tmp_path, harmonised_scorefiles):
         target_build = "GRCh37"
 
     args = [
-        ("pgscatalog-format", "-s"),
+        ("pgscatalog-combine", "-s"),
         paths,
-        ("-o", str(tmp_path), "-t", target_build),
+        ("-o", str(out_path), "-t", target_build),
     ]
     flargs = list(itertools.chain(*args))
 
@@ -240,59 +242,58 @@ def test_combine_fail(tmp_path, harmonised_scorefiles):
 
 def test_combine_custom(tmp_path, custom_scorefiles):
     """Test combining custom scoring files (not from PGS Catalog), including a scoring file that's missing the other allele column"""
+    out_path = tmp_path / "combined.txt"
     target_build = "GRCh37"
 
     args = [
-        ("pgscatalog-format", "-s"),
+        ("pgscatalog-combine", "-s"),
         (str(x) for x in custom_scorefiles),
-        ("-o", str(tmp_path), "-t", target_build),
+        ("-o", str(out_path), "-t", target_build),
     ]
     flargs = list(itertools.chain(*args))
 
     with patch("sys.argv", flargs):
         run()
 
-    with open(tmp_path / "normalised_custom.txt", mode="rt") as f:
+    with open(out_path, mode="rt") as f:
         csv_reader = csv.DictReader(f, delimiter="\t")
-        assert list(csv_reader) == [
-            {
-                "chr_name": "1",
-                "chr_position": "10397",
-                "effect_allele": "C",
-                "other_allele": "A",
-                "effect_weight": "-2.76E-02",
-                "effect_type": "additive",
-                "is_duplicated": "False",
-                "accession": "test",
-                "row_nr": "0",
-            }
-        ]
+        results = list(csv_reader)
 
-    with open(tmp_path / "normalised_custom_no_oa.txt", mode="rt") as f:
-        csv_reader = csv.DictReader(f, delimiter="\t")
-        assert list(csv_reader) == [
-            {
-                "chr_name": "1",
-                "chr_position": "10397",
-                "effect_allele": "C",
-                "other_allele": "",
-                "effect_weight": "-2.76E-02",
-                "effect_type": "additive",
-                "is_duplicated": "False",
-                "accession": "test2",
-                "row_nr": "0",
-            }
-        ]
+    assert results == [
+        {
+            "chr_name": "1",
+            "chr_position": "10397",
+            "effect_allele": "C",
+            "other_allele": "A",
+            "effect_weight": "-2.76E-02",
+            "effect_type": "additive",
+            "is_duplicated": "False",
+            "accession": "test",
+            "row_nr": "0",
+        },
+        {
+            "chr_name": "1",
+            "chr_position": "10397",
+            "effect_allele": "C",
+            "other_allele": "",
+            "effect_weight": "-2.76E-02",
+            "effect_type": "additive",
+            "is_duplicated": "False",
+            "accession": "test2",
+            "row_nr": "0",
+        },
+    ]
 
 
 def test_liftover(tmp_path, chain_dir, lift_scorefiles):
     """Test lifting over a scoring file from GRCh37 to GRCh38.
     Compare lifted coordinates with known good results"""
+    out_path = tmp_path / "combined.txt"
     target_build, path = lift_scorefiles[0]
     _, grch38_path = lift_scorefiles[1]
     args = [
-        ("pgscatalog-format", "-s", str(path)),
-        ("-o", str(tmp_path), "-t", target_build),
+        ("pgscatalog-combine", "-s", str(path)),
+        ("-o", str(out_path), "-t", target_build),
         ("--liftover", "--chain_dir", str(chain_dir)),
     ]
 
@@ -301,7 +302,7 @@ def test_liftover(tmp_path, chain_dir, lift_scorefiles):
     with patch("sys.argv", flargs):
         run()
 
-    with open(tmp_path / "normalised_PGS000001_hmPOS_GRCh37.txt") as f:
+    with open(out_path) as f:
         lifted_reader = csv.DictReader(f, delimiter="\t")
         known_good = [x.chr_position for x in ScoringFile(grch38_path).variants]
         lifted_pos = [row["chr_position"] for row in lifted_reader]

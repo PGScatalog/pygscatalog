@@ -4,36 +4,102 @@ import logging
 import pathlib
 import sys
 import textwrap
+from typing import Optional
 
+import pydantic
 from tqdm import tqdm
 
-from pgscatalog.core.cli.format import format_and_write
-from pgscatalog.core.lib.models import ScoreLog, ScoreLogs
-from pgscatalog.core.lib import GenomeBuild, ScoringFile
+from pgscatalog.core.lib.models import ScoreLog, ScoreLogs, ScoreVariant, VariantLog
+from pgscatalog.core.lib import GenomeBuild, ScoringFile, EffectTypeError
+
+from pgscatalog.core.cli._combine import TextFileWriter
 
 logger = logging.getLogger(__name__)
 
 
+def _combine(
+    scorefile: ScoringFile,
+    target_build: GenomeBuild,
+    drop_missing: bool,
+    compress_output: bool,
+    out_path: pathlib.Path,
+    liftover_kwargs: dict,
+) -> ScoreLog:
+    """This function normalises a single scoring file to a consistent structure and returns a summary log generated from the score header and variant statistics"""
+    logger.info(f"Started processing {scorefile.pgs_id}")
+    dumped_variants: Optional[list[dict]] = None
+    is_compatible: bool = True
+    try:
+        normalised_score = scorefile.normalise(
+            drop_missing=drop_missing,
+            **liftover_kwargs,
+            target_build=target_build,
+        )
+        # these fields are important for dumping and analysing output variants
+        fields: set[str] = set(ScoreVariant.output_fields).union(
+            {"accession", "row_nr", "hm_source", "is_complex"}
+        )
+        # it's important to create the list here to raise EffectTypeErrors
+        # for the largest scoring files this can use quite a lot of memory (~32GB)
+        # TODO: materialise and write these variants in batches to reduce memory usage
+        # don't forget to think about deleting a partially written file (i.e. bad batch?)
+        dumped_variants = list(x.model_dump(include=fields) for x in normalised_score)
+        logger.info(f"Finished processing {scorefile.pgs_id}")
+    except EffectTypeError:
+        logger.warning(
+            f"Unsupported non-additive effect types in {scorefile=}, skipping"
+        )
+        is_compatible = False
+    except pydantic.ValidationError:
+        logger.critical(
+            f"{scorefile.pgs_id} contains invalid data, stopping and exploding"
+        )
+        raise
+    else:
+        # no exceptions found, good to write out
+        logger.info("Writing variants to file")
+        writer = TextFileWriter(compress=compress_output, filename=out_path)
+        writer.write(dumped_variants)
+        logger.info("Finished writing")
+
+    # (don't use finally clause here, it was hiding helpful exceptions)
+    variant_logs: Optional[list[VariantLog]] = None
+    if dumped_variants is not None:
+        variant_logs = [VariantLog(**x) for x in dumped_variants]
+
+    log: ScoreLog = ScoreLog(
+        header=scorefile.header,
+        variant_logs=variant_logs,
+        compatible_effect_type=is_compatible,
+    )
+    if log.variants_are_missing:
+        logger.warning(
+            f"{log.variant_count_difference} fewer variants in output compared to original file"
+        )
+    logger.info("Normalisation complete, returning score log")
+    return log
+
+
 def run():
     args = parse_args()
-    if args.verbose:  # pragma: no cover
+    if args.verbose:
         logging.getLogger("pgscatalog.core").setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
         logger.debug("Verbose logging enabled")
 
-    if pathlib.Path(sys.argv[0]).stem == "pgscatalog-combine":  # pragma: no cover
-        logger.warning("pgscatalog-combine is deprecated")
-        logger.warning(
-            "It has been renamed to pgscatalog-format to clarify its purpose"
-        )
-        logger.warning(
-            "This script will be removed in a future release, please use pgscatalog-format instead"
-        )
+    out_path = pathlib.Path(args.outfile).resolve()
 
-    out_dir = pathlib.Path(args.outfile).resolve()
+    if out_path.exists():
+        logger.critical(f"Output file already exists: {args.outfile}")
+        raise FileExistsError
 
-    if not out_dir.is_dir():
-        raise NotADirectoryError
+    match x := out_path.name:
+        case _ if x.endswith("gz"):
+            logger.debug("Compressing output with gzip")
+            compress_output = True
+        case _:
+            logger.debug("Not compressing output")
+            compress_output = False
 
     paths = list(set(args.scorefiles))  # unique paths only
     scoring_files = sorted([ScoringFile(x) for x in paths], key=lambda x: x.pgs_id)
@@ -68,26 +134,19 @@ def run():
 
     n_finished = 0
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
+    # TODO: max_workers=1: ready to parallelise and write to separate files
+    with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
         futures = []
         for scorefile in scoring_files:
-            if scorefile.path.name.endswith(".gz"):
-                gzip_output = True
-            else:
-                gzip_output = False
-
-            out_path = out_dir / ("normalised_" + scorefile.path.name)
-
             futures.append(
                 executor.submit(
-                    format_and_write,
+                    _combine,
                     scorefile=scorefile,
                     target_build=target_build,
                     liftover_kwargs=liftover_kwargs,
                     drop_missing=args.drop_missing,
+                    compress_output=compress_output,
                     out_path=out_path,
-                    gzip_output=gzip_output,
-                    batch_size=args.batch_size,
                 )
             )
 
@@ -106,7 +165,7 @@ def run():
                 )
             variant_log.append(log)
 
-    if n_finished == 0 or not out_dir.exists():
+    if n_finished == 0 or not out_path.exists():
         raise ValueError(
             "Couldn't process any scoring files. Did they all have non-additive weights?"
         )
@@ -114,18 +173,7 @@ def run():
     if n_finished != len(scoring_files):
         logger.warning(f"{len(scoring_files) - n_finished} scoring files were skipped")
 
-    pgs_ids_per_file = [x.header.pgs_id for x in variant_log]
-    seen = set()
-    dupes = {x for x in pgs_ids_per_file if x in seen or seen.add(x)}
-
-    if dupes:  # pragma: no cover
-        logger.critical(f"Found the same PGS ID in more than one scoring file {dupes=}")
-        logger.critical(
-            "Are you accidentally processing multiple PGS scoring files that have the same PGS ID?"
-        )
-        raise ValueError("The same PGS ID occurs in more than one scoring file")
-
-    log_out_path = pathlib.Path(args.outfile) / args.logfile
+    log_out_path = pathlib.Path(args.outfile).parent / args.logfile
     with open(log_out_path, "w") as f:
         logger.info(f"Writing log to {f.name}")
         f.write(ScoreLogs(variant_log).model_dump_json())
@@ -135,10 +183,9 @@ def run():
 
 _description_text = textwrap.dedent(
     """
-    Format multiple scoring files in PGS Catalog format (see 
-    https://www.pgscatalog.org/downloads/ for details) to a standard column set 
-    needed for variant matching and subsequent calculation. During this process Variants 
-    are checked to make sure they pass data validation using the PGS Catalog standard data models. 
+    Combine multiple scoring files in PGS Catalog format (see 
+    https://www.pgscatalog.org/downloads/ for details) to a 'long' table of columns 
+    needed for variant matching and subsequent calculation.
 
     Custom scorefiles in PGS Catalog format can be combined with PGS Catalog scoring files, and 
     optionally liftover genomic coordinates to GRCh37 or GRCh38. The script can accept a mix of
@@ -150,7 +197,8 @@ _description_text = textwrap.dedent(
 
 _epilog_text = textwrap.dedent(
     """
-    The standard column set is used by other PGS Catalog applications such as pgscatalog-match.
+    The long table is used to simplify intersecting variants in target genotyping datasets 
+    and the scoring files with the match_variants program.
     """
 )
 
@@ -228,20 +276,6 @@ def parse_args(args=None):
         dest="verbose",
         action="store_true",
         help="<Optional> Extra logging information",
-    )
-    parser.add_argument(
-        "--batch_size",
-        dest="batch_size",
-        type=int,
-        default=100_000,
-        help="<Optional> Number of records to process in each batch",
-    )
-    parser.add_argument(
-        "--threads",
-        dest="threads",
-        type=int,
-        default=1,
-        help="<Optional> Number of Python worker processes to use",
     )
 
     return parser.parse_args(args)

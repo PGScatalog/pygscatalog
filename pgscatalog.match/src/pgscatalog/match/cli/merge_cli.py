@@ -34,7 +34,7 @@ def run_merge():
     Config.DATASET = args.dataset
     Config.CLEANUP = args.cleanup
     Config.OUTDIR = pathlib.Path(args.outdir)
-    Config.SCOREFILE = [pathlib.Path(x) for x in args.scorefile]
+    Config.SCOREFILE = pathlib.Path(args.scorefile)
 
     if not Config.OUTDIR.exists():
         raise FileNotFoundError(f"{Config.OUTDIR} does not exist")
@@ -59,7 +59,7 @@ def run_merge():
     Config.COMBINED = args.combined
 
     with ScoringFileFrame(
-        paths=Config.SCOREFILE,
+        path=Config.SCOREFILE,
         chrom=None,  # when merging, scoring files can't be filtered
         cleanup=Config.CLEANUP,
         tmpdir=Config.TMPDIR,
@@ -114,9 +114,7 @@ def parse_args(args=None):
         "--scorefile",
         dest="scorefile",
         required=True,
-        nargs="+",
-        default=[],
-        help="<Required> Path to scorefile. Multiple paths supported",
+        help="<Required> Path to scorefile",
     )
     parser.add_argument(
         "-m",
