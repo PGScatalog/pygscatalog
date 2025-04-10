@@ -105,7 +105,7 @@ def _(path: TargetVariants, tmpdir=None):  # type: ignore
 
 
 def batch_read(
-    reader: BatchedCsvReader, tmpdir: pathlib.Path, cols_keep: list[str]
+    reader: BatchedCsvReader, tmpdir: pathlib.Path, cols_keep: list[str] | pl.Expr
 ) -> list[pathlib.Path]:
     """Read a CSV in batches and write them to temporary files"""
     arrowpaths = []

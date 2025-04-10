@@ -1,43 +1,87 @@
-[tool.poetry]
+[project]
 name = "pgscatalog.core"
 version = "0.3.3"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
-license = "Apache-2.0"
-authors = ["Benjamin Wingfield <bwingfield@ebi.ac.uk>", "Samuel Lambert <sl925@medschl.cam.ac.uk>", "Laurent Gil <lg10@sanger.ac.uk>"]
+license = {text = "Apache License (2.0)"}
+authors = [
+    {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
+    {name = "Samuel Lambert", email = "sl925@medschl.cam.ac.uk"},
+    {name = "Laurent Gil", email = "lg10@sanger.ac.uk"},
+    {name = "Florent Yvon", email = "fy279@cam.ac.uk"}
+]
 readme = "README.md"
-packages = [
-    { include = "pgscatalog", from = "src" },
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 
-[tool.poetry.scripts]
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.28.1",
+    "natsort>=8.4.0",
+    "pydantic>=2.10.6",
+    "pyliftover>=0.4.1",
+    "tenacity>=9.0.0",
+    "tqdm>=4.67.1",
+    "xopen[zstd]>=2.0.2",
+]
+
+# https://peps.python.org/pep-0621/
+[project.scripts]
 pgscatalog-download = 'pgscatalog.core.cli.download_cli:run'
 pgscatalog-combine = 'pgscatalog.core.cli.combine_cli:run'
 pgscatalog-relabel = 'pgscatalog.core.cli.relabel_cli:run'
 
-[tool.poetry.dependencies]
-python = ">=3.10"
-httpx = "^0.26.0"
-tenacity = "^8.2.3"
-pyliftover = "^0.4"
-xopen = {version = "^1.8.0", extras = ["zstd"]}
-tqdm = "^4.66.1"
-natsort = "^8.4.0"
-pydantic = "^2.9.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.4"
-sphinx-autoapi = "^3.0.0"
-pytest-cov = "^4.1.0"
-mypy = "^1.11.2"
+# https://peps.python.org/pep-0735/
+[dependency-groups]
+lint = [
+    "ruff>=0.9.4",
+    "mypy>=1.14.1"
+    ]
+test = [
+    "pytest>=8.3.4",
+    "pytest-coverage>=0.0",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-ra -q --doctest-modules"
+minversion = "8.0"
+addopts = "--doctest-modules"
 filterwarnings = ["error"]
+pythonpath = [
+  "src"
+]
+consider_namespace_packages = true
 
 [tool.coverage.run]
 source = ["src/pgscatalog/core", "tests"]
+concurrency = ["multiprocessing"]
+parallel = true
+sigterm = true
+
+[tool.uv]
+default-groups = ["test", "lint"]
+
+[tool.mypy]
+files = ["src/**/*.py"]
+warn_unused_configs = true
+ignore_missing_imports = true
+follow_imports = "silent"
+disallow_untyped_calls = false
+disallow_incomplete_defs = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
