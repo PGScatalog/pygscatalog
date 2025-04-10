@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 
 def run():
     args = parse_args()
-    if args.verbose:
+    if args.verbose:  # pragma: no cover
         logging.getLogger("pgscatalog.core").setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
         logger.debug("Verbose logging enabled")
 
-    if pathlib.Path(sys.argv[0]).stem == "pgscatalog-combine":
+    if pathlib.Path(sys.argv[0]).stem == "pgscatalog-combine":  # pragma: no cover
         logger.warning("pgscatalog-combine is deprecated")
         logger.warning(
             "It has been renamed to pgscatalog-format to clarify its purpose"
