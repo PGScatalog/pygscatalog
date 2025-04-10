@@ -12,9 +12,9 @@ on:
         required: true
         type: choice
         options:
-        - pgscatalog.core
-        - pgscatalog.match
-        - pgscatalog.calc
+        - pgscatalog.utils/packages/pgscatalog.core
+        - pgscatalog.utils/packages/pgscatalog.match
+        - pgscatalog.utils/packages/pgscatalog.calc
 
 jobs:
   generate-jobs:
@@ -29,7 +29,7 @@ jobs:
     - id: set-matrix
       shell: bash
       run: echo session=$(nox --json -l | jq -c '[.[].session]') | tee --append $GITHUB_OUTPUT
-      working-directory: pgscatalog.utils/packages/${{ inputs.package-directory }}
+      working-directory: ${{ inputs.package-directory }}
 
   checks:
     name: Session ${{ matrix.session }}
