@@ -1,6 +1,6 @@
-FROM python:3.12-slim-bullseye AS build
+FROM python:3.12-slim-bullseye
 
-RUN apt-get update && apt install -y procps curl
+ENV UV_FROZEN=1
 
 COPY ../../pgscatalog.core /opt/pygscatalog/pgscatalog.core
 
@@ -10,16 +10,10 @@ COPY ../../pgscatalog.calc /opt/pygscatalog/pgscatalog.calc
 
 COPY ../../pgscatalog.utils /opt/pygscatalog/pgscatalog.utils
 
-COPY ../../pgscatalog.utils/docker/pyproject.dev /opt/pygscatalog/pgscatalog.utils/pyproject.toml
-
 WORKDIR /opt/pygscatalog/pgscatalog.utils/
 
-RUN pip install uv && uv build
+RUN pip install uv && uv sync --all-extras --all-packages
 
-FROM python:3.12-slim-bullseye
+RUN apt-get update && apt-get install -y procps
 
-COPY --from=build /opt/pygscatalog/pgscatalog.utils/dist/ /opt/pgscatalog.utils
-
-WORKDIR /opt/pgscatalog.utils 
-
-RUN pip install *.whl
+ENV PATH="/opt/pygscatalog/pgscatalog.utils/.venv/bin:$PATH"

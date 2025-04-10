@@ -22,6 +22,7 @@ classifiers = [
 ]
 
 requires-python = ">=3.10"
+
 dependencies = [
     "pgscatalog-calc",
     "pgscatalog-core",
@@ -65,9 +66,10 @@ sigterm = true
 default-groups = ["test", "lint"]
 
 [tool.uv.sources]
-pgscatalog-core = { path = "../pgscatalog.core" }
-pgscatalog-calc = { path = "../pgscatalog.calc" }
-pgscatalog-match = { path = "../pgscatalog.match" }
+pgscatalog-core = { workspace = true }
+pgscatalog-calc = { workspace = true }
+pgscatalog-match = { workspace = true }
+
 
 [tool.mypy]
 files = ["src/**/*.py"]
@@ -79,3 +81,7 @@ disallow_incomplete_defs = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+
+[tool.uv.workspace]
+members = ["../pgscatalog.core", "../pgscatalog.calc", "../pgscatalog.match"]

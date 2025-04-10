@@ -6,6 +6,14 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[manifest]
+members = [
+    "pgscatalog-calc",
+    "pgscatalog-core",
+    "pgscatalog-match",
+    "pgscatalog-utils",
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -436,7 +444,7 @@ wheels = [
 [[package]]
 name = "pgscatalog-calc"
 version = "0.3.0"
-source = { directory = "../pgscatalog.calc" }
+source = { editable = "../pgscatalog.calc" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
@@ -444,6 +452,16 @@ dependencies = [
     { name = "pyarrow" },
     { name = "scikit-learn" },
     { name = "scipy" },
+]
+
+[package.dev-dependencies]
+lint = [
+    { name = "mypy" },
+    { name = "ruff" },
+]
+test = [
+    { name = "pytest" },
+    { name = "pytest-coverage" },
 ]
 
 [package.metadata]
@@ -469,7 +487,7 @@ test = [
 [[package]]
 name = "pgscatalog-core"
 version = "1.0.0"
-source = { directory = "../pgscatalog.core" }
+source = { editable = "../pgscatalog.core" }
 dependencies = [
     { name = "httpx" },
     { name = "natsort" },
@@ -478,6 +496,16 @@ dependencies = [
     { name = "tenacity" },
     { name = "tqdm" },
     { name = "xopen", extra = ["zstd"] },
+]
+
+[package.dev-dependencies]
+lint = [
+    { name = "mypy" },
+    { name = "ruff" },
+]
+test = [
+    { name = "pytest" },
+    { name = "pytest-coverage" },
 ]
 
 [package.metadata]
@@ -504,11 +532,21 @@ test = [
 [[package]]
 name = "pgscatalog-match"
 version = "0.4.0"
-source = { directory = "../pgscatalog.match" }
+source = { editable = "../pgscatalog.match" }
 dependencies = [
     { name = "pgscatalog-core" },
     { name = "polars" },
     { name = "pyarrow" },
+]
+
+[package.dev-dependencies]
+lint = [
+    { name = "mypy" },
+    { name = "ruff" },
+]
+test = [
+    { name = "pytest" },
+    { name = "pytest-coverage" },
 ]
 
 [package.metadata]
@@ -530,7 +568,7 @@ test = [
 
 [[package]]
 name = "pgscatalog-utils"
-version = "1.4.4"
+version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "pgscatalog-calc" },
@@ -550,9 +588,9 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pgscatalog-calc", directory = "../pgscatalog.calc" },
-    { name = "pgscatalog-core", directory = "../pgscatalog.core" },
-    { name = "pgscatalog-match", directory = "../pgscatalog.match" },
+    { name = "pgscatalog-calc", editable = "../pgscatalog.calc" },
+    { name = "pgscatalog-core", editable = "../pgscatalog.core" },
+    { name = "pgscatalog-match", editable = "../pgscatalog.match" },
 ]
 
 [package.metadata.requires-dev]

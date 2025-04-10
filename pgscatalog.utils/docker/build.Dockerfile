@@ -1,7 +1,19 @@
-FROM python:3.11-slim-bullseye
+FROM python:3.12-slim-bullseye
 
-ARG VERSION=1.0.2
+ENV UV_FROZEN=1
 
-RUN apt-get update && apt install -y procps
+COPY ../../pgscatalog.core /opt/pygscatalog/pgscatalog.core
 
-RUN pip install pgscatalog-utils==${VERSION}
+COPY ../../pgscatalog.match /opt/pygscatalog/pgscatalog.match
+
+COPY ../../pgscatalog.calc /opt/pygscatalog/pgscatalog.calc
+
+COPY ../../pgscatalog.utils /opt/pygscatalog/pgscatalog.utils
+
+WORKDIR /opt/pygscatalog/pgscatalog.utils/
+
+RUN pip install uv && uv sync --all-packages
+
+RUN apt-get update && apt-get install -y procps
+
+ENV PATH="/opt/pygscatalog/pgscatalog.utils/.venv/bin:$PATH"
