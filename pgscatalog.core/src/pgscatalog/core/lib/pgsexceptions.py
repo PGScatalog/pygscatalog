@@ -164,6 +164,7 @@ class ExceptionExitCodeMap:
         BuildError: 17,
         GenomesNotFound: 19,
         SamplesheetFormatError: 20,
+        EffectTypeError: 21,
     }
 
     code_map = MappingProxyType(_mapping)
