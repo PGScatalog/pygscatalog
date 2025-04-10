@@ -114,6 +114,17 @@ def run():
     if n_finished != len(scoring_files):
         logger.warning(f"{len(scoring_files) - n_finished} scoring files were skipped")
 
+    pgs_ids_per_file = [x.header.pgs_id for x in variant_log]
+    seen = set()
+    dupes = {x for x in pgs_ids_per_file if x in seen or seen.add(x)}
+
+    if dupes:  # pragma: no cover
+        logger.critical(f"Found the same PGS ID in more than one scoring file {dupes=}")
+        logger.critical(
+            "Are you accidentally processing multiple PGS scoring files that have the same PGS ID?"
+        )
+        raise ValueError("The same PGS ID occurs in more than one scoring file")
+
     log_out_path = pathlib.Path(args.outfile) / args.logfile
     with open(log_out_path, "w") as f:
         logger.info(f"Writing log to {f.name}")
