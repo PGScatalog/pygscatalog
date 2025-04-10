@@ -2,7 +2,7 @@
 name = "pgscatalog.calc"
 version = "0.3.0"
 description = "Libraries and applications for working with calculated polygenic scores"
-license = {text = "Apache License (2.0)"}
+license = "Apache-2.0"
 authors = [
     {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
     {name = "Samuel Lambert", email = "sl925@medschl.cam.ac.uk"},

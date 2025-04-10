@@ -2,7 +2,7 @@
 name = "pgscatalog-utils"
 version = "1.4.4"
 description = "Utilities for working with PGS Catalog API and scoring files"
-license = {text = "Apache License (2.0)"}
+license = "Apache-2.0"
 authors = [
     {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
     {name = "Samuel Lambert", email = "sl925@medschl.cam.ac.uk"},

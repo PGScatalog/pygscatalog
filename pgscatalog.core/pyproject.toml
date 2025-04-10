@@ -2,7 +2,7 @@
 name = "pgscatalog.core"
 version = "1.0.0"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
-license = {text = "Apache License (2.0)"}
+license = "Apache-2.0"
 authors = [
     {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
     {name = "Samuel Lambert", email = "sl925@medschl.cam.ac.uk"},

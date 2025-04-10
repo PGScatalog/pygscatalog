@@ -2,7 +2,7 @@
 name = "pgscatalog.match"
 version = "0.4.0"
 description = "Tools for matching variants in PGS scoring files and target variant information files"
-license = {text = "Apache License (2.0)"}
+license = "Apache-2.0"
 authors = [
     {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
     {name = "Samuel Lambert", email = "sl925@medschl.cam.ac.uk"},
