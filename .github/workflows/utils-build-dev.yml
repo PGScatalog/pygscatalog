@@ -30,4 +30,5 @@ jobs:
         with:
           file: "pgscatalog.utils/docker/dev.Dockerfile"
           push: true
-          tags: dockerhub.ebi.ac.uk/gdp-public/pygscatalog/pgscatalog-utils:dev          
+          tags: dockerhub.ebi.ac.uk/gdp-public/pygscatalog/pgscatalog-utils:dev
+          platforms: linux/amd64,linux/arm64
