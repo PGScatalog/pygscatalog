@@ -32,3 +32,23 @@ jobs:
           push: true
           tags: dockerhub.ebi.ac.uk/gdp-public/pygscatalog/pgscatalog-utils:dev
           platforms: linux/amd64,linux/arm64
+
+    needs: docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Set up apptainer
+        uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer-version: 1.2.0
+
+      - name: Build singularity image
+        run: apptainer build img.sif "docker://dockerhub.ebi.ac.uk/gdp-public/pygscatalog/pgscatalog-utils:dev"
+
+      - name: Push singularity image
+        run: |
+          echo "${{ secrets.GITLAB_TOKEN }}" | apptainer remote login -u pygscatalog-action --password-stdin oras://dockerhub.ebi.ac.uk
+          apptainer push img.sif "oras://dockerhub.ebi.ac.uk/gdp-public/pygscatalog/pgscatalog-utils:dev-singularity"
