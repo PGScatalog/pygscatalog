@@ -145,8 +145,9 @@ def https_download(*, url, out_path, directory, overwrite):
     finally:
         try:
             # if an exception was thrown, get rid of the temporary file
+            tempf.close()
             os.remove(tempf.name)
             logger.info(f"HTTPS download failed, deleting {tempf.name}")  # pragma: no cover
-        except OSError:
+        except FileNotFoundError:
             # file has been renamed, that's OK
             pass
