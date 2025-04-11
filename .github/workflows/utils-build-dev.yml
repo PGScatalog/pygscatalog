@@ -33,6 +33,7 @@ jobs:
           tags: dockerhub.ebi.ac.uk/gdp-public/pygscatalog/pgscatalog-utils:dev
           platforms: linux/amd64,linux/arm64
 
+  singularity:
     needs: docker
     runs-on: ubuntu-latest
 
