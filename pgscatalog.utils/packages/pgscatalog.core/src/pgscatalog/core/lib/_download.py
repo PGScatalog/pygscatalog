@@ -107,7 +107,7 @@ def https_download(*, url, out_path, directory, overwrite):
     """Download a file from the PGS Catalog over HTTPS, with automatic retries and
     waiting. md5 checksums are automatically validated.
     """
-    tempf = tempfile.NamedTemporaryFile(dir=directory, delete=False, delete_on_close=False)
+    tempf = tempfile.NamedTemporaryFile(dir=directory, delete=False)
 
     try:
         if Config.FTP_EXCLUSIVE:
