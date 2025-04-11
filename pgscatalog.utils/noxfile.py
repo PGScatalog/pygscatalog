@@ -25,7 +25,7 @@ def tests(session):
         )
     else:
         package = "pgscatalog.utils"
-        package_path = ""
+        package_path = "."
         config_file = "pyproject.toml"
 
     session.run_install(
@@ -48,6 +48,58 @@ def tests(session):
         external=True,
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
+
+
+@nox.session
+def coverage(session):
+    """Generate coverage report"""
+    if session.posargs:
+        package = session.posargs[0]
+        package_path = str(pathlib.Path("packages") / package)
+        config_file = str(
+            pathlib.Path("packages") / session.posargs[0] / "pyproject.toml"
+        )
+    else:
+        package = "pgscatalog.utils"
+        package_path = "."
+        config_file = "pyproject.toml"
+
+    session.run_install(
+        "uv",
+        "sync",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+    # make sure environment is clean
+    session.run("coverage", "erase")
+
+    # run coverage <options> -m pytest <path>
+    session.run(
+        "uv",
+        "run",
+        "--exact",
+        "--package",
+        package,
+        "coverage",
+        "run",
+        "--source",
+        package_path,
+        "--rc",
+        config_file,
+        "-m",
+        "pytest",
+        package_path,
+        external=True,
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+    session.run(
+        "coverage",
+        "combine",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+    session.run("coverage", "xml")
 
 
 @nox.session

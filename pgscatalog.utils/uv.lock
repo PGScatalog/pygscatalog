@@ -583,8 +583,8 @@ lint = [
     { name = "ruff" },
 ]
 test = [
+    { name = "coverage" },
     { name = "pytest" },
-    { name = "pytest-coverage" },
 ]
 
 [package.metadata]
@@ -600,8 +600,8 @@ lint = [
     { name = "ruff", specifier = ">=0.9.4" },
 ]
 test = [
+    { name = "coverage", specifier = ">=7.8.0" },
     { name = "pytest", specifier = ">=8.3.4" },
-    { name = "pytest-coverage", specifier = ">=0.0" },
 ]
 
 [[package]]
