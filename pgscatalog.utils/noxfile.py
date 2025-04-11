@@ -33,6 +33,8 @@ def tests(session):
         "sync",
         "--group",
         "test",
+        "--package",
+        package,
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
@@ -97,6 +99,8 @@ def coverage(session):
         "sync",
         "--group",
         "test",
+        "--package",
+        package,
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
