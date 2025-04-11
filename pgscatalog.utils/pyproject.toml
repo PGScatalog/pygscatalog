@@ -62,9 +62,6 @@ concurrency = ["multiprocessing"]
 parallel = true
 sigterm = true
 
-[tool.uv]
-default-groups = ["test", "lint"]
-
 [tool.uv.workspace]
 members = ["packages/*"]
 

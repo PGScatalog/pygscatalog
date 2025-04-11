@@ -12,4 +12,4 @@ jobs:
   calc-ci:
     uses: ./.github/workflows/ci.yaml
     with:
-      package-directory: "pgscatalog.utils/packages/pgscatalog.calc"
+      package: "pgscatalog.calc"

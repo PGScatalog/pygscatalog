@@ -3,7 +3,7 @@ name: Publish packages
 on:
   workflow_dispatch:
     inputs:
-      package-directory:
+      package:
         type: choice
         options:
         - pgscatalog.core
@@ -24,21 +24,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: wntrblm/nox@main
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
       - name: Build package
-        run: nox -s build
-        working-directory: ${{ inputs.package-directory }}
+        run: uv build --package ${{ inputs.package }}
+        working-directory: pgscatalog.utils
 
       - name: Publish package distributions
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: ${{inputs.package-directory}}/dist
+          packages-dir: pgscatalog.utils/dist/
           skip-existing: false
 
       - name: Read package version
-        run: echo "TAG_NAME=$(poetry version | tr -s ' ' '-')" >> $GITHUB_ENV
-        working-directory: ${{inputs.package-directory}}
+        run: echo "TAG_NAME=$(uv pip show ${{ inputs.package }} | grep Version | cut -f 2 -d ' ')" >> $GITHUB_ENV
+        working-directory: pgscatalog.utils
 
       - name: Create tag
         uses: actions/github-script@v7

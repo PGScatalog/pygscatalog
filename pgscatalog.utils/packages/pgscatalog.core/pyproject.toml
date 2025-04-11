@@ -72,9 +72,6 @@ concurrency = ["multiprocessing"]
 parallel = true
 sigterm = true
 
-[tool.uv]
-default-groups = ["test", "lint"]
-
 [tool.mypy]
 files = ["src/**/*.py"]
 exclude = "tests/"

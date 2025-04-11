@@ -31,6 +31,8 @@ def tests(session):
     session.run_install(
         "uv",
         "sync",
+        "--group",
+        "test",
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
@@ -51,6 +53,32 @@ def tests(session):
 
 
 @nox.session
+def lint(session):
+    """Run linting checks"""
+    if session.posargs:
+        package_path = str(pathlib.Path("packages") / session.posargs[0])
+        config_file = str(
+            pathlib.Path("packages") / session.posargs[0] / "pyproject.toml"
+        )
+    else:
+        package_path = "src"
+        config_file = "pyproject.toml"
+
+    session.run(
+        "uv",
+        "sync",
+        "--group",
+        "lint",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+    session.run("ruff", "check", package_path)
+    session.run(
+        "mypy", package_path, "--config-file", config_file, "--warn-unused-configs"
+    )
+
+
+@nox.session(default=False)
 def coverage(session):
     """Generate coverage report"""
     if session.posargs:
@@ -67,6 +95,8 @@ def coverage(session):
     session.run_install(
         "uv",
         "sync",
+        "--group",
+        "test",
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
@@ -102,50 +132,6 @@ def coverage(session):
     session.run("coverage", "xml")
 
 
-@nox.session
-def lint(session):
-    """Run linting checks"""
-    # https://nox.thea.codes/en/stable/cookbook.html#using-a-lockfile
-    # note: uv is set up to install the test and lint dependency groups
-
-    if session.posargs:
-        package_path = str(pathlib.Path("packages") / session.posargs[0])
-        config_file = str(
-            pathlib.Path("packages") / session.posargs[0] / "pyproject.toml"
-        )
-    else:
-        package_path = "src"
-        config_file = "pyproject.toml"
-
-    session.run(
-        "uv",
-        "sync",
-        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
-    )
-
-    session.run("ruff", "check", package_path)
-    session.run(
-        "mypy", package_path, "--config-file", config_file, "--warn-unused-configs"
-    )
-
-
-# nox cookbook: https://nox.thea.codes/en/stable/cookbook.html
-# It's a good idea to keep your dev session out of the default list
-# so it's not run twice accidentally
-@nox.session(default=False)
-def dev(session: nox.Session) -> None:
-    """
-    Set up a python development environment for the project at ".venv".
-
-    Subpackages are configured in the same venv using a uv workspace
-    """
-    session.run("uv", "venv")
-    session.run(
-        "uv",
-        "sync",
-    )
-
-
 @nox.session(default=False)
 def build(session):
     """
@@ -168,3 +154,17 @@ def build(session):
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
     session.run("uv", "build", "--package", package)
+
+
+# nox cookbook: https://nox.thea.codes/en/stable/cookbook.html
+# It's a good idea to keep your dev session out of the default list
+# so it's not run twice accidentally
+@nox.session(default=False)
+def dev(session: nox.Session) -> None:
+    """
+    Set up a python development environment for the project at ".venv".
+
+    Subpackages are configured in the same venv using a uv workspace
+    """
+    session.run("uv", "venv")
+    session.run("uv", "sync", "--all-groups")

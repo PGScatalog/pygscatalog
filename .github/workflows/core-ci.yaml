@@ -12,4 +12,4 @@ jobs:
   ci-core:
     uses: ./.github/workflows/ci.yaml
     with:
-      package-directory: "pgscatalog.utils/packages/pgscatalog.core"
+      package-directory: "pgscatalog.core"
