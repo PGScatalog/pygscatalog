@@ -1,7 +1,80 @@
+import pathlib
+
 import nox
 
 nox.options.error_on_external_run = True
 nox.options.default_venv_backend = "uv"
+
+
+# test every version of python we support!
+@nox.session(python=["3.10", "3.11", "3.12"])
+def tests(session):
+    """Run pytest for all supported python versions
+
+    Test subpackages with:
+
+        $ nox -s test -- pgscatalog.core
+
+    If no subpackage is set, test pgscatalog.utils (
+    """
+    if session.posargs:
+        package = session.posargs[0]
+        package_path = str(pathlib.Path("packages") / package)
+        config_file = str(
+            pathlib.Path("packages") / session.posargs[0] / "pyproject.toml"
+        )
+    else:
+        package = "pgscatalog.utils"
+        package_path = ""
+        config_file = "pyproject.toml"
+
+    session.run_install(
+        "uv",
+        "sync",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+    # run with --exact to make sure only the subpackage dependencies are loaded
+    session.run(
+        "uv",
+        "run",
+        "--exact",
+        "--package",
+        package,
+        "pytest",
+        "-c",
+        config_file,
+        package_path,
+        external=True,
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+
+@nox.session
+def lint(session):
+    """Run linting checks"""
+    # https://nox.thea.codes/en/stable/cookbook.html#using-a-lockfile
+    # note: uv is set up to install the test and lint dependency groups
+
+    if session.posargs:
+        package_path = str(pathlib.Path("packages") / session.posargs[0])
+        config_file = str(
+            pathlib.Path("packages") / session.posargs[0] / "pyproject.toml"
+        )
+    else:
+        package_path = "src"
+        config_file = "pyproject.toml"
+
+    session.run(
+        "uv",
+        "sync",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+    session.run("ruff", "check", package_path)
+    session.run(
+        "mypy", package_path, "--config-file", config_file, "--warn-unused-configs"
+    )
 
 
 # nox cookbook: https://nox.thea.codes/en/stable/cookbook.html
@@ -11,6 +84,8 @@ nox.options.default_venv_backend = "uv"
 def dev(session: nox.Session) -> None:
     """
     Set up a python development environment for the project at ".venv".
+
+    Subpackages are configured in the same venv using a uv workspace
     """
     session.run("uv", "venv")
     session.run(
@@ -23,10 +98,21 @@ def dev(session: nox.Session) -> None:
 def build(session):
     """
     Build source and wheel distributions ready for publishing
+
+    Build subpackages with:
+
+        $ nox -s build -- pgscatalog.core
+
+    If no subpackage is set, builds pgscatalog.utils
     """
+    if session.posargs:
+        package = session.posargs[0]
+    else:
+        package = "pgscatalog.utils"
+
     session.run(
         "uv",
         "sync",
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
-    session.run("uv", "build")
+    session.run("uv", "build", "--package", package)
