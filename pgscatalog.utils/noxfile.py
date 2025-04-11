@@ -42,6 +42,8 @@ def tests(session):
     session.run(
         "uv",
         "run",
+        "--group",
+        "test",
         "--exact",
         "--package",
         package,
@@ -111,6 +113,8 @@ def coverage(session):
     session.run(
         "uv",
         "run",
+        "--group",
+        "test",
         "--exact",
         "--package",
         package,
