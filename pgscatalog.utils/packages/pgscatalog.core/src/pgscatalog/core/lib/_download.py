@@ -107,6 +107,8 @@ def https_download(*, url, out_path, directory, overwrite):
     """Download a file from the PGS Catalog over HTTPS, with automatic retries and
     waiting. md5 checksums are automatically validated.
     """
+    tempf = tempfile.NamedTemporaryFile(dir=directory, delete=False, delete_on_close=False)
+
     try:
         if Config.FTP_EXCLUSIVE:
             logger.warning("HTTPS downloads disabled by Config.FTP_EXCLUSIVE")
@@ -121,30 +123,30 @@ def https_download(*, url, out_path, directory, overwrite):
         checksum = httpx.get(checksum_path, headers=Config.API_HEADER).text
         md5 = hashlib.md5()
 
-        with tempfile.NamedTemporaryFile(dir=directory, delete=False) as f:
+        with open(tempf.name, "wb") as f:
             with httpx.stream("GET", url, headers=Config.API_HEADER) as r:
                 for data in r.iter_bytes():
                     f.write(data)
                     md5.update(data)
 
-            if (calc := md5.hexdigest()) != (remote := checksum.split()[0]):
-                # will attempt to download again (see decorator)
-                raise ScoreChecksumError(
-                    f"Calculated checksum {calc} doesn't match {remote}"
-                )
+        if (calc := md5.hexdigest()) != (remote := checksum.split()[0]):
+            # will attempt to download again (see decorator)
+            raise ScoreChecksumError(
+                f"Calculated checksum {calc} doesn't match {remote}"
+            )
     except httpx.UnsupportedProtocol as protocol_exc:
         raise ValueError(f"Can't download a local file: {url!r}") from protocol_exc
     except httpx.RequestError as download_exc:
         raise ScoreDownloadError("HTTPS download failed") from download_exc
     else:
         # no exceptions thrown, move the temporary file to the final output path
-        os.rename(f.name, out_path)
+        os.rename(tempf.name, out_path)
         logger.info(f"HTTPS download OK, {out_path} checksum validation passed")
     finally:
         try:
             # if an exception was thrown, get rid of the temporary file
-            os.remove(f.name)
-            logger.info(f"HTTPS download failed, deleting {f.name}")  # pragma: no cover
+            os.remove(tempf.name)
+            logger.info(f"HTTPS download failed, deleting {tempf.name}")  # pragma: no cover
         except OSError:
             # file has been renamed, that's OK
             pass
