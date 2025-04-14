@@ -78,7 +78,7 @@ def run():
             else:
                 gzip_output = False
 
-            out_path = out_dir / ("normalised_" + scorefile.path.name)
+            out_path = (out_dir / ("normalised_" + scorefile.path.name)).resolve()
 
             futures.append(
                 executor.submit(
