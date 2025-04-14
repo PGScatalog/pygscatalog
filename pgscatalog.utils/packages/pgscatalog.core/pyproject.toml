@@ -1,7 +1,7 @@
 [project]
-name = "pgscatalog-utils"
-version = "2.0.0"
-description = "Utilities for working with PGS Catalog API and scoring files"
+name = "pgscatalog.core"
+version = "1.0.0"
+description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 license = "Apache-2.0"
 authors = [
     {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
@@ -22,12 +22,22 @@ classifiers = [
 ]
 
 requires-python = ">=3.10"
-
 dependencies = [
-    "pgscatalog-calc",
-    "pgscatalog-core",
-    "pgscatalog-match",
+    "httpx>=0.28.1",
+    "natsort>=8.4.0",
+    "pydantic>=2.10.6",
+    "pyliftover>=0.4.1",
+    "tenacity>=9.0.0",
+    "tqdm>=4.67.1",
+    "xopen[zstd]>=2.0.2",
 ]
+
+# https://peps.python.org/pep-0621/
+[project.scripts]
+pgscatalog-download = 'pgscatalog.core.cli.download_cli:run'
+pgscatalog-combine = 'pgscatalog.core.cli.format_cli:run' # deprecated
+pgscatalog-format = 'pgscatalog.core.cli.format_cli:run'
+pgscatalog-relabel = 'pgscatalog.core.cli.relabel_cli:run'
 
 # https://peps.python.org/pep-0735/
 [dependency-groups]
@@ -36,8 +46,8 @@ lint = [
     "mypy>=1.14.1"
     ]
 test = [
-    "coverage>=7.8.0",
     "pytest>=8.3.4",
+    "coverage>=7.8.0",
 ]
 
 [build-system]
@@ -49,29 +59,22 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
+addopts = "--doctest-modules"
 filterwarnings = ["error"]
-addopts = "--ignore packages"
 pythonpath = [
   "src"
 ]
 consider_namespace_packages = true
 
 [tool.coverage.run]
-source = ["src/pgscatalog/utils", "tests"]
+source = ["src/pgscatalog/core", "tests"]
 concurrency = ["multiprocessing"]
 parallel = true
 sigterm = true
 
-[tool.uv.workspace]
-members = ["packages/*"]
-
-[tool.uv.sources]
-pgscatalog-core = { workspace = true }
-pgscatalog-calc = { workspace = true }
-pgscatalog-match = { workspace = true }
-
 [tool.mypy]
 files = ["src/**/*.py"]
+exclude = "tests/"
 warn_unused_configs = true
 ignore_missing_imports = true
 follow_imports = "silent"

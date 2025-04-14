@@ -1,7 +1,7 @@
 [project]
-name = "pgscatalog-utils"
-version = "2.0.0"
-description = "Utilities for working with PGS Catalog API and scoring files"
+name = "pgscatalog.match"
+version = "0.4.0"
+description = "Tools for matching variants in PGS scoring files and target variant information files"
 license = "Apache-2.0"
 authors = [
     {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
@@ -22,12 +22,17 @@ classifiers = [
 ]
 
 requires-python = ">=3.10"
-
 dependencies = [
-    "pgscatalog-calc",
-    "pgscatalog-core",
-    "pgscatalog-match",
+    "pgscatalog-core>=0.3.3",
+    "polars==0.20.30",
+    "pyarrow>=15.0.0",
 ]
+
+# https://peps.python.org/pep-0621/
+[project.scripts]
+pgscatalog-match = 'pgscatalog.match.cli.match_cli:run_match'
+pgscatalog-matchmerge = 'pgscatalog.match.cli.merge_cli:run_merge'
+pgscatalog-intersect = 'pgscatalog.match.cli.intersect_cli:run_intersect'
 
 # https://peps.python.org/pep-0735/
 [dependency-groups]
@@ -36,8 +41,8 @@ lint = [
     "mypy>=1.14.1"
     ]
 test = [
-    "coverage>=7.8.0",
     "pytest>=8.3.4",
+    "coverage>=7.8.0",
 ]
 
 [build-system]
@@ -49,29 +54,22 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
+addopts = "--doctest-modules"
 filterwarnings = ["error"]
-addopts = "--ignore packages"
 pythonpath = [
   "src"
 ]
 consider_namespace_packages = true
 
 [tool.coverage.run]
-source = ["src/pgscatalog/utils", "tests"]
+source = ["src/pgscatalog/match", "tests"]
 concurrency = ["multiprocessing"]
 parallel = true
 sigterm = true
 
-[tool.uv.workspace]
-members = ["packages/*"]
-
-[tool.uv.sources]
-pgscatalog-core = { workspace = true }
-pgscatalog-calc = { workspace = true }
-pgscatalog-match = { workspace = true }
-
 [tool.mypy]
 files = ["src/**/*.py"]
+exclude = "tests/"
 warn_unused_configs = true
 ignore_missing_imports = true
 follow_imports = "silent"

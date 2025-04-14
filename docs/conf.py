@@ -22,9 +22,9 @@ extensions = [
 extensions.append("autoapi.extension")
 
 autoapi_dirs = [
-    "../pgscatalog.core/src/",
-    "../pgscatalog.calc/src/",
-    "../pgscatalog.match/src/",
+    "../pgscatalog.utils/packages/pgscatalog.core/src/",
+    "../pgscatalog.utils/packages/pgscatalog.calc/src/",
+    "../pgscatalog.utils/packages/pgscatalog.match/src/",
 ]
 autoapi_keep_files = True
 autoapi_options = ["members", "undoc-members", "show-module-summary"]

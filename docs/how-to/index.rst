@@ -8,7 +8,7 @@ These guides describe how to use pygscatalog CLI applications.
    :caption: Contents:
 
    guides/download
-   guides/combine
+   guides/format
    guides/match
    guides/intersect
    guides/aggregate
