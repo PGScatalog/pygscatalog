@@ -1,14 +1,16 @@
-How to combine scoring files from the PGS Catalog
+How to format scoring files from the PGS Catalog
 =================================================
 
-``pgscatalog-combine`` is a CLI application that makes it easy to combine scoring files into a standardised output.
+``pgscatalog-format`` is a CLI application that makes it easy to combine scoring files into a standardised output.
+
+.. note:: ``pgscatalog-combine`` was recently renamed to ``pgscatalog-format``
 
 The process involves:
 
 * extracting important fields from scoring files
 * doing some quality control checks
 * optionally lifting over variants to a consistent genome build
-* writing a long format / melted output file
+* writing to a consistent schema
 
 Input scoring files must follow PGS Catalog standards. The output file is useful for
 doing data science tasks, like matching variants across a scoring file and target
@@ -19,7 +21,7 @@ Installation
 
 ::
 
-    $ pip install pgscatalog-core
+    $ pipx install pgscatalog-core
 
 Usage
 -----
@@ -31,9 +33,12 @@ Combining PGS Catalog scoring files
 
 ::
 
-    $ pgscatalog-combine -s PGS000001_hmPOS_GRCh38.txt.gz PGS0001229_hmPOS_GRCh38.txt.gz -t GRCh38 -o combined.txt
+    $ mkdir output
+    $ pgscatalog-combine -s PGS000001_hmPOS_GRCh38.txt.gz PGS0001229_hmPOS_GRCh38.txt.gz -t GRCh38 -o output
 
-.. note:: If you're combining lots of files, you can compress the output automatically ``--o combined.txt.gz``
+For each input scoring file a formatted scoring file will be written to the output directory.
+
+.. tip:: If you're formatting lots of scoring files in parallel the ``--threads`` parameter can help speed up the process
 
 Lifting over scoring files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -56,14 +61,15 @@ Assuming you have a custom scoring file in GRCh37 (``my_scorefile_grch37.txt.gz`
 
 ::
 
-    $ pgscatalog-combine -s PGS000001_hmPOS_GRCh38.txt.gz my_scorefile_grch37.txt.gz \
+    $ mkdir output
+    $ pgscatalog-format -s PGS000001_hmPOS_GRCh38.txt.gz my_scorefile_grch37.txt.gz \
         --chain_dir my_chain_dir/ \
         -t GRCh38 \
-        -o combined.txt
+        -o output
 
 Help
 ----
 
 ::
 
-    $ pgscatalog-combine --help
+    $ pgscatalog-format --help
