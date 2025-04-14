@@ -19,12 +19,15 @@ def tests(session):
     """
     if session.posargs:
         package = session.posargs[0]
+    else:
+        package = "pgscatalog.utils"
+
+    if package != "pgscatalog.utils":
         package_path = str(pathlib.Path("packages") / package)
         config_file = str(
             pathlib.Path("packages") / session.posargs[0] / "pyproject.toml"
         )
     else:
-        package = "pgscatalog.utils"
         package_path = "."
         config_file = "pyproject.toml"
 
