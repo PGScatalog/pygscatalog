@@ -3,6 +3,7 @@
 import csv
 import logging
 import pathlib
+import shutil
 import tempfile
 from itertools import islice
 from typing import Optional
@@ -102,7 +103,8 @@ def format_and_write(
         raise
     else:
         logger.info(f"Finished processing {scorefile.pgs_id}")
-        temp_path.rename(out_path)
+        # rename doesn't support cross-filesystem moves
+        shutil.move(temp_path.resolve(), out_path.resolve())
         logger.info(f"Written normalised score to {out_path=}")
     finally:
         temp_path.unlink(missing_ok=True)
