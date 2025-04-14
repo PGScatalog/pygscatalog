@@ -69,6 +69,7 @@ def run():
     n_finished = 0
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
+        logger.info(f"Using {args.threads} worker processes")
         futures = []
         for scorefile in scoring_files:
             logger.info(f"Submitting {scorefile.local_path.name} to executor")
