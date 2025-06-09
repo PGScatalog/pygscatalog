@@ -143,7 +143,7 @@ def coverage(session):
     session.run("coverage", "xml")
 
 
-@nox.session(default=False)
+@nox.session(default=False, python="3.12")
 def build(session):
     """
     Build source and wheel distributions ready for publishing
