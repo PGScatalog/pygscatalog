@@ -44,7 +44,7 @@ jobs:
           skip-existing: false
 
       - name: Read package version
-        run: echo "TAG_NAME=$(uv pip show ${{ inputs.package }} | grep Version | cut -f 2 -d ' ')" >> $GITHUB_ENV
+        run: echo "TAG_NAME=$(uv version --package ${{ inputs.package }} | cut -f 2 -d ' ')" >> $GITHUB_ENV
         working-directory: pgscatalog.utils
 
       - name: Create tag
