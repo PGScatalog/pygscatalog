@@ -28,8 +28,6 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - uses: wntrblm/nox@2024.04.15
-        with:
-          python-versions: "3.12"
         
       - name: Test package before building
         run: nox -s tests -- ${{ inputs.package }}
