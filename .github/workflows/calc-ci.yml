@@ -1,0 +1,15 @@
+name: Run CI on pgscatalog.calc
+
+on:
+  push:
+    paths:
+      - 'pgscatalog.utils/packages/pgscatalog.calc/**.py'
+  pull_request:
+    paths:
+      - 'pgscatalog.utils/packages/pgscatalog.calc/**.py'
+
+jobs:
+  calc-ci:
+    uses: ./.github/workflows/ci.yaml
+    with:
+      package: "pgscatalog.calc"

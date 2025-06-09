@@ -1,7 +1,7 @@
 [project]
-name = "pgscatalog-utils"
-version = "2.0.0"
-description = "Utilities for working with PGS Catalog API and scoring files"
+name = "pgscatalog.calc"
+version = "0.3.0"
+description = "Libraries and applications for working with calculated polygenic scores"
 license = "Apache-2.0"
 authors = [
     {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
@@ -22,12 +22,19 @@ classifiers = [
 ]
 
 requires-python = ">=3.10"
-
 dependencies = [
-    "pgscatalog-calc",
-    "pgscatalog-core",
-    "pgscatalog-match",
+    "numpy~=1.26",
+    "pandas~=2.2.0",
+    "pgscatalog-core>=0.3.3",
+    "pyarrow~=15.0.0",
+    "scikit-learn~=1.4",
+    "scipy~=1.12",
 ]
+
+# https://peps.python.org/pep-0621/
+[project.scripts]
+pgscatalog-aggregate = 'pgscatalog.calc.cli.aggregate_cli:run_aggregate'
+pgscatalog-ancestry-adjust = 'pgscatalog.calc.cli.ancestry_cli:run_ancestry'
 
 # https://peps.python.org/pep-0735/
 [dependency-groups]
@@ -36,8 +43,8 @@ lint = [
     "mypy>=1.14.1"
     ]
 test = [
-    "coverage>=7.8.0",
     "pytest>=8.3.4",
+    "coverage>=7.8.0",
 ]
 
 [build-system]
@@ -49,29 +56,22 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
+addopts = "--doctest-modules"
 filterwarnings = ["error"]
-addopts = "--ignore packages"
 pythonpath = [
   "src"
 ]
 consider_namespace_packages = true
 
 [tool.coverage.run]
-source = ["src/pgscatalog/utils", "tests"]
+source = ["src/pgscatalog/calc", "tests"]
 concurrency = ["multiprocessing"]
 parallel = true
 sigterm = true
 
-[tool.uv.workspace]
-members = ["packages/*"]
-
-[tool.uv.sources]
-pgscatalog-core = { workspace = true }
-pgscatalog-calc = { workspace = true }
-pgscatalog-match = { workspace = true }
-
 [tool.mypy]
 files = ["src/**/*.py"]
+exclude = "tests/"
 warn_unused_configs = true
 ignore_missing_imports = true
 follow_imports = "silent"

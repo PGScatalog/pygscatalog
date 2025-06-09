@@ -1,0 +1,27 @@
+# Ignore Python bytecode files
+*.pyc
+*.pyo
+__pycache__/
+
+# Ignore virtual environments
+**/env/
+**/venv/
+**/.venv/
+
+# Ignore IDE files (PyCharm, VS Code, etc.)
+**/.idea/
+**/.vscode/
+
+# Ignore `uv` build directories and artifacts
+**/build/
+**/dist/
+**/*.egg-info/
+**/__pycache__/
+
+# Ignore test directories and files
+**/tests/
+**/*.pytest_cache/
+**/.nox/
+
+# Ignore any other system-specific or unnecessary files
+**/.DS_Store

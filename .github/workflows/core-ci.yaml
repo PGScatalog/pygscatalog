@@ -1,0 +1,15 @@
+name: Run CI on pgscatalog.core
+
+on:
+  push:
+    paths:
+      - 'pgscatalog.utils/packages/pgscatalog.core/**.py'
+  pull_request:
+    paths:
+      - 'pgscatalog.utils/packages/pgscatalog.core/**.py'
+
+jobs:
+  ci-core:
+    uses: ./.github/workflows/ci.yaml
+    with:
+      package: "pgscatalog.core"

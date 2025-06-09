@@ -1,0 +1,81 @@
+name: Run CI
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      package:
+        required: true
+        type: choice
+        options:
+        - pgscatalog.core
+        - pgscatalog.match
+        - pgscatalog.calc
+        - pgscatalog.utils
+
+jobs:
+  generate-jobs:
+    runs-on: ubuntu-latest
+    outputs:
+      session: ${{ steps.set-matrix.outputs.session }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: wntrblm/nox@main
+
+    - id: set-matrix
+      shell: bash
+      run: echo session=$(nox --json -l | jq -c '[.[].session]') | tee --append $GITHUB_OUTPUT
+      working-directory: "pgscatalog.utils"
+
+  checks:
+    name: Session ${{ matrix.session }}
+    needs: [generate-jobs]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        session: ${{ fromJson(needs.generate-jobs.outputs.session) }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up nox
+      uses: wntrblm/nox@main
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    - run: nox -s "${{ matrix.session }}" -- ${{ inputs.package }}
+      working-directory: "pgscatalog.utils"
+
+  coverage:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up nox
+        uses: wntrblm/nox@main
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Make coverage report
+        run: nox -s coverage -- ${{ inputs.package }}
+        working-directory: "pgscatalog.utils"
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+            use_oidc: true
+            fail_ci_if_error: true
+            slug: PGScatalog/pygscatalog
+            flags: ${{ inputs.package }}

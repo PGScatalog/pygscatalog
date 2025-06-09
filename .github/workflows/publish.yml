@@ -1,0 +1,58 @@
+name: Publish packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        type: choice
+        options:
+        - pgscatalog.core
+        - pgscatalog.match
+        - pgscatalog.calc
+        - pgscatalog.utils
+
+jobs:
+  publish:
+    name: build and publish package
+    runs-on: ubuntu-latest
+    environment: release
+
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Test package before building
+        run: nox -s tests -- ${{ inputs.package }}
+        working-directory: pgscatalog.utils
+
+      - name: Build package
+        run: nox -s build -- ${{ inputs.package }}
+        working-directory: pgscatalog.utils
+
+      - name: Publish package distributions
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pgscatalog.utils/dist/
+          skip-existing: false
+
+      - name: Read package version
+        run: echo "TAG_NAME=$(uv pip show ${{ inputs.package }} | grep Version | cut -f 2 -d ' ')" >> $GITHUB_ENV
+        working-directory: pgscatalog.utils
+
+      - name: Create tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+              github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'refs/tags/${{ env.TAG_NAME }}',
+                sha: context.sha
+              })
+
