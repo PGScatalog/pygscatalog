@@ -1,6 +1,5 @@
 # pygscatalog
 
-[![CI](https://github.com/PGScatalog/pygscatalog/actions/workflows/pytest.yaml/badge.svg)](https://github.com/PGScatalog/pygscatalog/actions/workflows/pytest.yaml)
 [![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/?badge=latest)
 [![codecov](https://codecov.io/github/PGScatalog/pygscatalog/graph/badge.svg?token=EEAU59C8IK)](https://codecov.io/github/PGScatalog/pygscatalog)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
