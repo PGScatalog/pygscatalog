@@ -1,3 +1,18 @@
+## 2025-06-10
+
+Major release [pgscatalog-core-1.0.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-core-1.0.0)
+
+* Add multiprocessing support to `pgscatalog-format` (`pgscatalog-combine` is now deprecated), each input scoring file now gets written to a separate output file
+* Fix `pgscatalog-download` sometimes leaving temporary files in the output directory
+
+Minor release [pgscatalog-match-0.4.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-match-0.4.0)
+
+* Add support for multiple input scoring files to `pgscatalog-match` and `pgscatalog-matchcombine`
+
+Major release [pgscatalog-utils-2.0.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-2.0.0)
+
+* Bump dependencies
+
 ## 2024-10-29
 
 Patch release [pgscatalog-utils-1.4.2](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.4.2)
