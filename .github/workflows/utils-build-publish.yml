@@ -31,7 +31,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          file: "pgscatalog.utils/docker/build.Dockerfile"
+          file: "pgscatalog.utils/Dockerfile"
           push: true
           platforms: "linux/amd64,linux/arm64"
           tags: ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}
