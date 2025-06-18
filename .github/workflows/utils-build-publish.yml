@@ -34,7 +34,7 @@ jobs:
           context: "{{defaultContext}}:pgscatalog.utils"
           push: true
           platforms: "linux/amd64,linux/arm64"
-          tags: ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}
+          tags: ghcr.io/pgscatalog/pygscatalog:pgscatalog-utils-${{ inputs.tag }}
     
 
   build_singularity_release:
@@ -52,9 +52,9 @@ jobs:
           apptainer-version: 1.2.0
           
       - name: Build singularity image
-        run: apptainer build img.sif "docker://ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}"
+        run: apptainer build img.sif "docker://ghcr.io/pgscatalog/pygscatalog:pgscatalog-utils-${{ inputs.tag }}"
 
       - name: Push singularity image
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | apptainer remote login -u "$GITHUB_ACTOR" --password-stdin oras://ghcr.io
-          apptainer push img.sif "oras://ghcr.io/pgscatalog/pygscatalog:${{ inputs.tag }}-singularity"
+          apptainer push img.sif "oras://ghcr.io/pgscatalog/pygscatalog:pgscatalog-utils-${{ inputs.tag }}-singularity"
