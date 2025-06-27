@@ -195,7 +195,7 @@ class CatalogScoreVariant(BaseModel):
         Field(
             default=None,
             title="Location within the Chromosome",
-            description="Chromosomal position associated with the variant.",
+            description="Chromosomal position associated with the variant. 1-based.",
             gt=0,
         ),
     ]
@@ -388,7 +388,8 @@ class CatalogScoreVariant(BaseModel):
             ge=0,
             default=None,
             title="Harmonized chromosome position",
-            description="Chromosomal position (base pair location) where the variant is located, preferring matches to chromosomes over patches present in later builds.",
+            description="Chromosomal position (base pair location) where the variant is located, preferring matches to chromosomes over patches present in later builds. 1-based.",
+            gt=0,
         ),
     ]
     hm_inferOtherAllele: Annotated[
