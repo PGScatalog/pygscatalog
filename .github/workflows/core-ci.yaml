@@ -13,3 +13,6 @@ jobs:
     uses: ./.github/workflows/ci.yaml
     with:
       package: "pgscatalog.core"
+    permissions:
+      contents: read
+      id-token: write
