@@ -51,9 +51,9 @@ of the PGS Catalog team (Samuel Lambert, Benjamin Wingfield, Aoife McMahon Laure
 
 If you use this package in your analysis, please cite:
 
-    Lambert, Wingfield, `et al.` (2024) The Polygenic Score Catalog: new functionality and tools to enable FAIR research. medRxiv. doi:`10.1101/2024.05.29.24307783`_.
+    Lambert, Wingfield, `et al.` (2024) Enhancing the Polygenic Score Catalog with tools for score calculation and ancestry normalization. Nature Genetics. doi:`10.1038/s41588-024-01937-x`_.
 
-.. _10.1101/2024.05.29.24307783: https://doi.org/10.1101/2024.05.29.24307783
+.. _10.1038/s41588-024-01937-x: https://doi.org/10.1038/s41588-024-01937-x
 
 All of our code is open source and permissively licensed with `Apache 2`_.
 
