@@ -44,6 +44,22 @@ class ScoringFile:
     >>> sf.is_harmonised
     False
 
+    Scoring file from OmicsPred
+
+    >>> from pgscatalog.core.lib.genomebuild import GenomeBuild
+    >>> from pgscatalog.core.lib._config import Config
+    >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "data" / "OPGS002493.txt.gz")
+    >>> sf
+    ScoringFile('.../OPGS002493.txt.gz', target_build=None)
+    >>> sf.header
+    ScoreHeader(pgs_id='OPGS002493', pgs_name='P80162', trait_reported='C-X-C motif chemokine 6', genome_build=GenomeBuild.GRCh37)
+    >>> sf.is_harmonised
+    False
+    >>> for variant in sf.variants:
+    ...     variant
+    ...     break
+    ScoreVariant(rsID='rs75288020', chr_name='4', chr_position=74151217, effect_allele=Allele(allele='A', is_snp=True)...
+
     Also supports PGS Catalog header metadata:
 
     >>> sf = ScoringFile(Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz")

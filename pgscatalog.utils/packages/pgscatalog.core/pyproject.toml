@@ -1,6 +1,6 @@
 [project]
 name = "pgscatalog.core"
-version = "1.0.0"
+version = "1.0.1"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 license = "Apache-2.0"
 authors = [

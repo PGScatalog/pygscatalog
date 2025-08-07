@@ -18,6 +18,7 @@ from typing import ClassVar, Optional, Union, Any, Annotated
 from typing_extensions import Self
 
 from pydantic import (
+    AliasChoices,
     BaseModel,
     computed_field,
     model_serializer,
@@ -127,6 +128,12 @@ class CatalogScoreVariant(BaseModel):
     >>> CatalogScoreVariant(**variant_with_allelefrequency)  # doctest: +ELLIPSIS
     CatalogScoreVariant(rsID=None, chr_name='1', chr_position=5743196..., allelefrequency_effect_European=0.067, allelefrequency_effect_African=0.439, allelefrequency_effect_Asian=0.113, allelefrequency_effect_Hispanic=0.157, ...)
 
+    An example from the first row from PGS000018 with the edited column name 'rsid':
+
+    >>> variant_with_rsid_column = {"rsid": "rs2843152", "chr_name": 1, "chr_position": 2245570, "effect_allele": "G", "other_allele": "C", "effect_weight": -2.76009e-02}
+    >>> CatalogScoreVariant(**variant_with_rsid_column)
+    CatalogScoreVariant(rsID='rs2843152', chr_name='1', chr_position=2245570..., effect_weight='-0.0276009', ...)
+
     Extra field names which don't follow the pattern "allelefrequency_effect_{label}" will raise a ValueError:
 
     >>> bad_extra_fields = variant_with_allelefrequency | {"favourite_ice_cream": "vanilla"}
@@ -177,8 +184,9 @@ class CatalogScoreVariant(BaseModel):
         Optional[str],
         Field(
             default=None,
+            validation_alias=AliasChoices('rsID','rsid'), # Allow the use of 'rsid' in lower case
             title="dbSNP Accession ID (rsID)",
-            description="The SNP’s rs ID. This column also contains HLA alleles in the standard notation (e.g. HLA-DQA1*0102) that aren’t always provided with chromosomal positions.",
+            description="The SNP’s rsID. This column also contains HLA alleles in the standard notation (e.g. HLA-DQA1*0102) that aren’t always provided with chromosomal positions.",
         ),
     ]
     chr_name: Annotated[
@@ -768,13 +776,24 @@ class ScoreHeader(BaseModel):
     >>> ScoreHeader(**{"pgs_id": "PGS123456", "trait_reported": "testtrait", "genome_build": "GRCh38"})
     ScoreHeader(pgs_id='PGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38)
 
+    >>> ScoreHeader(**{"omicspred_id": "OPGS123456", "trait_reported": "testtrait", "genome_build": "GRCh38"})
+    ScoreHeader(pgs_id='OPGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38)
+
+    >>> ScoreHeader(**{"score_id": "SC1234B", "trait_reported": "testtrait", "genome_build": "GRCh37"})
+    ScoreHeader(pgs_id='SC1234B', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh37)
+
     >>> from ._config import Config
     >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
     >>> ScoreHeader.from_path(testpath).row_count
     77
+
+    >>> from ._config import Config
+    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "OPGS002493.txt.gz"
+    >>> test = ScoreHeader.from_path(testpath) # doctest
     """
 
-    pgs_id: Annotated[str, Field(title="PGS identifier")]
+    # Fields storing the score identifier (the file should contains either pgs_id, omicspred_id or score_id)
+    pgs_id: Annotated[Optional[str], Field(title="PGS identifier",validation_alias=AliasChoices('pgs_id','omicspred_id','score_id'))]
     pgs_name: Annotated[Optional[str], Field(description="PGS name", default=None)]
     trait_reported: Annotated[str, Field(description="Trait name")]
     # genome build is Optional because "NR" is represented internally as None
@@ -1024,7 +1043,7 @@ class ScoreLog(BaseModel):
 
     @computed_field  # type: ignore
     @property
-    def pgs_id(self) -> str:
+    def pgs_id(self) -> str | None:
         return self.header.pgs_id
 
     @computed_field  # type: ignore
