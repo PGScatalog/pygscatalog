@@ -1043,7 +1043,7 @@ class ScoreLog(BaseModel):
 
     @computed_field  # type: ignore
     @property
-    def pgs_id(self) -> str:
+    def pgs_id(self) -> str | None:
         return self.header.pgs_id
 
     @computed_field  # type: ignore
