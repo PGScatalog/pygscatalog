@@ -1,7 +1,7 @@
 [project]
-name = "pgscatalog-utils"
-version = "2.0.0"
-description = "Utilities for working with PGS Catalog API and scoring files"
+name = "pgscatalog.validate"
+version = "0.1"
+description = "Tools for checking that the scoring files and harmonized scoring files match the PGS Catalog scoring file formats"
 license = "Apache-2.0"
 authors = [
     {name = "Benjamin Wingfield", email = "bwingfield@ebi.ac.uk"},
@@ -22,23 +22,22 @@ classifiers = [
 ]
 
 requires-python = ">=3.10"
-
 dependencies = [
-    "pgscatalog-calc",
-    "pgscatalog-core",
-    "pgscatalog-match",
-    "pgscatalog-validate",
+    "pgscatalog-core>=1.0.0",
+    "openpyxl>=3.1.3",
 ]
 
-# https://peps.python.org/pep-0735/
+[project.scripts]
+pgscatalog-validate = 'pgscatalog.validate.cli.validate_cli:run'
+
 [dependency-groups]
 lint = [
     "ruff>=0.9.4",
     "mypy>=1.14.1"
     ]
 test = [
-    "coverage>=7.8.0",
     "pytest>=8.3.4",
+    "coverage>=7.8.0",
 ]
 
 [build-system]
@@ -50,30 +49,22 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
+addopts = "--doctest-modules"
 filterwarnings = ["error"]
-addopts = "--ignore packages"
 pythonpath = [
   "src"
 ]
 consider_namespace_packages = true
 
 [tool.coverage.run]
-source = ["src/pgscatalog/utils", "tests"]
+source = ["src/pgscatalog/validate", "tests"]
 concurrency = ["multiprocessing"]
 parallel = true
 sigterm = true
 
-[tool.uv.workspace]
-members = ["packages/*"]
-
-[tool.uv.sources]
-pgscatalog-core = { workspace = true }
-pgscatalog-calc = { workspace = true }
-pgscatalog-match = { workspace = true }
-pgscatalog-validate = { workspace = true }
-
 [tool.mypy]
 files = ["src/**/*.py"]
+exclude = "tests/"
 warn_unused_configs = true
 ignore_missing_imports = true
 follow_imports = "silent"
