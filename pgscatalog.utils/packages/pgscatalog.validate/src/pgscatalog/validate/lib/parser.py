@@ -9,6 +9,8 @@ from typing import List, TextIO, Generator
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
+import pgscatalog.validate.lib.errors as errors
+
 
 def skip_comments(file: TextIO) -> Generator:
     """Reads the input file and returns each line as a generator, skipping the commented lines starting with #."""
@@ -83,6 +85,6 @@ class SpreadsheetFileParser(ScoreFileParser):
             elif value.lower() in ("no", "false", "false()", "=false()", "0"):
                 return False
             else:
-                raise ValueError("Not a valid boolean value")
+                raise ValueError(errors.NOT_A_BOOLEAN)
         else:
             return None

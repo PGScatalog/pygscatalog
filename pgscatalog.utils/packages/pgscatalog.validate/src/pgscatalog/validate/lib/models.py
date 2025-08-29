@@ -9,6 +9,7 @@ from pydantic import (
 from typing_extensions import Self
 
 from pgscatalog.core.lib.models import ScoreVariant
+import pgscatalog.validate.lib.errors as errors
 
 
 class ScoringFileValidationError(Exception):
@@ -75,13 +76,12 @@ class ColumnNames(BaseModel):
                 or {'chr_name', 'chr_position'}.issubset(columns)
                 or {'chr_name', 'variant_type'}.issubset(columns)  # If only complex alleles
                 ):
-            raise ValueError('Missing column either rsID, or both chr_name and chr_position')
+            raise ValueError(errors.MISSING_COLUMN_RSID_OR_COORD)
 
         # effect_weight or dosage_{0..2}_weight
         if not ('effect_weight' in columns or
                 {'dosage_0_weight', 'dosage_1_weight', 'dosage_2_weight'}.issubset(columns)):
-            raise ValueError('Missing column either effect_weight,'
-                             ' or {\'dosage_0_weight\', \'dosage_1_weight\', \'dosage_2_weight\'}')
+            raise ValueError(errors.MISSING_COLUMN_EFFECT_OR_DOSAGE_WEIGHT)
 
         # allelefrequency_effect_[Ancestry] variable columns
         pattern = r'^allelefrequency_effect_'
@@ -90,8 +90,7 @@ class ColumnNames(BaseModel):
         # Don't allow non-listed columns
         allowed_columns = self.base_columns.union(self.hm_columns) if self.hm else self.base_columns
         if not columns.issubset(allowed_columns):
-            raise ValueError('The following columns are not in the schema:'
-                             ' {}'.format(str(columns - set(allowed_columns))))
+            raise ValueError(errors.UNEXPECTED_COLUMNS.format(columns=str(columns - set(allowed_columns))))
 
         return self
 
@@ -132,9 +131,9 @@ class ValidationVariant(ScoreVariant):
         Validate all fields for common mistakes such as non-printable characters or leading/trailing spaces.
         """
         if cls.__value_contains_non_printable_characters(v):
-            raise ValueError('Value contains non printable character(s). Input: {}'.format(repr(v)))
+            raise ValueError(errors.NON_PRINTABLE_CHAR.format(input=repr(v)))
         if cls.__value_contains_leading_or_trailing_spaces(v):
-            raise ValueError('Value contains leading or trailing space(s). Input: {}'.format(repr(v)))
+            raise ValueError(errors.LEADING_OR_TRAILING_SPACE.format(input=repr(v)))
         return v
 
     @field_validator('chr_name', 'hm_chr', mode="after")
@@ -146,7 +145,7 @@ class ValidationVariant(ScoreVariant):
         if chr_name.upper() not in cls.allowed_chr_names:
             # Allow alternate/random contigs like "1_KI270766v1_alt". Might be found in harmonised files
             if not cls._contig_pattern.match(chr_name):
-                raise ValueError('Invalid chr_name: {}'.format(chr_name))
+                raise ValueError(errors.INVALID_CHR_NAME.format(input=chr_name))
         return chr_name
 
 
@@ -164,15 +163,14 @@ class ComplexVariant(ValidationVariant):
             case "CYP_allele":
                 self._validate_cyp()
             case _:
-                raise ValueError(f"{self.variant_type} is not a valid variant type.")
+                raise ValueError(errors.INVALID_VARIANT_TYPE.format(input=self.variant_type))
 
         # Diplotype/haplotype
         if self.is_diplotype and self.is_haplotype:
-            raise ValueError('Cannot be both diplotype and haplotype.')
+            raise ValueError(errors.BOTH_DIPLOTYPE_AND_HAPLOTYPE)
         if self.is_diplotype and self.effect_allele:
             if len(self.effect_allele.allele.split("/")) != 2:
-                raise ValueError("Variant is marked as diplotype,"
-                                 " although it doesn't show 2 effect alleles ('/' separator).")
+                raise ValueError(errors.MISSING_DIPLOTYPE_ALLELE)
 
         return self
 
@@ -188,14 +186,14 @@ class ComplexVariant(ValidationVariant):
                     if field_value.startswith('X'):
                         alleles_exclusion_groups.add(field_value)
                         if field_value not in var_desc_exclusion_groups:
-                            raise ValueError(f"Exclusion group {field_value} is not found in variant_description.")
+                            raise ValueError(errors.EXCLUSION_GROUP_NOT_IN_VAR_DESC.format(input=field_value))
             if set(var_desc_exclusion_groups.keys()) != alleles_exclusion_groups:
-                raise ValueError(f"Exclusion group(s) {set(var_desc_exclusion_groups.keys()) - alleles_exclusion_groups}"
-                                 " are declared in variant_description but cannot be found in effect_allele.")
+                raise ValueError(errors.EXCLUSION_GROUPS_NOT_IN_EFFECT_ALLELE
+                                 .format(input=set(var_desc_exclusion_groups.keys()) - alleles_exclusion_groups))
 
     def _validate_apoe(self):
         if self.locus_name != 'APOE':
-            raise ValueError("locus_name of APOE allele variant is not APOE.")  # no
+            raise ValueError(errors.LOCUS_NAME_NOT_APOE)
         pass
 
     def _validate_cyp(self):
@@ -209,6 +207,6 @@ class ComplexVariant(ValidationVariant):
             if re.match(r'X[0-9]*!', key):
                 exclusion_group_id = key[:-1]
                 if exclusion_group_id in exclusion_groups:
-                    raise ValueError(f"Exclusion group {exclusion_group_id} is declared twice.")
+                    raise ValueError(errors.DUPLICATE_EXCLUSION_GROUPS.format(input=exclusion_group_id))
                 exclusion_groups[exclusion_group_id] = value.strip('[').strip(']')
         return exclusion_groups
