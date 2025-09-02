@@ -47,12 +47,12 @@ class TSVFileParser(ScoreFileParser):
             self.open_fn = gzip.open
 
     def get_column_names(self) -> List[str]:
-        with self.open_fn(self.file_path, mode="rt") as file:
+        with self.open_fn(self.file_path, mode="rt", encoding="utf-8", errors="replace") as file:
             reader = csv.reader(skip_comments(file), delimiter="\t")
             return next(reader)  # Get the first row (header)
 
     def get_variants(self) -> Iterable:
-        with self.open_fn(self.file_path, mode="rt") as file:
+        with self.open_fn(self.file_path, mode="rt", encoding="utf-8", errors="replace") as file:
             yield from csv.DictReader(skip_comments(file), delimiter="\t")
 
 
