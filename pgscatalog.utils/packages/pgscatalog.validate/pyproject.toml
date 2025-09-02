@@ -1,6 +1,6 @@
 [project]
 name = "pgscatalog.validate"
-version = "0.1"
+version = "0.2"
 description = "Tools for checking that the scoring files and harmonized scoring files match the PGS Catalog scoring file formats"
 license = "Apache-2.0"
 authors = [
