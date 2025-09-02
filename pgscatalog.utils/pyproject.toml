@@ -27,6 +27,7 @@ dependencies = [
     "pgscatalog-calc",
     "pgscatalog-core",
     "pgscatalog-match",
+    "pgscatalog-validate",
 ]
 
 # https://peps.python.org/pep-0735/
@@ -69,6 +70,7 @@ members = ["packages/*"]
 pgscatalog-core = { workspace = true }
 pgscatalog-calc = { workspace = true }
 pgscatalog-match = { workspace = true }
+pgscatalog-validate = { workspace = true }
 
 [tool.mypy]
 files = ["src/**/*.py"]
