@@ -8,7 +8,17 @@ from pgscatalog.validate.lib.parser import ScoreFileParser, SpreadsheetFileParse
 class ScoringFileValidation:
     """Main class for performing the validation of PGS Scoring files.
 
-    The validation is performed when the object is built. The validation errors are then available by reading the .errors attribute."""
+    The validation is performed when the object is built.
+
+    >>> validation = ScoringFileValidation("path_to_scoring_file", header=False)
+    >>> validation.is_valid()
+    True
+
+    The validation errors are then available by reading the .errors attribute.
+
+    >>> for validation_error in validation.errors:
+    >>>     print(f"Row: {validation_error.row}, Error: {str(validation_error.error)}")
+    """
 
     column_names: ColumnNames
     accession: str
