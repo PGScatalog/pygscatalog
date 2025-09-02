@@ -56,6 +56,10 @@ class ScoringFileValidation:
         except FileNotFoundError:
             print(f"Error: File not found: {self.parser.file_path}")
 
+    def is_valid(self) -> bool:
+        """Checks if the validated file is valid. If not, the errors available through the .errors attribute."""
+        return not self.errors
+
     @staticmethod
     def __remove_empty_values(line: dict) -> Dict:
         return {key: value for key, value in line.items() if value is not None and value != ""}
