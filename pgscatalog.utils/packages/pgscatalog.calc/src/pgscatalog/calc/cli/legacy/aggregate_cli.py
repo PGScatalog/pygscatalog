@@ -8,7 +8,7 @@ from collections import deque
 from typing import Optional
 from xopen import xopen
 
-from ..lib import PolygenicScore
+from pgscatalog.calc.lib import PolygenicScore
 from pgscatalog.core import chrom_keyfunc
 
 logger = logging.getLogger(__name__)

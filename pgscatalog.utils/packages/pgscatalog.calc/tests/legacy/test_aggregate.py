@@ -4,10 +4,10 @@ import shutil
 from os import unlink
 from unittest.mock import patch
 
-from pgscatalog.calc.cli.aggregate_cli import run_aggregate
-
 import pytest
 import pandas as pd
+
+from pgscatalog.calc.cli.legacy.aggregate_cli import run_aggregate
 
 
 @pytest.fixture(scope="module")

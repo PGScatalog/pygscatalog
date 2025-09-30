@@ -72,29 +72,29 @@ def compare_ancestry(
     :return: dataframes for reference (predictions on training set) and target (predicted labels) datasets
     """
     # Check that datasets have the correct columns
-    assert (
-        method in comparison_method_threshold.keys()
-    ), "comparison method parameter must be Mahalanobis or RF"
+    assert method in comparison_method_threshold.keys(), (
+        "comparison method parameter must be Mahalanobis or RF"
+    )
     if method == "Mahalanobis":
-        assert (
-            covariance_method in _mahalanobis_methods
-        ), "covariance estimation method must be MinCovDet or EmpiricalCovariance"
+        assert covariance_method in _mahalanobis_methods, (
+            "covariance estimation method must be MinCovDet or EmpiricalCovariance"
+        )
 
     cols_pcs = ["PC{}".format(x + 1) for x in range(0, n_pcs)]
-    assert all(
-        [col in ref_df.columns for col in cols_pcs]
-    ), "Reference Dataset (ref_df) is missing some PC columns for ancestry comparison (max:{})".format(
-        n_pcs
+    assert all([col in ref_df.columns for col in cols_pcs]), (
+        "Reference Dataset (ref_df) is missing some PC columns for ancestry comparison (max:{})".format(
+            n_pcs
+        )
     )
-    assert all(
-        [col in target_df.columns for col in cols_pcs]
-    ), "Target Dataset (target_df) is missing some PC columns for ancestry comparison (max:{})".format(
-        n_pcs
+    assert all([col in target_df.columns for col in cols_pcs]), (
+        "Target Dataset (target_df) is missing some PC columns for ancestry comparison (max:{})".format(
+            n_pcs
+        )
     )
-    assert (
-        ref_pop_col in ref_df.columns
-    ), "Population label column ({}) is missing from reference dataframe".format(
-        ref_pop_col
+    assert ref_pop_col in ref_df.columns, (
+        "Population label column ({}) is missing from reference dataframe".format(
+            ref_pop_col
+        )
     )
     ref_populations = ref_df[ref_pop_col].unique()
 
@@ -104,10 +104,10 @@ def compare_ancestry(
 
     # Create Training dfs
     if ref_train_col:
-        assert (
-            ref_train_col in ref_df.columns
-        ), "Training index column({}) is missing from reference dataframe".format(
-            ref_train_col
+        assert ref_train_col in ref_df.columns, (
+            "Training index column({}) is missing from reference dataframe".format(
+                ref_train_col
+            )
         )
         ref_train_df = ref_df.loc[ref_df[ref_train_col],]
     else:
@@ -286,43 +286,43 @@ def pgs_adjust(
     """
     # Check that datasets have the correct columns
     ## Check that score is in both dfs
-    assert all(
-        [x in ref_df.columns for x in scorecols]
-    ), "Reference Dataset (ref_df) is missing some PGS column(s)".format()
-    assert all(
-        [x in target_df.columns for x in scorecols]
-    ), "Target Dataset (target_df) is missing some PGS column(s)".format()
+    assert all([x in ref_df.columns for x in scorecols]), (
+        "Reference Dataset (ref_df) is missing some PGS column(s)".format()
+    )
+    assert all([x in target_df.columns for x in scorecols]), (
+        "Target Dataset (target_df) is missing some PGS column(s)".format()
+    )
 
     ## Check that PCs is in both dfs
     cols_pcs = ["PC{}".format(x + 1) for x in range(0, n_pcs)]
-    assert all(
-        [col in ref_df.columns for col in cols_pcs]
-    ), "Reference Dataset (ref_df) is missing some PC columns for PCA adjustment (max:{})".format(
-        n_pcs
+    assert all([col in ref_df.columns for col in cols_pcs]), (
+        "Reference Dataset (ref_df) is missing some PC columns for PCA adjustment (max:{})".format(
+            n_pcs
+        )
     )
-    assert all(
-        [col in target_df.columns for col in cols_pcs]
-    ), "Target Dataset (target_df) is missing some PC columns for PCA adjustment (max:{})".format(
-        n_pcs
+    assert all([col in target_df.columns for col in cols_pcs]), (
+        "Target Dataset (target_df) is missing some PC columns for PCA adjustment (max:{})".format(
+            n_pcs
+        )
     )
-    assert (
-        ref_pop_col in ref_df.columns
-    ), "Population label column ({}) is missing from reference dataframe".format(
-        ref_pop_col
+    assert ref_pop_col in ref_df.columns, (
+        "Population label column ({}) is missing from reference dataframe".format(
+            ref_pop_col
+        )
     )
     ref_populations = ref_df[ref_pop_col].unique()
-    assert (
-        target_pop_col in target_df.columns
-    ), "Population label column ({}) is missing from target dataframe".format(
-        target_pop_col
+    assert target_pop_col in target_df.columns, (
+        "Population label column ({}) is missing from target dataframe".format(
+            target_pop_col
+        )
     )
 
     ## Create Training dfs
     if ref_train_col:
-        assert (
-            ref_train_col in ref_df.columns
-        ), "Training index column({}) is missing from reference dataframe".format(
-            ref_train_col
+        assert ref_train_col in ref_df.columns, (
+            "Training index column({}) is missing from reference dataframe".format(
+                ref_train_col
+            )
         )
         ref_train_df = ref_df.loc[ref_df[ref_train_col],].copy()
     else:
@@ -385,10 +385,10 @@ def pgs_adjust(
                     results_ref[percentile_col].loc[i_ref_pop] = percentileofscore(
                         c_pgs_pop_dist, ref_df.loc[i_ref_pop, c_pgs]
                     )
-                    results_target[percentile_col].loc[
-                        i_target_pop
-                    ] = percentileofscore(
-                        c_pgs_pop_dist, target_df.loc[i_target_pop, c_pgs]
+                    results_target[percentile_col].loc[i_target_pop] = (
+                        percentileofscore(
+                            c_pgs_pop_dist, target_df.loc[i_target_pop, c_pgs]
+                        )
                     )
                     r_pop["percentiles"] = np.percentile(
                         c_pgs_pop_dist, range(0, 101, 1)
@@ -475,9 +475,9 @@ def pgs_adjust(
                 target_pgs_pred = pcs2pgs_fit.predict(target_norm[cols_pcs])
                 target_pgs_resid = target_norm[c_pgs] - target_pgs_pred
                 results_target[adj_col] = target_pgs_resid / ref_train_pgs_resid_std
-                results_models["adjust_pcs"]["PGS"][c_pgs][
-                    "Z_norm1"
-                ] = package_skl_regression(pcs2pgs_fit)
+                results_models["adjust_pcs"]["PGS"][c_pgs]["Z_norm1"] = (
+                    package_skl_regression(pcs2pgs_fit)
+                )
 
                 if "mean+var" in use_method:
                     # Method 2 (Khan et al. Nature Medicine (2022)): normalize variance (doi:10.1038/s41591-022-01869-1)
@@ -498,9 +498,9 @@ def pgs_adjust(
                         results_target[adj_col] = target_pgs_resid / np.sqrt(
                             pcs2var_fit_gamma.predict(target_norm[cols_pcs])
                         )
-                        results_models["adjust_pcs"]["PGS"][c_pgs][
-                            "Z_norm2"
-                        ] = package_skl_regression(pcs2var_fit_gamma)
+                        results_models["adjust_pcs"]["PGS"][c_pgs]["Z_norm2"] = (
+                            package_skl_regression(pcs2var_fit_gamma)
+                        )
                     else:
                         # Return full-likelihood adjustment model
                         # This jointly re-fits the regression parameters from the mean and variance prediction to better
@@ -537,9 +537,9 @@ def pgs_adjust(
                                     pcs2full_fit["params"]["message"],
                                 )
                             )
-                        results_models["adjust_pcs"]["PGS"][c_pgs][
-                            "Z_norm2"
-                        ] = pcs2full_fit
+                        results_models["adjust_pcs"]["PGS"][c_pgs]["Z_norm2"] = (
+                            pcs2full_fit
+                        )
     # Only return results
     logger.debug("Outputting adjusted PGS & models")
     results_ref = pd.DataFrame(results_ref)
