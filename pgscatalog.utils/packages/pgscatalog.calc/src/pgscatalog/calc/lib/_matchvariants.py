@@ -9,7 +9,7 @@ from functools import cache
 from typing import TYPE_CHECKING, ClassVar
 
 import duckdb
-from duckdb.typing import BOOLEAN, UINTEGER, VARCHAR, DuckDBPyType
+from duckdb.sqltypes import BOOLEAN, UINTEGER, VARCHAR, DuckDBPyType
 
 logger = logging.getLogger(__name__)
 

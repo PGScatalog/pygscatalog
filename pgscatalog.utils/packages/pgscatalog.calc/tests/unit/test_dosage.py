@@ -1,0 +1,106 @@
+import pathlib
+
+import dask.array as da
+import numpy as np
+import pytest
+import zarr
+
+from pgscatalog.calc.lib._dosage import (
+    adjust_dosage_for_effect,
+    calculate_effect_allele_dosage,
+)
+from pgscatalog.calc.lib.constants import ZARR_PLOIDY
+
+N_SAMPLES = 5
+
+
+@pytest.fixture
+def dosage():
+    # first variant: 0 copies of effect allele, second: 1 copy, third: 2 copies
+    dosage = np.zeros(shape=(N_SAMPLES, 1000))
+    dosage[1,] = 1
+    dosage[2,] = 2
+    dosage[3,] = 1
+    dosage[4,] = 2
+    return dosage
+
+
+@pytest.fixture
+def dosage_ones():
+    return np.ones(shape=(N_SAMPLES, 1000))
+
+
+def test_calculate_dosage_persists_nan(genotype_missing_masked, effect_allele_idx):
+    # missing calls must be correctly converted to missing dosages (np.nan)
+    missing_array = da.from_array(genotype_missing_masked)
+    dosage_array = calculate_effect_allele_dosage(
+        genotype_array=missing_array, effect_idx=effect_allele_idx
+    )
+
+    n_missing_calls = np.sum(np.isnan(genotype_missing_masked))
+    n_missing_dosages = np.sum(np.isnan(dosage_array.compute()))
+    assert n_missing_dosages == (n_missing_calls / ZARR_PLOIDY)
+
+
+def test_adjust_dosage_for_effect(dosage, tmp_path):
+    is_recessive = np.array([False, True, True, False, False])
+    is_dominant = np.array([False, False, False, True, True])
+    store = zarr.storage.MemoryStore()
+    dosage_zarr = zarr.create_array(store=store, shape=dosage.shape, dtype=dosage.dtype)
+    dosage_zarr[:] = dosage
+    adjusted = adjust_dosage_for_effect(
+        dosage_array=dosage_zarr, recessive_mask=is_recessive, dominant_mask=is_dominant
+    )
+
+    # 0/0
+    assert np.all(adjusted[0,] == 0)  # additive = no change
+
+    # 0/1
+    assert np.all(adjusted[1,] == 0)  # recessive = max(dosage - 1, 0)
+    assert np.all(adjusted[3,] == 1)  # dominant = (greater than 1 is 1)
+
+    # 1/1
+    assert np.all(adjusted[2,] == 1)  # recessive = max(dosage - 1, 0)
+    assert np.all(adjusted[4,] == 1)  # dominant = (greater than 1 is 1)
+
+
+def test_bad_effect_types(dosage, tmp_path):
+    # both recessive and dominant is impossible
+    is_recessive = np.array([False, True, True, False, False])
+    is_dominant = np.array([False, False, True, True, True])
+
+    store = zarr.storage.MemoryStore()
+    dosage_zarr = zarr.create_array(store=store, shape=dosage.shape, dtype=dosage.dtype)
+    dosage_zarr[:] = dosage
+    with pytest.raises(ValueError) as e:
+        _ = adjust_dosage_for_effect(
+            dosage_array=dosage_zarr,
+            recessive_mask=is_recessive,
+            dominant_mask=is_dominant,
+        )
+    assert "A variant cannot be both" in str(e.value)
+
+
+@pytest.fixture
+def allele_match_table():
+    return (
+        pathlib.Path(__file__).parent.parent
+        / "data"
+        / "duckdb"
+        / "allele_match_table.json"
+    )
+
+
+@pytest.fixture
+def score_variant_table():
+    return (
+        pathlib.Path(__file__).parent.parent
+        / "data"
+        / "duckdb"
+        / "score_variant_table.json"
+    )
+
+
+@pytest.fixture
+def db_metadata():
+    return "PGS001229_hmPOS_GRCh38", "1000G"

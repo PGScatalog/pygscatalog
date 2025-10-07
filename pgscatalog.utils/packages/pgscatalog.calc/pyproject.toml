@@ -75,6 +75,9 @@ filterwarnings = ["error"]
 pythonpath = [
   "src"
 ]
+testpaths = [
+    "tests",
+]
 consider_namespace_packages = true
 
 [tool.coverage.run]
