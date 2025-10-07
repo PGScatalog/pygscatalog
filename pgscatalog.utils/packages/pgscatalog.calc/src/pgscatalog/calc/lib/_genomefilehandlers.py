@@ -208,9 +208,8 @@ def get_file_handler(
 
     if path.suffixes[-2:] == [".vcf", ".gz"]:
         return VCFHandler(path=path, cache_dir=cache_dir)
-    elif path.suffix == ".bgen":
+    if path.suffix == ".bgen":
         if sample_file is None:
             raise ValueError("BGEN files require a sample file")
         return BgenFileHandler(path=path, cache_dir=cache_dir, sample_file=sample_file)
-    else:
-        raise ValueError(f"Unsupported genome file type: {path}")
+    raise ValueError(f"Unsupported genome file type: {path}")

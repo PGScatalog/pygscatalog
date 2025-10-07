@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import argparse
 import logging
 import pathlib
+from typing import TYPE_CHECKING
 
 from rich.logging import RichHandler
 from rich.progress import (
@@ -16,6 +16,9 @@ from rich.progress import (
 )
 
 from pgscatalog.calc import ScorePipeline
+
+if TYPE_CHECKING:
+    import argparse
 
 logger = logging.getLogger("pgscatalog.wgs")
 

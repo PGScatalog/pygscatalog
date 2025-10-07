@@ -1,16 +1,16 @@
 # mypy: ignore-errors
 
-import logging
-import pandas as pd
-import numpy as np
-from sklearn.covariance import MinCovDet, EmpiricalCovariance
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LinearRegression, GammaRegressor
-from scipy.stats import chi2, percentileofscore, mannwhitneyu
-from scipy import optimize as opt
-import json
 import gzip
+import json
+import logging
 
+import numpy as np
+import pandas as pd
+from scipy import optimize as opt
+from scipy.stats import chi2, mannwhitneyu, percentileofscore
+from sklearn.covariance import EmpiricalCovariance, MinCovDet
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import GammaRegressor, LinearRegression
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def compare_ancestry(
     :return: dataframes for reference (predictions on training set) and target (predicted labels) datasets
     """
     # Check that datasets have the correct columns
-    assert method in comparison_method_threshold.keys(), (
+    assert method in comparison_method_threshold, (
         "comparison method parameter must be Mahalanobis or RF"
     )
     if method == "Mahalanobis":
@@ -80,21 +80,15 @@ def compare_ancestry(
             "covariance estimation method must be MinCovDet or EmpiricalCovariance"
         )
 
-    cols_pcs = ["PC{}".format(x + 1) for x in range(0, n_pcs)]
+    cols_pcs = [f"PC{x + 1}" for x in range(0, n_pcs)]
     assert all([col in ref_df.columns for col in cols_pcs]), (
-        "Reference Dataset (ref_df) is missing some PC columns for ancestry comparison (max:{})".format(
-            n_pcs
-        )
+        f"Reference Dataset (ref_df) is missing some PC columns for ancestry comparison (max:{n_pcs})"
     )
     assert all([col in target_df.columns for col in cols_pcs]), (
-        "Target Dataset (target_df) is missing some PC columns for ancestry comparison (max:{})".format(
-            n_pcs
-        )
+        f"Target Dataset (target_df) is missing some PC columns for ancestry comparison (max:{n_pcs})"
     )
     assert ref_pop_col in ref_df.columns, (
-        "Population label column ({}) is missing from reference dataframe".format(
-            ref_pop_col
-        )
+        f"Population label column ({ref_pop_col}) is missing from reference dataframe"
     )
     ref_populations = ref_df[ref_pop_col].unique()
 
@@ -105,9 +99,7 @@ def compare_ancestry(
     # Create Training dfs
     if ref_train_col:
         assert ref_train_col in ref_df.columns, (
-            "Training index column({}) is missing from reference dataframe".format(
-                ref_train_col
-            )
+            f"Training index column({ref_train_col}) is missing from reference dataframe"
         )
         ref_train_df = ref_df.loc[ref_df[ref_train_col],]
     else:
@@ -118,8 +110,8 @@ def compare_ancestry(
     pop = "ALL"
     ref_covariance_model = get_covariance_method(covariance_method)
     ref_covariance_fit = ref_covariance_model.fit(ref_train_df[cols_pcs])
-    colname_dist = "Mahalanobis_dist_{}".format(pop)
-    colname_pval = "Mahalanobis_P_{}".format(pop)
+    colname_dist = f"Mahalanobis_dist_{pop}"
+    colname_pval = f"Mahalanobis_P_{pop}"
     target_df[colname_dist] = ref_covariance_fit.mahalanobis(target_df[cols_pcs])
     target_df[colname_pval] = chi2.sf(target_df[colname_dist], n_pcs - 1)
     compare_info["Mahalanobis_P_ALL"] = dict(target_df[colname_pval].describe())
@@ -136,10 +128,8 @@ def compare_ancestry(
             compare_info[col_pc] = {"U": mwu_pc.statistic, "pvalue": mwu_pc.pvalue}
             if mwu_pc.pvalue < 1e-4:
                 logger.warning(
-                    "{} *may* be capturing target/reference stratification (Mann-Whitney p-value={}), "
-                    "use visual inspection of PC plot to confirm".format(
-                        col_pc, mwu_pc.pvalue
-                    )
+                    f"{col_pc} *may* be capturing target/reference stratification (Mann-Whitney p-value={mwu_pc.pvalue}), "
+                    "use visual inspection of PC plot to confirm"
                 )
 
     # Run Ancestry Assignment methods
@@ -148,10 +138,10 @@ def compare_ancestry(
         # Calculate population distances
         pval_cols = []
         for pop in ref_populations:
-            logger.debug("Fitting Mahalanobis distances: {}".format(pop))
+            logger.debug(f"Fitting Mahalanobis distances: {pop}")
             # Fit the covariance matrix for the current population
-            colname_dist = "Mahalanobis_dist_{}".format(pop)
-            colname_pval = "Mahalanobis_P_{}".format(pop)
+            colname_dist = f"Mahalanobis_dist_{pop}"
+            colname_pval = f"Mahalanobis_P_{pop}"
 
             covariance_model = get_covariance_method(covariance_method)
 
@@ -184,9 +174,7 @@ def compare_ancestry(
 
         if p_threshold:
             logger.debug(
-                "Comparing Population Similarity to p-value threshold (p < {})".format(
-                    p_threshold
-                )
+                f"Comparing Population Similarity to p-value threshold (p < {p_threshold})"
             )
             ref_assign["MostSimilarPop_LowConfidence"] = [
                 (ref_assign[x][i] < p_threshold)
@@ -219,14 +207,14 @@ def compare_ancestry(
         ref_assign = pd.DataFrame(
             clf_rf.predict_proba(ref_df[cols_pcs]),
             index=ref_df.index,
-            columns=["RF_P_{}".format(x) for x in clf_rf.classes_],
+            columns=[f"RF_P_{x}" for x in clf_rf.classes_],
         )
         ref_assign["MostSimilarPop"] = clf_rf.predict(ref_df[cols_pcs])
 
         target_assign = pd.DataFrame(
             clf_rf.predict_proba(target_df[cols_pcs]),
             index=target_df.index,
-            columns=["RF_P_{}".format(x) for x in clf_rf.classes_],
+            columns=[f"RF_P_{x}" for x in clf_rf.classes_],
         )
         target_assign["MostSimilarPop"] = clf_rf.predict(target_df[cols_pcs])
 
@@ -236,16 +224,14 @@ def compare_ancestry(
 
         if p_threshold:
             logger.debug(
-                "Comparing Population Similarity to p-value threshold (p < {})".format(
-                    p_threshold
-                )
+                f"Comparing Population Similarity to p-value threshold (p < {p_threshold})"
             )
             ref_assign["MostSimilarPop_LowConfidence"] = [
-                (ref_assign["RF_P_{}".format(x)].iloc[i] < p_threshold)
+                (ref_assign[f"RF_P_{x}"].iloc[i] < p_threshold)
                 for i, x in enumerate(clf_rf.predict(ref_df[cols_pcs]))
             ]
             target_assign["MostSimilarPop_LowConfidence"] = [
-                (target_assign["RF_P_{}".format(x)].iloc[i] < p_threshold)
+                (target_assign[f"RF_P_{x}"].iloc[i] < p_threshold)
                 for i, x in enumerate(clf_rf.predict(target_df[cols_pcs]))
             ]
 
@@ -294,35 +280,25 @@ def pgs_adjust(
     )
 
     ## Check that PCs is in both dfs
-    cols_pcs = ["PC{}".format(x + 1) for x in range(0, n_pcs)]
+    cols_pcs = [f"PC{x + 1}" for x in range(0, n_pcs)]
     assert all([col in ref_df.columns for col in cols_pcs]), (
-        "Reference Dataset (ref_df) is missing some PC columns for PCA adjustment (max:{})".format(
-            n_pcs
-        )
+        f"Reference Dataset (ref_df) is missing some PC columns for PCA adjustment (max:{n_pcs})"
     )
     assert all([col in target_df.columns for col in cols_pcs]), (
-        "Target Dataset (target_df) is missing some PC columns for PCA adjustment (max:{})".format(
-            n_pcs
-        )
+        f"Target Dataset (target_df) is missing some PC columns for PCA adjustment (max:{n_pcs})"
     )
     assert ref_pop_col in ref_df.columns, (
-        "Population label column ({}) is missing from reference dataframe".format(
-            ref_pop_col
-        )
+        f"Population label column ({ref_pop_col}) is missing from reference dataframe"
     )
     ref_populations = ref_df[ref_pop_col].unique()
     assert target_pop_col in target_df.columns, (
-        "Population label column ({}) is missing from target dataframe".format(
-            target_pop_col
-        )
+        f"Population label column ({target_pop_col}) is missing from target dataframe"
     )
 
     ## Create Training dfs
     if ref_train_col:
         assert ref_train_col in ref_df.columns, (
-            "Training index column({}) is missing from reference dataframe".format(
-                ref_train_col
-            )
+            f"Training index column({ref_train_col}) is missing from reference dataframe"
         )
         ref_train_df = ref_df.loc[ref_df[ref_train_col],].copy()
     else:
@@ -335,7 +311,7 @@ def pgs_adjust(
     scorecols_drop = set()
     for c_pgs in scorecols:
         # Makes melting easier later
-        sum_col = "SUM|{}".format(c_pgs)
+        sum_col = f"SUM|{c_pgs}"
         results_ref[sum_col] = ref_df[c_pgs]
         results_target[sum_col] = target_df[c_pgs]
         results_models = {}
@@ -344,9 +320,7 @@ def pgs_adjust(
         if np.var(results_ref[sum_col]) == 0:
             scorecols_drop.add(c_pgs)
             logger.warning(
-                "Skipping adjustment: {} has 0 variance in PGS SUM [REFERENCE]".format(
-                    c_pgs
-                )
+                f"Skipping adjustment: {c_pgs} has 0 variance in PGS SUM [REFERENCE]"
             )
 
     # Report PGS values with respect to distribution of PGS in the most similar reference population
@@ -358,12 +332,12 @@ def pgs_adjust(
 
         for c_pgs in scorecols:
             # Initialize Output
-            percentile_col = "percentile_MostSimilarPop|{}".format(c_pgs)
+            percentile_col = f"percentile_MostSimilarPop|{c_pgs}"
             results_ref[percentile_col] = pd.Series(index=ref_df.index, dtype="float64")
             results_target[percentile_col] = pd.Series(
                 index=target_df.index, dtype="float64"
             )
-            z_col = "Z_MostSimilarPop|{}".format(c_pgs)
+            z_col = f"Z_MostSimilarPop|{c_pgs}"
             results_ref[z_col] = pd.Series(index=ref_df.index, dtype="float64")
             results_target[z_col] = pd.Series(index=target_df.index, dtype="float64")
 
@@ -408,7 +382,7 @@ def pgs_adjust(
                     r_model[pop] = r_pop
 
                 results_models["dist_empirical"][c_pgs] = r_model
-                # ToDo: explore handling of individuals who have low-confidence population labels
+                # TODO: explore handling of individuals who have low-confidence population labels
                 #  -> Possible Soln: weighted average based on probabilities? Small Mahalanobis P-values will complicate this
     # PCA-based adjustment
     if any([x in use_method for x in ["mean", "mean+var"]]):
@@ -437,9 +411,9 @@ def pgs_adjust(
         for c_pgs in scorecols:
             if c_pgs in scorecols_drop:
                 # fill the output with NAs
-                adj_cols = ["Z_norm1|{}".format(c_pgs)]
+                adj_cols = [f"Z_norm1|{c_pgs}"]
                 if "mean+var" in use_method:
-                    adj_cols.append("Z_norm2|{}".format(c_pgs))
+                    adj_cols.append(f"Z_norm2|{c_pgs}")
                 for adj_col in adj_cols:
                     results_ref[adj_col] = pd.Series(
                         index=ref_df.index, dtype="float64"
@@ -457,7 +431,7 @@ def pgs_adjust(
                     results_models["adjust_pcs"]["PGS"][c_pgs]["pgs_offset"] = pgs_mean
 
                 # Method 1 (Khera et al. Circulation (2019): normalize mean (doi:10.1161/CIRCULATIONAHA.118.035658)
-                adj_col = "Z_norm1|{}".format(c_pgs)
+                adj_col = f"Z_norm1|{c_pgs}"
                 # Fit to Reference Data
                 pcs2pgs_fit = LinearRegression().fit(
                     ref_train_df[cols_pcs], ref_train_df[c_pgs]
@@ -485,7 +459,7 @@ def pgs_adjust(
                     # (e.g. reduce the correlation between genetic ancestry and how far away you are from the mean)
                     # USE gamma distribution for predicted variance to constrain it to be positive (b/c using linear
                     # regression we can get negative predictions for the sd)
-                    adj_col = "Z_norm2|{}".format(c_pgs)
+                    adj_col = f"Z_norm2|{c_pgs}"
                     pcs2var_fit_gamma = GammaRegressor(max_iter=1000).fit(
                         ref_train_df[cols_pcs],
                         (ref_train_pgs_resid - ref_train_pgs_resid_mean) ** 2,
@@ -663,16 +637,16 @@ class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
-        elif isinstance(obj, np.floating):
+        if isinstance(obj, np.floating):
             return float(obj)
-        elif isinstance(obj, np.ndarray):
+        if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
 
 def write_model(d: dict, outname):
     """Use numpy encoder to write json file for models"""
-    logger.debug("Writing PGS adjustment models to: {}".format(outname))
+    logger.debug(f"Writing PGS adjustment models to: {outname}")
     if outname.endswith(".gz"):
         outfile = gzip.open(outname, "wt")
     else:

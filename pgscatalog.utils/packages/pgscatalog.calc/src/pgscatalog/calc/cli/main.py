@@ -13,8 +13,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         prog="pgsc_calc",
         description="""
-    Polygenic Score (PGS) Catalog Calculator. 
-    
+    Polygenic Score (PGS) Catalog Calculator.
+
     A set of programs to apply PGS scoring files to new target genomes.
     """,
     )
@@ -107,7 +107,7 @@ def parser_load_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--format",
         type=GenomeFileType,
-        choices=list(x.value for x in GenomeFileType),
+        choices=[x.value for x in GenomeFileType],
         help="Target genome format",
         required=True,
     )

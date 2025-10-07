@@ -3,8 +3,12 @@ import logging
 import pathlib
 import textwrap
 
-from pgscatalog.calc.lib import AdjustArguments, AggregatedPGS
-from pgscatalog.calc.lib import PrincipalComponents, PopulationType
+from pgscatalog.calc.lib import (
+    AdjustArguments,
+    AggregatedPGS,
+    PopulationType,
+    PrincipalComponents,
+)
 
 logger = logging.getLogger(__name__)
 

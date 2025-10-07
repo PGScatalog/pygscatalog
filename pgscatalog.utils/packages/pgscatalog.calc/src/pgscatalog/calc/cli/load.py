@@ -44,9 +44,8 @@ def logger_thread(queue: Queue[logging.LogRecord | None]) -> None:
         record: logging.LogRecord | None = queue.get()
         if record is None:
             break
-        else:
-            thread_log = logging.getLogger(record.name)
-            thread_log.handle(record)
+        thread_log = logging.getLogger(record.name)
+        thread_log.handle(record)
 
 
 def init_worker(queue: Queue[logging.LogRecord | None], verbose: bool) -> None:
@@ -85,7 +84,7 @@ def parse_genome_paths(
     bgen_sample_file: Pathish | None,
 ) -> dict[str | None, list[TargetGenome]]:
     targets: list[AnnotatedGenomePath] = list(
-        set(AnnotatedGenomePath.from_string(x) for x in target_genomes)
+        {AnnotatedGenomePath.from_string(x) for x in target_genomes}
     )
 
     genomes: dict[str | None, list[TargetGenome]] = {}
@@ -144,18 +143,17 @@ def get_jobs(
         for k, g in itertools.groupby(
             sorted(unique_positions, key=lambda x: (x[0], x[1])), key=lambda p: p[0]
         ):
-            genomes: list[TargetGenome] | None = target_genomes.get(k, None)
+            genomes: list[TargetGenome] | None = target_genomes.get(k)
             if genomes is None:
                 logger.warning(
                     f"Skipping scoring file positions in chromosome {k}: no associated"
                     f" target genome found"
                 )
                 continue
-            else:
-                variants = list(itertools.batched(g, batch_size))
-                cache_jobs.extend(list(itertools.product(genomes, variants)))
+            variants = list(itertools.batched(g, batch_size))
+            cache_jobs.extend(list(itertools.product(genomes, variants)))
     else:
-        genomes = target_genomes.get(None, None)
+        genomes = target_genomes.get(None)
         if genomes is None:
             raise TypeError("Can't get target genome")
 
@@ -335,4 +333,5 @@ def cleanup_cache_tmpdir(cache_dir: pathlib.Path) -> None:
     try:
         rmtree(tmp_dir)
     except FileNotFoundError:
-        pass
+        from contextlib import suppress
+        suppress(FileNotFoundError)

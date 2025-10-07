@@ -11,7 +11,6 @@ import dask.array as da
 import dask.config
 import duckdb
 import numpy as np
-import polars as pl
 import tenacity
 import zarr
 import zarr.errors
@@ -29,6 +28,8 @@ from .targetvariant import TargetVariant, TargetVariants
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    import polars as pl
 
     from .types import Pathish
 
@@ -123,7 +124,7 @@ class TargetGenome:
                 logger.info("Connected to database")
                 # filtering by filename is important to handle split files properly
                 query = conn.sql(f"""
-                    SELECT DISTINCT chr_name, chr_pos 
+                    SELECT DISTINCT chr_name, chr_pos
                     FROM variants_table
                     WHERE filename = '{self.filename}'
                 """)
@@ -160,7 +161,7 @@ class TargetGenome:
 
         logger.info(f"Caching {len(positions_to_query)} unique positions {self.chrom=}")
         sorted_positions: list[tuple[str, int]] = sorted(
-            list(positions_to_query - self.cached_positions),
+            positions_to_query - self.cached_positions,
             key=lambda x: (int(x[0]), x[1]),
         )
         logger.info(
@@ -236,7 +237,7 @@ def write_metadata_to_zarr(
             )
 
 
-def init_genotype_array(zarr_group: zarr.Group, n_samples: int):
+def init_genotype_array(zarr_group: zarr.Group, n_samples: int) -> zarr.Array:
     try:
         # rows, cols, z-axis
         zarr_shape = (
@@ -263,9 +264,8 @@ def init_genotype_array(zarr_group: zarr.Group, n_samples: int):
     except zarr.errors.ContainsArrayError:
         if not isinstance(zarr_group["genotypes"], zarr.Array):
             raise TypeError("Expected a Zarr Array >:(") from None
-        else:
-            # array has already been initialised
-            gt_arr = zarr_group["genotypes"]
+        # array has already been initialised
+        gt_arr = zarr_group["genotypes"]
 
     return gt_arr
 

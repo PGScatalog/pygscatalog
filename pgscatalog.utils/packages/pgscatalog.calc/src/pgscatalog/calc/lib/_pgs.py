@@ -6,15 +6,17 @@ from typing import TYPE_CHECKING
 import duckdb
 import numpy as np
 import polars as pl
-import zarr
 from dask import array as da
 from numpy import typing as npt
 
-from ._dosage import ScoreStats
 from .constants import ZARR_VARIANT_CHUNK_SIZE
 
 if TYPE_CHECKING:
+    import zarr
+
+    from ._dosage import ScoreStats
     from .types import Pathish
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ def create_score_table(db_path: Pathish) -> None:
     with duckdb.connect(str(db_path)) as conn:
         conn.sql("""
         CREATE OR REPLACE TABLE score_table (
-            sampleset TEXT NOT NULL,            
+            sampleset TEXT NOT NULL,
             accession TEXT NOT NULL,
             n_matched UINTEGER NOT NULL,
             sample_id TEXT NOT NULL,
@@ -86,7 +88,7 @@ def write_scores(
     logger.info(f"Score columns will have {scale} digits after the decimal point")
     with duckdb.connect(
         str(db_path),
-        config={"max_memory": max_memory_gb, "threads": threads},
+        config={"max_memory": max_memory_gb, "threads": str(threads)},
     ) as conn:
         conn.sql(f"""
         COPY (
@@ -94,10 +96,10 @@ def write_scores(
                 sampleset,
                 accession,
                 sample_id,
-                n_matched,                
+                n_matched,
                 allele_count,
                 -- export fixed-width decimals
-                CAST(dosage_sum AS DECIMAL(18, {scale})) AS dosage_sum,                
+                CAST(dosage_sum AS DECIMAL(18, {scale})) AS dosage_sum,
                 CAST(score AS DECIMAL(18, {scale})) AS score,
                 CAST(score_avg AS DECIMAL(18, {scale})) AS score_avg,
             FROM score_table
@@ -105,12 +107,12 @@ def write_scores(
         )
         TO '{str(out_dir)}'
         (
-            FORMAT CSV, 
-            HEADER, 
-            DELIMITER ',', 
-            COMPRESSION GZIP, 
-            PARTITION_BY (sampleset, accession), 
-            WRITE_PARTITION_COLUMNS true, 
+            FORMAT CSV,
+            HEADER,
+            DELIMITER ',',
+            COMPRESSION GZIP,
+            PARTITION_BY (sampleset, accession),
+            WRITE_PARTITION_COLUMNS true,
             OVERWRITE true
         );
         """)
@@ -215,10 +217,10 @@ def calculate_score_statistics(
         for accession in accessions:
             query = conn.execute(
                 """
-            SELECT COUNT(*) 
-            FROM allele_match_table 
-            WHERE match_result.match_summary='matched' AND 
-                sampleset = $sampleset AND 
+            SELECT COUNT(*)
+            FROM allele_match_table
+            WHERE match_result.match_summary='matched' AND
+                sampleset = $sampleset AND
                 accession = $accession;
             """,
                 {"accession": accession, "sampleset": sampleset},
@@ -226,13 +228,12 @@ def calculate_score_statistics(
 
             if query is None:
                 raise ValueError(f"{accession=} can't count matches")
-            else:
-                n_matched = query[0]
+            n_matched = query[0]
 
             # slice the weight matrix to include variants with non-zero effect weights
             accession_idx = conn.sql(f"""
-            SELECT weight_mat_row_nr 
-            FROM wide_score_variants 
+            SELECT weight_mat_row_nr
+            FROM wide_score_variants
             WHERE "{accession}" != 0
             """).fetchnumpy()["weight_mat_row_nr"]
 
@@ -252,7 +253,7 @@ def calculate_score_statistics(
             score_stats["n_matched"].append(n_matched)
 
     # per-sampleset statistics
-    score_stats["score"] = [score for score in score.T]
+    score_stats["score"] = [score for score in score.T]  # noqa: C416
     score_stats["sampleset"] = [sampleset] * len(accessions)
     score_stats["sample_id"] = [sample_ids] * len(accessions)
 

@@ -24,13 +24,13 @@ def add_match_log(
 
     conn.execute("""
     CREATE TABLE IF NOT EXISTS score_log_table(
-        sampleset VARCHAR, 
-        accession VARCHAR, 
-        row_nr UINTEGER, 
-        chr_name VARCHAR, 
-        chr_position UINTEGER, 
+        sampleset VARCHAR,
+        accession VARCHAR,
+        row_nr UINTEGER,
+        chr_name VARCHAR,
+        chr_position UINTEGER,
         effect_allele VARCHAR NOT NULL,
-        matched_effect_allele VARCHAR 
+        matched_effect_allele VARCHAR
             GENERATED ALWAYS AS (
             CASE match_type
                 WHEN 'REFALT'       THEN effect_allele
@@ -43,13 +43,13 @@ def add_match_log(
             END
         ),
         other_allele VARCHAR,
-        target_ref VARCHAR, 
-        target_alts VARCHAR[], 
-        is_matched BOOLEAN NOT NULL, 
+        target_ref VARCHAR,
+        target_alts VARCHAR[],
+        is_matched BOOLEAN NOT NULL,
         match_type match_type_enum NOT NULL,
         match_summary match_summary_enum NOT NULL,
-        is_ambiguous BOOLEAN, 
-        is_multiallelic BOOLEAN, 
+        is_ambiguous BOOLEAN,
+        is_multiallelic BOOLEAN,
         target_row_nr UINTEGER,
         filename VARCHAR,
         -- each variant in a scoring file can only match once
@@ -57,7 +57,7 @@ def add_match_log(
     );
     """)
 
-    # TODO: work with multiple samplesets
+    # TODO @nebfield: test implementation with multiple samplesets  # noqa: TD003
     conn.execute(
         """
      INSERT INTO score_log_table
@@ -93,7 +93,7 @@ def add_match_log(
     logger.info("Creating temporary tables to summarise match logs")
     conn.sql(
         """
-        CREATE TEMP TABLE temp_summary_log_table AS 
+        CREATE TEMP TABLE temp_summary_log_table AS
         WITH match_counts AS (
             SELECT sampleset,
                    accession,
@@ -108,8 +108,8 @@ def add_match_log(
                      is_ambiguous,
                      is_multiallelic
         )
-        SELECT *, 
-               CAST(count / sum(count) OVER (PARTITION BY sampleset, accession) 
+        SELECT *,
+               CAST(count / sum(count) OVER (PARTITION BY sampleset, accession)
                    AS DECIMAL(5, 2)) AS fraction
         FROM match_counts;
         """
@@ -131,21 +131,21 @@ def add_match_log(
 
     logger.info("Creating summary_log_table if it doesn't exist")
     conn.sql(
-        """ 
-        CREATE TABLE summary_log_table AS 
-        SELECT 
-            sampleset, 
-            accession, 
-            match_summary, 
-            is_ambiguous, 
-            is_multiallelic, 
-            count, 
-            fraction, 
-            match_rate, 
-            is_match_rate_ok 
-        FROM temp_summary_log_table 
-        JOIN temp_match_rates_ok 
-        USING (sampleset, accession); 
+        """
+        CREATE TABLE summary_log_table AS
+        SELECT
+            sampleset,
+            accession,
+            match_summary,
+            is_ambiguous,
+            is_multiallelic,
+            count,
+            fraction,
+            match_rate,
+            is_match_rate_ok
+        FROM temp_summary_log_table
+        JOIN temp_match_rates_ok
+        USING (sampleset, accession);
         """
     )
 
@@ -158,7 +158,7 @@ def get_ok_accessions(db_path: Pathish, sampleset: str) -> list[str]:
     with duckdb.connect(str(db_path), read_only=True) as conn:
         accessions: list[tuple[str, bool, float]] = conn.execute(
             """
-            SELECT DISTINCT accession, is_match_rate_ok, match_rate 
+            SELECT DISTINCT accession, is_match_rate_ok, match_rate
             FROM summary_log_table
             WHERE sampleset = ?
         """,

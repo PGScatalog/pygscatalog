@@ -10,7 +10,7 @@ from functools import cache
 from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING, BinaryIO, cast
 
-from bgen import BgenReader
+from bgen import BgenReader  # type: ignore[import-untyped]
 
 from .targetvariant import TargetVariant
 
@@ -160,8 +160,8 @@ def bgen_buffer_variants(
     tmp_dir = pathlib.Path(cache_dir).resolve() / "tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     buffered_bgen_file = cast(
-        BinaryIO,
-        NamedTemporaryFile(
+        "BinaryIO",
+        NamedTemporaryFile(  # noqa: SIM115
             dir=tmp_dir, delete_on_close=False, suffix=".bgen", delete=False
         ),
     )

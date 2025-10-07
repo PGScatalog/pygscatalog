@@ -20,11 +20,11 @@ if TYPE_CHECKING:
 
 def _setup_enums(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("""
-        CREATE TYPE IF NOT EXISTS match_summary_enum AS 
+        CREATE TYPE IF NOT EXISTS match_summary_enum AS
         ENUM ('matched', 'unmatched', 'excluded');
     """)
     conn.execute(f"""
-        CREATE TYPE IF NOT EXISTS match_type_enum AS 
+        CREATE TYPE IF NOT EXISTS match_type_enum AS
         ENUM{tuple(e.name for e in MatchPriority)}
     """)
 
@@ -82,9 +82,9 @@ def update_match_table(
             sampleset TEXT NOT NULL,
             accession TEXT NOT NULL,
             row_nr UINTEGER NOT NULL,
-            match_result STRUCT(effect_allele_idx UINT8, 
-                is_multiallelic BOOLEAN, 
-                is_ambiguous BOOLEAN, 
+            match_result STRUCT(effect_allele_idx UINT8,
+                is_multiallelic BOOLEAN,
+                is_ambiguous BOOLEAN,
                 is_matched BOOLEAN,
                 match_priority UINT8,
                 match_type match_type_enum,
@@ -104,7 +104,7 @@ def update_match_table(
                 accession,
                 row_nr,
                 filename,
-                match_variant(effect_allele, other_allele, ref, alts) 
+                match_variant(effect_allele, other_allele, ref, alts)
                     AS match_result,
                 target_row_nr
             FROM position_match_table

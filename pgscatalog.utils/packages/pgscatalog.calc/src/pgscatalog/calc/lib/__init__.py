@@ -1,18 +1,18 @@
 from .genomefiletypes import GenomeFileType
+
+# legacy stuff
+from .legacy.polygenicscore import (
+    AdjustArguments,
+    AdjustResults,
+    AggregatedPGS,
+    PolygenicScore,
+)
+from .legacy.principalcomponents import PopulationType, PrincipalComponents
 from .scorefile import Scorefiles
 from .scorepipeline import ScorePipeline
 from .targetgenome import TargetGenome
 from .targetvariant import TargetVariant, TargetVariants
 from .types import Pathish, PathishList
-
-# legacy stuff
-from .legacy.polygenicscore import (
-    PolygenicScore,
-    AggregatedPGS,
-    AdjustResults,
-    AdjustArguments,
-)
-from .legacy.principalcomponents import PopulationType, PrincipalComponents
 
 __all__ = [
     "Scorefiles",
@@ -29,5 +29,5 @@ __all__ = [
     "AggregatedPGS",
     "AdjustResults",
     "AdjustArguments",
-    "PrincipalComponents"
+    "PrincipalComponents",
 ]

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, TypedDict
 import dask.config
 import duckdb
 import numpy as np
-import polars as pl
 import zarr
 import zarr.storage
 from dask import array as da
@@ -19,6 +18,7 @@ from .constants import (
 )
 
 if TYPE_CHECKING:
+    import polars as pl
     from numpy import typing as npt
 
     from .types import Pathish
@@ -102,7 +102,7 @@ def store_dosage_from_chunks(
     missing_array: zarr.Array = pgs_group.create_array(
         "missing",
         shape=(n_variants, n_samples),
-        dtype=np.bool,
+        dtype=np.bool_,
         fill_value=np.nan,
         overwrite=True,
         chunks=(ZARR_VARIANT_CHUNK_SIZE, n_samples),
@@ -144,8 +144,8 @@ def store_dosage_from_chunks(
         )
 
         # adjust dosages for recessive / dominant effect types
-        recessive_mask: npt.NDArray[np.bool] = df["is_recessive"].to_numpy()
-        dominant_mask: npt.NDArray[np.bool] = df["is_dominant"].to_numpy()
+        recessive_mask: npt.NDArray[np.bool_] = df["is_recessive"].to_numpy()
+        dominant_mask: npt.NDArray[np.bool_] = df["is_dominant"].to_numpy()
         effect_type_adjusted: da.Array = adjust_dosage_for_effect(
             dosage_array=filled,
             recessive_mask=recessive_mask,
@@ -397,8 +397,7 @@ def get_n_score_variants(db_path: Pathish) -> int:
     if query is None:
         logger.critical("Couldn't get number of variants from dosage table")
         raise ValueError("Query returned no results")
-    else:
-        return int(query[0])
+    return int(query[0])
 
 
 def get_n_samples(store: zarr.storage.StoreLike, sampleset: str) -> int:

@@ -1,8 +1,8 @@
 # mypy: ignore-errors
 
 import logging
-import pandas as pd
 
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ def read_pcs(loc_pcs: list[str], dataset: str, loc_related_ids=None, nPCs=None):
     proj = pd.DataFrame()
 
     for i, path in enumerate(loc_pcs):
-        logger.debug("Reading PCA projection: {}".format(path))
+        logger.debug(f"Reading PCA projection: {path}")
         df = pd.read_csv(path, sep="\t", converters={"IID": str, "FID": str}, header=0)
         df["sampleset"] = dataset
 
@@ -42,9 +42,9 @@ def read_pcs(loc_pcs: list[str], dataset: str, loc_related_ids=None, nPCs=None):
 
     # Read/process IDs for unrelated samples (usually reference dataset)
     if loc_related_ids:
-        logger.debug("Flagging related samples with: {}".format(loc_related_ids))
+        logger.debug(f"Flagging related samples with: {loc_related_ids}")
         proj["Unrelated"] = True
-        with open(loc_related_ids, "r") as infile:
+        with open(loc_related_ids) as infile:
             IDs_related = [x.strip() for x in infile.readlines()]
         proj.loc[
             proj.index.get_level_values(level=1).isin(IDs_related), "Unrelated"
@@ -83,7 +83,7 @@ def read_pgs(loc_aggscore):
     :param loc_aggscore: path to aggregated scores output
     :return:
     """
-    logger.debug("Reading aggregated score data: {}".format(loc_aggscore))
+    logger.debug(f"Reading aggregated score data: {loc_aggscore}")
     df = pd.read_csv(
         loc_aggscore,
         sep="\t",

@@ -2,19 +2,17 @@ import dataclasses
 import gzip
 import logging
 import pathlib
-import typing
 
 import pandas as pd
 
+from ._ancestry import read
 from ._ancestry.tools import (
-    compare_ancestry,
     choose_pval_threshold,
+    compare_ancestry,
     pgs_adjust,
     write_model,
 )
 from .principalcomponents import PopulationType
-from ._ancestry import read
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ class AdjustArguments:
     """
 
     method_compare: str = "RandomForest"
-    pThreshold: typing.Optional[float] = None
+    pThreshold: float | None = None
     method_normalization: tuple[str, ...] = ("empirical", "mean", "mean+var")
 
     def __post_init__(self):
@@ -76,7 +74,7 @@ class AdjustResults:
         loc_pgs_out = str(directory / f"{self.target_label}_pgs.txt.gz")
         with gzip.open(loc_pgs_out, "wt") as outf:
             logger.debug(
-                "Writing adjusted PGS values (long format) to: {}".format(loc_pgs_out)
+                f"Writing adjusted PGS values (long format) to: {loc_pgs_out}"
             )
             for i, pgs_id in enumerate(scorecols):
                 df_pgs = self.pgs.loc[:, self.pgs.columns.str.endswith(pgs_id)].melt(
@@ -94,13 +92,13 @@ class AdjustResults:
                 )
                 if i == 0:
                     logger.debug(
-                        "{}/{}: Writing {}".format(i + 1, len(scorecols), pgs_id)
+                        f"{i + 1}/{len(scorecols)}: Writing {pgs_id}"
                     )
                     colorder = list(df_pgs.columns)  # to ensure sort order
                     df_pgs.to_csv(outf, sep="\t")
                 else:
                     logger.debug(
-                        "{}/{}: Appending {}".format(i + 1, len(scorecols), pgs_id)
+                        f"{i + 1}/{len(scorecols)}: Appending {pgs_id}"
                     )
                     df_pgs[colorder].to_csv(outf, sep="\t", header=False)
 
@@ -342,8 +340,7 @@ class PolygenicScore:
             logger.info(f"Doing element-wise addition: {self} + {other}")
             sumdf = self.df.add(other.df, fill_value=0)
             return PolygenicScore(sampleset=self.sampleset, df=sumdf)
-        else:
-            return NotImplemented
+        return NotImplemented
 
     @property
     def df(self):

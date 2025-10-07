@@ -5,7 +5,7 @@ import pathlib
 import textwrap
 import typing
 from collections import deque
-from typing import Optional
+
 from xopen import xopen
 
 from pgscatalog.calc.lib import PolygenicScore
@@ -48,8 +48,7 @@ def verify_variants(score: pathlib.Path) -> None:
 
     if diff := scored_variants.symmetric_difference(scorefile_variants):
         raise ValueError(f"Missing variants {diff}")
-    else:
-        logger.info(f"{score} was calculated from good variant sets :)")
+    logger.info(f"{score} was calculated from good variant sets :)")
 
 
 def run_aggregate():
@@ -79,7 +78,7 @@ def run_aggregate():
     pgs = deque(PolygenicScore(path=x) for x in score_paths)
 
     observed_columns = set()
-    aggregated: Optional[PolygenicScore] = None
+    aggregated: PolygenicScore | None = None
 
     # first, use PolygenicScore's __add__ method, which implements df.add(fill_value=0)
     while pgs:
@@ -100,8 +99,7 @@ def run_aggregate():
             f"Observed: {observed_columns}. "
             f"In aggregated: {dfcols}"
         )
-    else:
-        logger.info("Aggregated columns match observed columns")
+    logger.info("Aggregated columns match observed columns")
 
     # next, melt the plink2 scoring files from wide (many columns) format to long format
     aggregated.melt()

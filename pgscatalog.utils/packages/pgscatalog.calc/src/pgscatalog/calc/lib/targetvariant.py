@@ -130,7 +130,7 @@ class TargetVariants:
         return np.stack(cleaned_arrays, axis=0)
 
     def probs_to_hard_calls(self) -> da.Array:
-        is_phased = set(x.is_phased for x in self._variants)
+        is_phased = {x.is_phased for x in self._variants}
         if True in is_phased and False in is_phased:
             raise ValueError("Variants having mixed phase")
 
@@ -139,13 +139,15 @@ class TargetVariants:
         n_samples = len(self.samples)
 
         logger.info(f"{self.filetype} {is_phased=}")
+        missing: npt.NDArray[np.float64]
+        probs: list[npt.NDArray[np.float64]]
         match (self.filetype, is_any_phased):
             case (GenomeFileType.BGEN, True):
                 # phasing: { None, True } or { True }
                 missing = np.full(
                     (n_samples, BGEN_PHASED_N_COLS),
                     fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,
-                    dtype=np.uint8,
+                    dtype=np.float64,
                 )
                 probs = [
                     x.probs if x.probs is not None else missing for x in self._variants
@@ -159,7 +161,7 @@ class TargetVariants:
                 missing = np.full(
                     (n_samples, BGEN_UNPHASED_N_COLS),
                     fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,
-                    dtype=np.uint8,
+                    dtype=np.float64,
                 )
                 probs = [
                     x.probs if x.probs is not None else missing for x in self._variants

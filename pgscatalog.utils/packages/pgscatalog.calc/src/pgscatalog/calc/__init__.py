@@ -1,21 +1,21 @@
 import importlib.metadata
 
 from .lib import (
-    Scorefiles,
-    TargetGenome,
-    TargetVariant,
-    TargetVariants,
-    ScorePipeline,
+    AdjustArguments,
+    AdjustResults,
+    AggregatedPGS,
     GenomeFileType,
     Pathish,
     PathishList,
     # legacy stuff
     PolygenicScore,
-    AggregatedPGS,
-    AdjustResults,
-    AdjustArguments,
     PopulationType,
     PrincipalComponents,
+    Scorefiles,
+    ScorePipeline,
+    TargetGenome,
+    TargetVariant,
+    TargetVariants,
 )
 
 __all__ = [

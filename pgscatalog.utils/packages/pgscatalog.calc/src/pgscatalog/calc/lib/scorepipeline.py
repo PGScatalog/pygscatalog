@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
 import dask.config
 import duckdb
-import numpy as np
-import polars as pl
 import zarr
 
 from ._dosage import (
@@ -27,20 +24,16 @@ from ._weight_matrix import store_group_weight_arrays
 from .scorefile import load_scoring_files
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import numpy as np
     import numpy.typing as npt
+    import polars as pl
 
     from .types import Pathish, PathishList
 
 
 logger = logging.getLogger(__name__)
-
-
-# # TODO: add state checks
-# class ScoreDBState(enum.Enum):
-#     INIT = enum.auto()
-#     SCORES_LOADED = enum.auto()
-#     VARIANTS_MATCHED = enum.auto()
-#     SCORES_CALCULATED = enum.auto()
 
 
 class ScorePipeline:
@@ -113,7 +106,8 @@ class ScorePipeline:
         for sampleset in self.samplesets:
             with duckdb.connect(
                 self.db_path,
-                config={"max_memory": self._max_memory_gb, "threads": self._threads},
+                config={"max_memory": self._max_memory_gb,
+                        "threads": str(self._threads)},
             ) as conn:
                 self._attach_target_variants(conn)
                 update_match_table(
@@ -135,7 +129,7 @@ class ScorePipeline:
 
         with duckdb.connect(
             self.db_path,
-            config={"max_memory": self._max_memory_gb, "threads": self._threads},
+            config={"max_memory": self._max_memory_gb, "threads": str(self._threads)},
         ) as conn:
             self._attach_target_variants(conn)
             conn.table("score_log_table").order("accession, row_nr").write_csv(
@@ -153,7 +147,8 @@ class ScorePipeline:
 
         with duckdb.connect(
             self.db_path,
-            config={"max_memory": self._max_memory_gb, "threads": self._threads},
+            config={"max_memory": self._max_memory_gb,
+                    "threads": str(self._threads)},
         ) as conn:
             conn.table("summary_log_table").write_csv(file_name=str(out_path))
 
@@ -175,8 +170,7 @@ class ScorePipeline:
         samplesets = list(root.keys())
         if len(samplesets) > 1:
             raise NotImplementedError
-        else:
-            return samplesets
+        return samplesets
 
     def calculate_scores(self) -> None:
         create_score_table(db_path=self.db_path)
@@ -209,7 +203,7 @@ class ScorePipeline:
 
             with dask.config.set(scheduler="threads", num_workers=self._threads):
                 effect_weights: zarr.Array = cast(
-                    zarr.Array, pgs_group["weight_matrix"]
+                    "zarr.Array", pgs_group["weight_matrix"]
                 )
                 scores: npt.NDArray[np.float64] = calculate_scores(
                     dosage_array=dosage_zarr, effect_weights=effect_weights
@@ -235,5 +229,5 @@ class ScorePipeline:
 def get_sample_ids(store: zarr.storage.StoreLike, sampleset: str) -> list[str]:
     group = zarr.open_group(store=store, path=f"gts/{sampleset}", mode="r")
     # it's definitely a list of strings
-    samples = cast(Sequence[str], group.attrs["samples"])
+    samples = cast("Sequence[str]", group.attrs["samples"])
     return [str(x) for x in samples]

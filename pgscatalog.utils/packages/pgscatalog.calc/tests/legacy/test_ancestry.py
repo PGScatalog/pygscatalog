@@ -3,8 +3,8 @@ import json
 import os
 from unittest.mock import patch
 
-import pytest
 import pandas as pd
+import pytest
 
 from pgscatalog.calc.cli.legacy.ancestry_cli import run_ancestry
 

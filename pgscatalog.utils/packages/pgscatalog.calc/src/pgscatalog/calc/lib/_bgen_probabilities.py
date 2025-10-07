@@ -21,8 +21,7 @@ def unphased_probabilities_to_hard_calls(
     """Convert unphased probabilities to VCF style genotypes"""
     if not all(x.shape[1] == BGEN_UNPHASED_N_COLS for x in probabilities):
         raise ValueError("Unphased probabilities must have 3 columns")
-    else:
-        logger.info("Unphased probabilities have good shapes")
+    logger.info("Unphased probabilities have good shapes")
 
     # axis 0 (x): variants
     # axis 1 (y): samples
@@ -57,16 +56,15 @@ def unphased_probabilities_to_hard_calls(
         dtype=np.uint8,
     )
 
-    def map_lookup(block):
+    def map_lookup(block):  # type: ignore
         return lookup_table[block]
 
     # dask doesn't support native fancy indexing, so map the numpy approach
-    hard_calls = masked_indices.map_blocks(
+    hard_calls: da.Array = masked_indices.map_blocks(
         map_lookup,
         dtype=np.uint8,
         new_axis=2,
     )
-
     return hard_calls
 
 
@@ -76,9 +74,8 @@ def phased_probabilities_to_hard_calls(
     """Convert phased probabilities to genotypes"""
     if not all(x.shape[1] == BGEN_PHASED_N_COLS for x in probabilities):
         raise ValueError("Haplotype pair probabilities required (4 columns).")
-    else:
-        logger.info("Haplotype pair probabilities have good shapes")
-        logger.info("Hard calling phased probabilities with dask")
+    logger.info("Haplotype pair probabilities have good shapes")
+    logger.info("Hard calling phased probabilities with dask")
 
     # axis 0 (x): variants
     # axis 1 (y): samples
@@ -103,4 +100,5 @@ def phased_probabilities_to_hard_calls(
     masked_hap1 = da.where(hap1_mask, MISSING_GENOTYPE_SENTINEL_VALUE, hap1_alleles)
     masked_hap2 = da.where(hap2_mask, MISSING_GENOTYPE_SENTINEL_VALUE, hap2_alleles)
 
-    return da.stack([masked_hap1, masked_hap2], axis=2)
+    hard_calls: da.Array = da.stack([masked_hap1, masked_hap2], axis=2)
+    return hard_calls

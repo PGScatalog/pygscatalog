@@ -105,7 +105,7 @@ def load_scoring_files(
 
     with duckdb.connect(
         str(db_path),
-        config={"max_memory": max_memory_gb, "threads": threads},
+        config={"max_memory": max_memory_gb, "threads": str(threads)},
     ) as conn:
         logger.info(f"Loading {path_strings} into {db_path=} score_variant_table")
         conn.sql("""
@@ -127,7 +127,7 @@ def load_scoring_files(
         conn.execute(
             """
         INSERT INTO score_variant_table
-        SELECT * FROM read_csv(?, columns={ 
+        SELECT * FROM read_csv(?, columns={
             'chr_name': 'VARCHAR',
             'chr_position': 'UINTEGER',
             'effect_allele': 'VARCHAR',

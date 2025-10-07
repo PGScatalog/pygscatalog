@@ -4,8 +4,8 @@ import shutil
 from os import unlink
 from unittest.mock import patch
 
-import pytest
 import pandas as pd
+import pytest
 
 from pgscatalog.calc.cli.legacy.aggregate_cli import run_aggregate
 
@@ -166,7 +166,7 @@ def test_var_overlap_fails(
     copied_score_vars = [shutil.copy(x, outdir) for x in score_vars]
     _ = [shutil.copy(x, outdir) for x in score_files]
 
-    with open(copied_score_vars[0], mode="at") as f:
+    with open(copied_score_vars[0], mode="a") as f:
         f.writelines(["potato"])
 
     args = [
