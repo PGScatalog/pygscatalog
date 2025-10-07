@@ -18,7 +18,7 @@ def main() -> None:
     A set of programs to apply PGS scoring files to new target genomes.
     """,
     )
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(required=True)
 
     parser_load = subparsers.add_parser(
         "load", help="Load genomes into a cache directory"

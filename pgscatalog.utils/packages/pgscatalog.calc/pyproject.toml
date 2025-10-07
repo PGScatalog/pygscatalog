@@ -1,6 +1,6 @@
 [project]
 name = "pgscatalog.calc"
-version = "0.3.1"
+version = "1.0.0"
 description = "Libraries and applications for working with calculated polygenic scores"
 license = "Apache-2.0"
 authors = [
@@ -23,13 +23,8 @@ classifiers = [
 
 requires-python = ">=3.10"
 dependencies = [
-    "numpy~=1.26",
-    "pandas~=2.2.0",
-    "pyarrow~=15.0.0",
-    "scikit-learn~=1.4",
-    "scipy~=1.12",
     "pgscatalog-core",
-    "bgen>=1.9.0",
+    "bgen==1.9.3",
     "dask>=2025.9.1",
     "duckdb>=1.4.0",
     "filelock>=3.19.1",
@@ -37,11 +32,8 @@ dependencies = [
     "polars>=0.20.30",
     "pysam>=0.23.3",
     "rich>=14.1.0",
+    "numpy>=1.26.4",
 ]
-
-
-[tool.uv.sources]
-pgscatalog-core = { workspace = true }
 
 # https://peps.python.org/pep-0621/
 [project.scripts]
@@ -59,13 +51,21 @@ test = [
     "pytest>=8.3.4",
     "coverage>=7.8.0",
 ]
+# packages for legacy implementations
+legacy = [
+    "pandas>=2.3.3",
+    "scikit-learn>=1.7.2",
+]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.uv]
+default-groups = ["legacy"]
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/pgscatalog/calc"]
+packages = ["src/pgscatalog"]
 artifacts = ["pgscatalog/calc/py.typed"]
 
 [tool.pytest.ini_options]

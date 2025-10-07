@@ -24,8 +24,8 @@ classifiers = [
 requires-python = ">=3.10"
 
 dependencies = [
-    "pgscatalog-calc",
     "pgscatalog-core",
+    "pgscatalog-calc",
     "pgscatalog-match",
 ]
 
@@ -78,5 +78,3 @@ follow_imports = "silent"
 disallow_untyped_calls = false
 disallow_incomplete_defs = true
 
-[tool.setuptools.packages.find]
-where = ["src"]
