@@ -101,18 +101,17 @@ def test_write_scores(tmp_path, tmp_path_factory, random_score_table_rows):
     # test output structure
     df = duckdb.read_csv(str(out_csv)).pl()
     assert df.shape[0] == len(random_score_table_rows)
-    assert df.collect_schema() == pl.Schema(
-        {
-            "sampleset": pl.String,
-            "accession": pl.String,
-            "sample_id": pl.String,
-            "n_matched": pl.Int64,
-            "allele_count": pl.Int64,
-            "dosage_sum": pl.Float64,
-            "score": pl.Float64,
-            "score_avg": pl.Float64,
-        }
-    )
+    assert df.schema == {
+        "sampleset": pl.String,
+        "accession": pl.String,
+        "sample_id": pl.String,
+        "n_matched": pl.Int64,
+        "allele_count": pl.Int64,
+        "dosage_sum": pl.Float64,
+        "score": pl.Float64,
+        "score_avg": pl.Float64,
+    }
+
 
 
 def test_create_score_table(tmp_path):

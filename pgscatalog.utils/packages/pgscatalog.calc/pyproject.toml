@@ -33,6 +33,7 @@ dependencies = [
     "pysam>=0.23.3",
     "rich>=14.1.0",
     "numpy>=1.26.4",
+    "pyarrow>=15.0.2",
 ]
 
 # https://peps.python.org/pep-0621/

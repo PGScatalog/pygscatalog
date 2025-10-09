@@ -2,7 +2,7 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from pgscatalog.calc import TargetVariant, TargetVariants
+from pgscatalog.calc import TargetVariant, TargetVariants, GenomeFileType
 
 
 @pytest.fixture
@@ -33,6 +33,7 @@ def test_bad_variant(variant) -> None:
             samples=["test"],
             filename="test.vcf.gz",
             sampleset="test",
+            filetype=GenomeFileType.VCF,
         )
     assert "Number of samples in genotypes" in str(excinfo.value)
 
@@ -43,6 +44,7 @@ def test_bad_variant(variant) -> None:
             samples=["test", "test", "test"],
             filename="test.vcf.gz",
             sampleset="test",
+            filetype=GenomeFileType.VCF,
         )
     assert "Number of samples in genotypes" in str(excinfo.value)
 

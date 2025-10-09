@@ -117,11 +117,6 @@ def parse_target_variants(
             ref: str = variant.alleles[0] if ref_first else variant.alleles[1]
             alt: str = variant.alleles[1] if ref_first else variant.alleles[0]
 
-            # if variant.is_phased:
-            #     gts = phased_probabilities_to_hard_calls(variant.probabilities)
-            # else:
-            #     gts = unphased_probabilities_to_hard_calls(variant.probabilities)
-
             yield TargetVariant(
                 chr_name=fetched_chrom,
                 chr_pos=fetched_pos,
@@ -190,8 +185,6 @@ def bgen_buffer_variants(
             temp_idx_path=pathlib.Path(idx_path),
             table_name=temp_view_name,
         )
-        # close the temporary bgen file and get ready to read it
-        buffered_bgen_file.close()
 
         # parse bgen variants as target variants
         yield from parse_target_variants(
@@ -201,6 +194,7 @@ def bgen_buffer_variants(
             ref_first=ref_first,
         )
     finally:
+        buffered_bgen_file.close()
         buffered_bgen_path.unlink()
         with sqlite3.connect(idx_path) as conn:
             if temp_table_name is not None:

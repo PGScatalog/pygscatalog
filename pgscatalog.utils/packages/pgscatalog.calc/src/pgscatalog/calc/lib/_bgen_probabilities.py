@@ -16,9 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 def unphased_probabilities_to_hard_calls(
-    probabilities: list[npt.NDArray[np.floating]], n_samples: int
+    probabilities: list[npt.NDArray[np.floating]]
 ) -> da.Array:
     """Convert unphased probabilities to VCF style genotypes"""
+    if not all(isinstance(x, np.ndarray) and x.ndim == 2 for x in probabilities):
+        raise TypeError("All elements must be 2D numpy arrays.")
+
     if not all(x.shape[1] == BGEN_UNPHASED_N_COLS for x in probabilities):
         raise ValueError("Unphased probabilities must have 3 columns")
     logger.info("Unphased probabilities have good shapes")
@@ -26,9 +29,10 @@ def unphased_probabilities_to_hard_calls(
     # axis 0 (x): variants
     # axis 1 (y): samples
     # axis 2 (z): ploidy
+    arr = np.stack(probabilities, axis=0)
     darr = da.from_array(
-        np.stack(probabilities, axis=0),
-        chunks=(ZARR_VARIANT_CHUNK_SIZE, n_samples, BGEN_UNPHASED_N_COLS),
+        arr,
+        chunks=(ZARR_VARIANT_CHUNK_SIZE, arr.shape[1], BGEN_UNPHASED_N_COLS),
     )
 
     # which variants have missing calls?
@@ -67,22 +71,24 @@ def unphased_probabilities_to_hard_calls(
     )
     return hard_calls
 
-
 def phased_probabilities_to_hard_calls(
-    probabilities: list[npt.NDArray[np.floating]], n_samples: int
+    probabilities: list[npt.NDArray[np.floating]],
 ) -> da.Array:
-    """Convert phased probabilities to genotypes"""
+    """Convert a list of per-variant haplotype-pair probabilities to a dask array."""
+    if not all(isinstance(x, np.ndarray) and x.ndim == 2 for x in probabilities):
+        raise TypeError("All elements must be 2D numpy arrays.")
+
     if not all(x.shape[1] == BGEN_PHASED_N_COLS for x in probabilities):
-        raise ValueError("Haplotype pair probabilities required (4 columns).")
-    logger.info("Haplotype pair probabilities have good shapes")
-    logger.info("Hard calling phased probabilities with dask")
+        raise ValueError(
+            "Each array must have 4 columns (haplotype pair probabilities)."
+        )
 
     # axis 0 (x): variants
     # axis 1 (y): samples
     # axis 2 (z): ploidy
+    arr = np.stack(probabilities, axis=0)
     darr = da.from_array(
-        np.stack(probabilities, axis=0),
-        chunks=(ZARR_VARIANT_CHUNK_SIZE, n_samples, BGEN_PHASED_N_COLS),
+        arr, chunks=(ZARR_VARIANT_CHUNK_SIZE, arr.shape[1], arr.shape[2])
     )
 
     hap1, hap2 = darr[:, :, :2], darr[:, :, 2:]

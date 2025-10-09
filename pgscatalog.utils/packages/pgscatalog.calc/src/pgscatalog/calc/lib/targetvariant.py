@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
+import dask.array as da
 
 from ._bgen_probabilities import (
     phased_probabilities_to_hard_calls,
@@ -17,6 +18,7 @@ from .constants import (
     BGEN_UNPHASED_N_COLS,
     MISSING_GENOTYPE_SENTINEL_VALUE,
     ZARR_PLOIDY,
+    ZARR_VARIANT_CHUNK_SIZE,
 )
 from .genomefiletypes import GenomeFileType
 
@@ -106,8 +108,8 @@ class TargetVariants:
     def variant_ids(self) -> pl.Series:
         return pl.Series([str(x.variant_id) for x in self.variants], dtype=pl.String)
 
-    @cached_property
-    def genotypes(self) -> npt.NDArray[np.uint8]:
+    @property
+    def genotypes(self) -> da.Array:
         """
         Return genotypes as a stacked 3D matrix.
 
@@ -124,17 +126,26 @@ class TargetVariants:
             fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,
             dtype=np.uint8,
         )
-        cleaned_arrays = [
-            (x.gts if x.gts is not None else null_gt_calls) for x in self._variants
-        ]
-        return np.stack(cleaned_arrays, axis=0)
+        match self.filetype:
+            case GenomeFileType.VCF:
+                # important to replace missing calls in VCFs with null_gt_calls
+                # gts = da.from_array()[x.gts if x.gts is not None else null_gt_calls for x in self._variants]
+                cleaned_arrays = np.stack([x.gts if x.gts is not None else null_gt_calls for x in self._variants], axis=0)
+                gts = da.from_array(cleaned_arrays, chunks=(ZARR_VARIANT_CHUNK_SIZE, len(self.samples), ZARR_PLOIDY))
+            case GenomeFileType.BGEN:
+                # calculate gts from probabilities
+                gts = self.probs_to_hard_calls()
+            case _:
+                raise NotImplementedError
+
+        return gts
 
     def probs_to_hard_calls(self) -> da.Array:
         is_phased = {x.is_phased for x in self._variants}
         if True in is_phased and False in is_phased:
             raise ValueError("Variants having mixed phase")
 
-        # None phashing values are missing gts, must be filled by dispatched functions
+        # None phasing values are missing gts, must be filled by dispatched functions
         is_any_phased = True in is_phased
         n_samples = len(self.samples)
 
@@ -153,7 +164,7 @@ class TargetVariants:
                     x.probs if x.probs is not None else missing for x in self._variants
                 ]
                 hard_calls = phased_probabilities_to_hard_calls(
-                    probabilities=probs, n_samples=n_samples
+                    probabilities=probs
                 )
             case (GenomeFileType.BGEN, False):
                 # phasing: { None, False}, { False }, or { None } (all variants
@@ -167,7 +178,7 @@ class TargetVariants:
                     x.probs if x.probs is not None else missing for x in self._variants
                 ]
                 hard_calls = unphased_probabilities_to_hard_calls(
-                    probabilities=probs, n_samples=n_samples
+                    probabilities=probs
                 )
             case (GenomeFileType.VCF, _):
                 raise NotImplementedError

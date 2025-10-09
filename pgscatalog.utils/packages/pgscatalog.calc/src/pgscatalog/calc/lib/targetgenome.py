@@ -281,7 +281,7 @@ def write_genotypes_to_zarr(
 
     A lock is used here because it's too difficult to align work over chunks
     """
-    gts: da.Array = target_variants.probs_to_hard_calls()
+    gts: da.Array = target_variants.genotypes
     start = min(gt_indices)
     end = max(gt_indices)
     region = (slice(start, end), slice(None), slice(None))
@@ -295,7 +295,7 @@ def write_genotypes_to_zarr(
         end_time = time.perf_counter()
 
     logger.info(
-        f"{target_variants.genotypes.shape} genotypes computed and written to disk in "
+        f"{gts.shape} genotypes computed and written to disk in "
         f"{end_time - start_time} seconds, lock released"
     )
 

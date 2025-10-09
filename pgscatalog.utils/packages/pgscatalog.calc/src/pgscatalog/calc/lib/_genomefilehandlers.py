@@ -71,11 +71,11 @@ class VCFHandler(GenomeFileHandler):
 
         super().__init__(path=path, cache_dir=cache_dir)
 
-        csi_path = self._target_path.with_suffix(".csi")
+        csi_path = pathlib.Path(str(self._target_path) + ".csi")
         if csi_path.exists():
             self._index_path = csi_path
         else:
-            tbi_path = self._target_path.with_suffix(".tbi")
+            tbi_path = pathlib.Path(str(self._target_path) + ".tbi")
             if tbi_path.exists():
                 self._index_path = tbi_path
             else:

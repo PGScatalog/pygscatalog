@@ -61,12 +61,16 @@ def phased_missing(missing_prob):
     hap1[nan_row_indices] = np.nan
     hap2[nan_row_indices] = np.nan
 
-    return np.hstack([hap1, hap2])
+    phased = []
+    for x in np.hstack([hap1, hap2]):
+        phased.append(np.atleast_2d((x)))
+    return phased
 
 
 def test_phased_probabilities_to_hard_calls(phased_missing):
     """Test that np.nan probabilities are correctly handled"""
-    arr = phased_probabilities_to_hard_calls(phased_missing)
+    phased_missing
+    arr = phased_probabilities_to_hard_calls(phased_missing).compute()
     values, counts = np.unique(arr, return_counts=True)
 
     assert arr.max() == 255
