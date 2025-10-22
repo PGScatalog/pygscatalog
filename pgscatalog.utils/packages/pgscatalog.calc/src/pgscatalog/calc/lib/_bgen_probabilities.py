@@ -24,6 +24,10 @@ def unphased_probabilities_to_hard_calls(
 
     if not all(x.shape[1] == BGEN_UNPHASED_N_COLS for x in probabilities):
         raise ValueError("Unphased probabilities must have 3 columns")
+
+    if not all(np.issubdtype(x.dtype, np.floating) for x in probabilities):
+        raise TypeError("This function only handles floating-point dtypes.")
+
     logger.info("Unphased probabilities have good shapes")
 
     # axis 0 (x): variants
@@ -36,7 +40,8 @@ def unphased_probabilities_to_hard_calls(
     )
 
     # which variants have missing calls?
-    missing_mask = da.any(darr == MISSING_GENOTYPE_SENTINEL_VALUE, axis=2)
+    # huh??
+    missing_mask = da.any(da.isnan(darr), axis=2)
     # which index is the most probable?
     allele_indices = darr.argmax(axis=2).astype(np.uint8)
     # reset the sentinel value to the fancy indexing missing value
@@ -83,6 +88,9 @@ def phased_probabilities_to_hard_calls(
             "Each array must have 4 columns (haplotype pair probabilities)."
         )
 
+    if not all(np.issubdtype(x.dtype, np.floating) for x in probabilities):
+        raise TypeError("This function only handles floating-point dtypes.")
+
     # axis 0 (x): variants
     # axis 1 (y): samples
     # axis 2 (z): ploidy
@@ -99,8 +107,8 @@ def phased_probabilities_to_hard_calls(
 
     # argmax will have broken the sentinel (missing) values
     # (because it returns the index of the sentinel value, which is large)
-    hap1_mask = da.any(hap1 == MISSING_GENOTYPE_SENTINEL_VALUE, axis=2)
-    hap2_mask = da.any(hap2 == MISSING_GENOTYPE_SENTINEL_VALUE, axis=2)
+    hap1_mask = da.any(da.isnan(hap1), axis=2)
+    hap2_mask = da.any(da.isnan(hap2), axis=2)
 
     # reset sentinel values in haplotypes
     masked_hap1 = da.where(hap1_mask, MISSING_GENOTYPE_SENTINEL_VALUE, hap1_alleles)
