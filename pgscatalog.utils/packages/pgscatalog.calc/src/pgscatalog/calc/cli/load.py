@@ -334,4 +334,5 @@ def cleanup_cache_tmpdir(cache_dir: pathlib.Path) -> None:
         rmtree(tmp_dir)
     except FileNotFoundError:
         from contextlib import suppress
+
         suppress(FileNotFoundError)

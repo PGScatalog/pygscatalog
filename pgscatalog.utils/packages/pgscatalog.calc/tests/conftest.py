@@ -39,11 +39,13 @@ def bgen_sample() -> pathlib.Path:
         pathlib.Path(__file__).parent / "data" / "bgen" / "phased" / "tiny1000G.sample"
     )
 
+
 @pytest.fixture
 def bgen_samples(bgen_sample) -> list[str]:
     with open(bgen_sample, "rt") as f:
         csvreader = csv.DictReader(f, delimiter=" ")
         return [row["ID_2"] for row in csvreader][1:]
+
 
 @pytest.fixture(scope="session")
 def vcf_path() -> pathlib.Path:

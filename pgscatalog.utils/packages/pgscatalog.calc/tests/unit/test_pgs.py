@@ -113,7 +113,6 @@ def test_write_scores(tmp_path, tmp_path_factory, random_score_table_rows):
     }
 
 
-
 def test_create_score_table(tmp_path):
     db_path = tmp_path / "test.db"
     create_score_table(db_path)

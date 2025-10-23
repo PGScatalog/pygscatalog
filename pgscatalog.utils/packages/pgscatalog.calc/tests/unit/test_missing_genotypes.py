@@ -3,8 +3,10 @@ import pytest
 import zarr
 
 from pgscatalog.calc import TargetGenome
-from pgscatalog.calc.lib._bgen_probabilities import phased_probabilities_to_hard_calls, \
-    unphased_probabilities_to_hard_calls
+from pgscatalog.calc.lib._bgen_probabilities import (
+    phased_probabilities_to_hard_calls,
+    unphased_probabilities_to_hard_calls,
+)
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
 
@@ -67,6 +69,7 @@ def phased_missing(missing_prob):
         phased.append(np.atleast_2d((x)))
     return phased
 
+
 @pytest.fixture
 def unphased_missing(missing_prob):
     np.random.seed(42)
@@ -86,6 +89,7 @@ def unphased_missing(missing_prob):
         unphased.append(np.atleast_2d((x)))
 
     return unphased
+
 
 def test_phased_probabilities_to_hard_calls(phased_missing):
     """Test that np.nan probabilities are correctly handled"""

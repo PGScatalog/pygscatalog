@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def unphased_probabilities_to_hard_calls(
-    probabilities: list[npt.NDArray[np.floating]]
+    probabilities: list[npt.NDArray[np.floating]],
 ) -> da.Array:
     """Convert unphased probabilities to VCF style genotypes"""
     if not all(isinstance(x, np.ndarray) and x.ndim == 2 for x in probabilities):
@@ -75,6 +75,7 @@ def unphased_probabilities_to_hard_calls(
         new_axis=2,
     )
     return hard_calls
+
 
 def phased_probabilities_to_hard_calls(
     probabilities: list[npt.NDArray[np.floating]],

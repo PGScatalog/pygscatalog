@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING
 
+import dask.array as da
 import numpy as np
 import polars as pl
-import dask.array as da
 
 from ._bgen_probabilities import (
     phased_probabilities_to_hard_calls,
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    import dask.array as da
     import numpy.typing as npt
 
 
@@ -120,6 +119,7 @@ class TargetVariants:
 
         This mirrors the layout of `to_polars()`.
         """
+        gts = None
         # dummy value for None list elements
         null_gt_calls = np.full(
             (len(self.samples), ZARR_PLOIDY),
@@ -129,9 +129,17 @@ class TargetVariants:
         match self.filetype:
             case GenomeFileType.VCF:
                 # important to replace missing calls in VCFs with null_gt_calls
-                # gts = da.from_array()[x.gts if x.gts is not None else null_gt_calls for x in self._variants]
-                cleaned_arrays = np.stack([x.gts if x.gts is not None else null_gt_calls for x in self._variants], axis=0)
-                gts = da.from_array(cleaned_arrays, chunks=(ZARR_VARIANT_CHUNK_SIZE, len(self.samples), ZARR_PLOIDY))
+                cleaned_arrays = np.stack(
+                    [
+                        x.gts if x.gts is not None else null_gt_calls
+                        for x in self._variants
+                    ],
+                    axis=0,
+                )
+                gts = da.from_array(
+                    cleaned_arrays,
+                    chunks=(ZARR_VARIANT_CHUNK_SIZE, len(self.samples), ZARR_PLOIDY),
+                )
             case GenomeFileType.BGEN:
                 # calculate gts from probabilities
                 gts = self.probs_to_hard_calls()
@@ -143,7 +151,7 @@ class TargetVariants:
     def probs_to_hard_calls(self) -> da.Array:
         is_phased = {x.is_phased for x in self._variants}
         if True in is_phased and False in is_phased:
-            raise ValueError("Variants having mixed phase")
+            raise ValueError("Variants with mixed phase")
 
         # None phasing values are missing gts, must be filled by dispatched functions
         is_any_phased = True in is_phased
@@ -152,34 +160,35 @@ class TargetVariants:
         logger.info(f"{self.filetype} {is_phased=}")
         missing: npt.NDArray[np.float64]
         probs: list[npt.NDArray[np.float64]]
+        hard_calls = None
         match (self.filetype, is_any_phased):
             case (GenomeFileType.BGEN, True):
                 # phasing: { None, True } or { True }
                 missing = np.full(
                     (n_samples, BGEN_PHASED_N_COLS),
-                    fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,
+                    fill_value=np.nan,
                     dtype=np.float64,
                 )
                 probs = [
                     x.probs if x.probs is not None else missing for x in self._variants
                 ]
-                hard_calls = phased_probabilities_to_hard_calls(
-                    probabilities=probs
-                )
+                # missing hard calls get replaced with sentinel values by
+                # the function
+                hard_calls = phased_probabilities_to_hard_calls(probabilities=probs)
             case (GenomeFileType.BGEN, False):
                 # phasing: { None, False}, { False }, or { None } (all variants
                 # missing gt)
                 missing = np.full(
                     (n_samples, BGEN_UNPHASED_N_COLS),
-                    fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,
+                    fill_value=np.nan,
                     dtype=np.float64,
                 )
                 probs = [
                     x.probs if x.probs is not None else missing for x in self._variants
                 ]
-                hard_calls = unphased_probabilities_to_hard_calls(
-                    probabilities=probs
-                )
+                # missing hard calls get replaced with sentinel values by
+                # the function
+                hard_calls = unphased_probabilities_to_hard_calls(probabilities=probs)
             case (GenomeFileType.VCF, _):
                 raise NotImplementedError
             case _:

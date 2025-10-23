@@ -71,7 +71,8 @@ def lint(session):
     package_path = "src"
     config_file = "pyproject.toml"
 
-    session.run(*uv_call,
+    session.run(
+        *uv_call,
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, cast
 import dask.config
 import duckdb
 import zarr
+import zarr.storage
 
 from ._dosage import (
     store_dosage_from_chunks,
@@ -106,8 +107,10 @@ class ScorePipeline:
         for sampleset in self.samplesets:
             with duckdb.connect(
                 self.db_path,
-                config={"max_memory": self._max_memory_gb,
-                        "threads": str(self._threads)},
+                config={
+                    "max_memory": self._max_memory_gb,
+                    "threads": str(self._threads),
+                },
             ) as conn:
                 self._attach_target_variants(conn)
                 update_match_table(
@@ -147,8 +150,7 @@ class ScorePipeline:
 
         with duckdb.connect(
             self.db_path,
-            config={"max_memory": self._max_memory_gb,
-                    "threads": str(self._threads)},
+            config={"max_memory": self._max_memory_gb, "threads": str(self._threads)},
         ) as conn:
             conn.table("summary_log_table").write_csv(file_name=str(out_path))
 
