@@ -213,6 +213,8 @@ def load_cli(args: argparse.Namespace) -> None:
     else:
         logger.setLevel(logging.WARNING)
 
+    atexit.register(cleanup_cache_tmpdir, cache_dir=args.cache_dir)
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -223,7 +225,6 @@ def load_cli(args: argparse.Namespace) -> None:
         refresh_per_second=2,
     ) as progress:
         progress.print(":test_tube:", "pgscatalog-genome-cache", ":dna:", "starting...")
-        atexit.register(cleanup_cache_tmpdir, cache_dir=args.cache_dir)
 
         # set up input data
         target_genomes: dict[str | None, list[TargetGenome]] = parse_genome_paths(
@@ -293,46 +294,18 @@ def run_jobs_sequentially(
         progress.print(
             f"Job {i}/{len(jobs)} started: {len(positions)} positions to cache"
         )
-        cache_variants(target=target_genome, positions=positions)
+        target_genome.cache_variants(positions=positions)
         progress.update(task_id, completed=i, refresh=True)
 
 
-def run_jobs_parallel(
-    progress: Progress,
-    jobs: list[tuple[TargetGenome, tuple[tuple[str, int], ...]]],
-    task_id: TaskID,
-    executor: concurrent.futures.Executor,
-    timeout_s: int,
-) -> None:
-    futures: list[concurrent.futures.Future] = []
-    for job in jobs:
-        target_genome: TargetGenome
-        positions: Sequence[tuple[str, int]]
-        target_genome, positions = job
-        futures.append(
-            executor.submit(
-                cache_variants,
-                target=target_genome,
-                positions=positions,
-            )
-        )
-
-    try:
-        for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
-            _ = future.result(timeout=timeout_s)
-            progress.update(task_id, completed=i, refresh=True)
-            progress.print(f"Job {i} finished of {len(jobs)} total")
-    except Exception as e:
-        logger.critical("A worker process has stopped suddenly, bailing out")
-        executor.shutdown(cancel_futures=True, wait=True)
-        raise e
-
-
 def cleanup_cache_tmpdir(cache_dir: pathlib.Path) -> None:
+    # use print statements in this atexit handler
+    # during interpreter exit logging handlers might not exist
     tmp_dir = cache_dir / "tmp"
+    print(f"Cleaning up {tmp_dir} if it exists")
     try:
         rmtree(tmp_dir)
     except FileNotFoundError:
-        from contextlib import suppress
-
-        suppress(FileNotFoundError)
+        print("Nothing to clean up")
+    finally:
+        print("cleanup function exiting, goodbye!")
