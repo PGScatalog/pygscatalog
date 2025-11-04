@@ -2,19 +2,17 @@ import dataclasses
 import gzip
 import logging
 import pathlib
-import typing
 
 import pandas as pd
 
+from ._ancestry import read
 from ._ancestry.tools import (
-    compare_ancestry,
     choose_pval_threshold,
+    compare_ancestry,
     pgs_adjust,
     write_model,
 )
 from .principalcomponents import PopulationType
-from ._ancestry import read
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ class AdjustArguments:
     """
 
     method_compare: str = "RandomForest"
-    pThreshold: typing.Optional[float] = None
+    pThreshold: float | None = None
     method_normalization: tuple[str, ...] = ("empirical", "mean", "mean+var")
 
     def __post_init__(self):
@@ -76,7 +74,7 @@ class AdjustResults:
         loc_pgs_out = str(directory / f"{self.target_label}_pgs.txt.gz")
         with gzip.open(loc_pgs_out, "wt") as outf:
             logger.debug(
-                "Writing adjusted PGS values (long format) to: {}".format(loc_pgs_out)
+                f"Writing adjusted PGS values (long format) to: {loc_pgs_out}"
             )
             for i, pgs_id in enumerate(scorecols):
                 df_pgs = self.pgs.loc[:, self.pgs.columns.str.endswith(pgs_id)].melt(
@@ -94,13 +92,13 @@ class AdjustResults:
                 )
                 if i == 0:
                     logger.debug(
-                        "{}/{}: Writing {}".format(i + 1, len(scorecols), pgs_id)
+                        f"{i + 1}/{len(scorecols)}: Writing {pgs_id}"
                     )
                     colorder = list(df_pgs.columns)  # to ensure sort order
                     df_pgs.to_csv(outf, sep="\t")
                 else:
                     logger.debug(
-                        "{}/{}: Appending {}".format(i + 1, len(scorecols), pgs_id)
+                        f"{i + 1}/{len(scorecols)}: Appending {pgs_id}"
                     )
                     df_pgs[colorder].to_csv(outf, sep="\t", header=False)
 
@@ -111,7 +109,7 @@ class AggregatedPGS:
     The most useful method in this class adjusts PGS based on :func:`genetic ancestry similarity estimation <pgscatalog.calc.AggregatedPGS.adjust>`.
 
     >>> from ._config import Config
-    >>> score_path = Config.ROOT_DIR / "tests" / "data" / "aggregated_scores.txt.gz"
+    >>> score_path = Config.ROOT_DIR / "tests" / "legacy" / "data" / "aggregated_scores.txt.gz"
     >>> AggregatedPGS(path=score_path, target_name="hgdp")
     AggregatedPGS(path=PosixPath('.../aggregated_scores.txt.gz'))
     """
@@ -166,10 +164,10 @@ class AggregatedPGS:
 
         >>> from ._config import Config
         >>> from .principalcomponents import PrincipalComponents
-        >>> related_path = Config.ROOT_DIR / "tests" / "data" / "ref.king.cutoff.id"
-        >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "data" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "data" / "ref.psam", pop_type=PopulationType.REFERENCE, related_path=related_path)
-        >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "data" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
-        >>> score_path = Config.ROOT_DIR / "tests" / "data" / "aggregated_scores.txt"
+        >>> related_path = Config.ROOT_DIR / "tests" / "legacy" / "data" / "ref.king.cutoff.id"
+        >>> ref_pc = PrincipalComponents(pcs_path=[Config.ROOT_DIR / "tests" / "legacy" /"data" / "ref.pcs"], dataset="reference", psam_path=Config.ROOT_DIR / "tests" / "legacy" /"data" / "ref.psam", pop_type=PopulationType.REFERENCE, related_path=related_path)
+        >>> target_pcs = PrincipalComponents(pcs_path=Config.ROOT_DIR / "tests" / "legacy" / "data" / "target.pcs", dataset="target", pop_type=PopulationType.TARGET)
+        >>> score_path = Config.ROOT_DIR / "tests" / "legacy" / "data" / "aggregated_scores.txt"
         >>> results = AggregatedPGS(path=score_path, target_name="hgdp").adjust(ref_pc=ref_pc, target_pc=target_pcs)
         >>> results.pgs.to_dict().keys()
         dict_keys(['SUM|PGS001229_hmPOS_GRCh38', 'percentile_MostSimilarPop|PGS001229_hmPOS_GRCh38', 'Z_MostSimilarPop|PGS001229_hmPOS_GRCh38', ...
@@ -263,7 +261,7 @@ class PolygenicScore:
 
     >>> from ._config import Config
     >>> import reprlib
-    >>> score1 = Config.ROOT_DIR / "tests" / "data" / "cineca_22_additive_0.sscore.zst"
+    >>> score1 = Config.ROOT_DIR / "tests" / "legacy" / "data" / "cineca_22_additive_0.sscore.zst"
     >>> pgs1 = PolygenicScore(sampleset="test", path=score1)  # doctest: +ELLIPSIS
     >>> pgs1
     PolygenicScore(sampleset='test', path=PosixPath('.../cineca_22_additive_0.sscore.zst'))
@@ -342,8 +340,7 @@ class PolygenicScore:
             logger.info(f"Doing element-wise addition: {self} + {other}")
             sumdf = self.df.add(other.df, fill_value=0)
             return PolygenicScore(sampleset=self.sampleset, df=sumdf)
-        else:
-            return NotImplemented
+        return NotImplemented
 
     @property
     def df(self):
@@ -363,7 +360,7 @@ class PolygenicScore:
 
         >>> from ._config import Config
         >>> from xopen import xopen
-        >>> score1 = Config.ROOT_DIR / "tests" / "data" / "cineca_22_additive_0.sscore.zst"
+        >>> score1 = Config.ROOT_DIR / "tests" / "legacy" / "data" / "cineca_22_additive_0.sscore.zst"
         >>> with xopen(score1) as f:
         ...     f.readline().split()
         ['#IID', 'ALLELE_CT', 'DENOM', 'NAMED_ALLELE_DOSAGE_SUM', 'PGS001229_22_AVG', 'PGS001229_22_SUM']

@@ -7,7 +7,7 @@ nox.options.default_venv_backend = "uv"
 
 
 # test every version of python we support!
-@nox.session(python=["3.10", "3.11", "3.12"])
+@nox.session(python=["3.12"])
 def tests(session):
     """Run pytest for all supported python versions
 
@@ -62,20 +62,17 @@ def tests(session):
 @nox.session
 def lint(session):
     """Run linting checks"""
+    uv_call = ["uv", "sync", "--group", "lint"]
     if session.posargs:
         package_path = str(pathlib.Path("packages") / session.posargs[0])
-        config_file = str(
-            pathlib.Path("packages") / session.posargs[0] / "pyproject.toml"
-        )
-    else:
-        package_path = "src"
-        config_file = "pyproject.toml"
+        session.chdir(package_path)
+        uv_call.extend(["--package", session.posargs[0]])
+
+    package_path = "src"
+    config_file = "pyproject.toml"
 
     session.run(
-        "uv",
-        "sync",
-        "--group",
-        "lint",
+        *uv_call,
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 

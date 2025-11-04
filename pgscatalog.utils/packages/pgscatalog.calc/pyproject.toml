@@ -1,6 +1,6 @@
 [project]
 name = "pgscatalog.calc"
-version = "0.3.1"
+version = "1.0.0"
 description = "Libraries and applications for working with calculated polygenic scores"
 license = "Apache-2.0"
 authors = [
@@ -21,14 +21,19 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-    "numpy~=1.26",
-    "pandas~=2.2.0",
-    "pyarrow~=15.0.0",
-    "scikit-learn~=1.4",
-    "scipy~=1.12",
-    "pgscatalog-core"
+    "pgscatalog-core",
+    "bgen==1.9.3",
+    "dask>=2025.9.1",
+    "duckdb>=1.4.1",
+    "filelock>=3.19.1",
+    "zarr>=2.18.3",
+    "polars>=0.20.30",
+    "pysam>=0.23.3",
+    "rich>=14.1.0",
+    "numpy>=1.26.4",
+    "pyarrow>=15.0.2",
 ]
 
 
@@ -37,8 +42,9 @@ pgscatalog-core = { workspace = true }
 
 # https://peps.python.org/pep-0621/
 [project.scripts]
-pgscatalog-aggregate = 'pgscatalog.calc.cli.aggregate_cli:run_aggregate'
-pgscatalog-ancestry-adjust = 'pgscatalog.calc.cli.ancestry_cli:run_ancestry'
+pgsc_calc = "pgscatalog.calc.cli.main:main"
+pgscatalog-aggregate = 'pgscatalog.calc.cli.legacy.aggregate_cli:run_aggregate'
+pgscatalog-ancestry-adjust = 'pgscatalog.calc.cli.legacy.ancestry_cli:run_ancestry'
 
 # https://peps.python.org/pep-0735/
 [dependency-groups]
@@ -50,13 +56,22 @@ test = [
     "pytest>=8.3.4",
     "coverage>=7.8.0",
 ]
+# packages for legacy implementations
+legacy = [
+    "pandas>=2.3.3",
+    "scikit-learn>=1.7.2",
+]
 
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+default-groups = ["legacy"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["src/pgscatalog"]
+artifacts = ["pgscatalog/calc/py.typed"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -64,6 +79,9 @@ addopts = "--doctest-modules"
 filterwarnings = ["error"]
 pythonpath = [
   "src"
+]
+testpaths = [
+    "tests",
 ]
 consider_namespace_packages = true
 
@@ -74,13 +92,39 @@ parallel = true
 sigterm = true
 
 [tool.mypy]
-files = ["src/**/*.py"]
-exclude = "tests/"
-warn_unused_configs = true
-ignore_missing_imports = true
-follow_imports = "silent"
-disallow_untyped_calls = false
-disallow_incomplete_defs = true
+mypy_path = "src"
+exclude = "tests|legacy"
+namespace_packages = true
+explicit_package_bases = true
+# https://careers.wolt.com/en/blog/tech/professional-grade-mypy-configuration
+disallow_untyped_defs = true
+disallow_any_unimported = false
+no_implicit_optional = true
+check_untyped_defs = true
+warn_return_any = true
+show_error_codes = true
+warn_unused_ignores = true
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.ruff]
+fix = true
+extend-exclude = ["src/pgscatalog/calc/lib/legacy", "src/pgscatalog/calc/cli/legacy/"]
+
+[tool.ruff.lint]
+extend-select = [
+    "F",        # Pyflakes rules
+    "W",        # PyCodeStyle warnings
+    "E",        # PyCodeStyle errors
+    "I",        # Sort imports properly
+    "UP",       # Warn if certain things can changed due to newer Python versions
+    "C4",       # Catch incorrect use of comprehensions, dict, list, etc
+    "FA",       # Enforce from __future__ import annotations
+    "ISC",      # Good use of string concatenation
+    "ICN",      # Use common import conventions
+    "RET",      # Good return practices
+    "SIM",      # Common simplification rules
+    "TID",      # Some good import practices
+    "TC",       # Enforce importing certain types in a TYPE_CHECKING block
+    "PTH",      # Use pathlib instead of os.path
+    "TD",       # Be diligent with TODO comments
+    "NPY",      # Some numpy-specific things
+]
