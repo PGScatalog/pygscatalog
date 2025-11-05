@@ -7,8 +7,6 @@ import time
 from functools import cached_property
 from typing import TYPE_CHECKING
 
-import dask.array as da
-import dask.config
 import duckdb
 import numpy as np
 import tenacity
@@ -24,11 +22,12 @@ from .constants import (
     ZARR_PLOIDY,
     ZARR_VARIANT_CHUNK_SIZE,
 )
-from .targetvariant import TargetVariant, TargetVariants
+from .targetvariants import TargetVariants
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    import numpy.typing as npt
     import polars as pl
 
     from .types import Pathish
@@ -40,6 +39,7 @@ logger = logging.getLogger(__name__)
 class TargetGenome:
     def __init__(
         self,
+        *,
         target_path: Pathish,
         cache_dir: Pathish,
         sampleset: str,
@@ -53,7 +53,10 @@ class TargetGenome:
         self._chrom = chrom
         self._threads = threads
         self._handler: GenomeFileHandler = get_file_handler(
-            path=target_path, sample_file=sample_file, cache_dir=self._cache_dir
+            path=target_path,
+            sample_file=sample_file,
+            cache_dir=self._cache_dir,
+            sampleset=self._sampleset,
         )
 
     def __repr__(self) -> str:
@@ -172,37 +175,29 @@ class TargetGenome:
             logger.info("No positions to query")
             return
 
-        variants = self._handler.query_variants(positions=sorted_positions)
+        variants: TargetVariants = self._handler.query_variants(
+            positions=sorted_positions
+        )
 
         # variants may be empty with very small batches or sparse files
         if variants:
-            self._write_variants(list(variants), n_workers=self._threads)
+            self._write_variants(variants=variants)
         else:
             logger.warning("No variants to write. This is weird!")
 
         logger.info(f"{self} finished caching")
 
-    def _write_variants(
-        self, variants: list[TargetVariant], n_workers: int = 1
-    ) -> None:
-        target_variants = TargetVariants(
-            variants,
-            samples=self.samples,
-            filename=str(self.target_path),
-            sampleset=self._sampleset,
-            filetype=self.filetype,
-        )
-        gt_indices: list[int] = write_variants_to_db(
+    def _write_variants(self, variants: TargetVariants) -> None:
+        gt_indices = write_variants_to_db(
             database_path=self.variants_db_path,
-            target_variants=target_variants,
+            target_variants=variants,
             sampleset=self._sampleset,
         )
         write_genotypes_to_zarr(
             zarr_group=self.zarr_group,
-            target_variants=target_variants,
+            target_variants=variants,
             gt_indices=gt_indices,
             lock=self.zarr_group_lock,
-            n_workers=n_workers,
         )
         write_metadata_to_zarr(
             cache_dir=self.cache_dir,
@@ -273,29 +268,25 @@ def init_genotype_array(zarr_group: zarr.Group, n_samples: int) -> zarr.Array:
 def write_genotypes_to_zarr(
     zarr_group: zarr.Group,
     target_variants: TargetVariants,
-    gt_indices: list[int],
+    gt_indices: npt.NDArray[np.int64],
     lock: BaseFileLock,
-    n_workers: int = 1,
 ) -> None:
     """Vectorised function that writes genotypes to a zarr store
 
     A lock is used here because it's too difficult to align work over chunks
     """
-    gts: da.Array = target_variants.genotypes
-    start = min(gt_indices)
-    end = max(gt_indices)
-    region = (slice(start, end), slice(None), slice(None))
-    with lock, dask.config.set(num_workers=n_workers):
+    logger.info("Acquiring lock to write genotypes")
+    with lock:
+        logger.info("Genotype write lock acquired")
         start_time = time.perf_counter()
         zarr_array = init_genotype_array(
             zarr_group=zarr_group, n_samples=len(target_variants.samples)
         )
-        logger.info("Computing genotypes and writing to zarr array")
-        gts.to_zarr(url=zarr_array, regions=region, component="genotypes")
+        zarr_array[gt_indices] = target_variants.genotypes
         end_time = time.perf_counter()
 
     logger.info(
-        f"{gts.shape} genotypes computed and written to disk in "
+        f"{target_variants.genotypes.shape} genotypes written to disk in "
         f"{end_time - start_time} seconds, lock released"
     )
 
@@ -306,7 +297,7 @@ def write_genotypes_to_zarr(
 )
 def write_variants_to_db(
     database_path: Pathish, target_variants: TargetVariants, sampleset: str
-) -> list[int]:
+) -> npt.NDArray[np.int64]:
     start_time = time.perf_counter()
     sequence_name = f"sequence_{sampleset}"
     logger.info("Attempting to connect to database")
@@ -329,7 +320,7 @@ def write_variants_to_db(
             PRIMARY KEY (variant_id, filename)
         );
         """)
-        arrow: pl.DataFrame = target_variants.variant_df.to_arrow()  # noqa: F841
+        _df: pl.DataFrame = target_variants.metadata_to_df(sampleset=sampleset)
         try:
             conn.begin()
             indices = conn.execute(f"""
@@ -343,7 +334,7 @@ def write_variants_to_db(
                         sampleset,
                         parse_filename(filename) AS filename,
                         nextval(\'{sequence_name}\') - 1 AS geno_index
-                    FROM arrow
+                    FROM _df
                     RETURNING geno_index;
                     """).fetchall()
             conn.commit()
@@ -353,8 +344,8 @@ def write_variants_to_db(
 
     end_time = time.perf_counter()
     logger.info(
-        f"Inserted {arrow.shape[0]} variants to database in "
+        f"Inserted {_df.shape[0]} variants to database in "
         f"{(end_time - start_time):.2f} seconds"
     )
     logger.info("db connection released")
-    return [item for sublist in indices for item in sublist]
+    return np.array(indices, dtype=np.int64).flatten()

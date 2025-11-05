@@ -42,7 +42,7 @@ def bgen_sample() -> pathlib.Path:
 
 @pytest.fixture
 def bgen_samples(bgen_sample) -> list[str]:
-    with open(bgen_sample, "rt") as f:
+    with open(bgen_sample) as f:
         csvreader = csv.DictReader(f, delimiter=" ")
         return [row["ID_2"] for row in csvreader][1:]
 

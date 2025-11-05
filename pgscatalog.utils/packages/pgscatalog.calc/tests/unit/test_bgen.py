@@ -4,15 +4,9 @@ import shutil
 import numpy as np
 import pytest
 
-from pgscatalog.calc import GenomeFileType
-from pgscatalog.calc import TargetVariants
+from pgscatalog.calc import GenomeFileType, TargetVariants
 from pgscatalog.calc.lib._bgen import (
     bgen_buffer_variants,
-    bgen_get_sample_list,
-)
-from pgscatalog.calc.lib._bgen_probabilities import (
-    phased_probabilities_to_hard_calls,
-    unphased_probabilities_to_hard_calls,
 )
 
 
@@ -26,33 +20,21 @@ def test_phased_bgen(
 ):
     cache_dir = tmp_path_factory.mktemp("cache")
     chroms = [x[0] for x in test_positions]
-    variants = list(
-        bgen_buffer_variants(
-            position_batch=test_positions,
-            target_path=phased_bgen_path,
-            cache_dir=cache_dir,
-            target_chroms=chroms,
-            idx_path=phased_bgen_path.with_suffix(".bgen.bgi"),
-        )
-    )
-
-    samples = bgen_get_sample_list(
-        target_path=phased_bgen_path, sample_path=bgen_sample
-    )
-
-    assert len(variants) == len(test_positions)
-    assert len(samples) == n_samples
-
-    targets = TargetVariants(
-        variants,
-        samples=sample_ids,
-        filename=str(phased_bgen_path),
+    variants = bgen_buffer_variants(
+        position_batch=test_positions,
+        target_path=phased_bgen_path,
+        cache_dir=cache_dir,
+        target_chroms=chroms,
+        idx_path=phased_bgen_path.with_suffix(".bgen.bgi"),
+        sample_path=bgen_sample,
         sampleset="test",
-        filetype=GenomeFileType.BGEN,
     )
-    gts = targets.probs_to_hard_calls().compute()
-    assert gts.shape == (3, 3202, 2)
-    assert np.ptp(gts) == np.uint8(1)
+
+    variants.variant_ids
+    assert len(variants) == len(test_positions)
+    assert len(variants.samples) == n_samples
+    assert variants.genotypes.shape == (len(variants), 3202, 2)
+    assert np.ptp(variants.genotypes) == np.uint8(1)
 
 
 def test_unphased_bgen(
@@ -232,25 +214,3 @@ def phased_probabilities():
     gts = np.array([[[0, 0]], [[0, 1]], [[1, 0]], [[1, 1]]], dtype=np.uint8)
     return probs, gts
 
-
-def test_unphased_probs(unphased_probabilities):
-    probs, gts = unphased_probabilities
-    calculated_hard_calls = unphased_probabilities_to_hard_calls(probs).compute()
-    assert np.array_equal(calculated_hard_calls, gts)
-
-
-def test_phased_probs(phased_probabilities):
-    probs, gts = phased_probabilities
-    calculated_hard_calls = phased_probabilities_to_hard_calls(probs).compute()
-    assert np.array_equal(calculated_hard_calls, gts)
-
-
-def test_bad_input(unphased_probabilities, phased_probabilities):
-    unphased_probs, _ = unphased_probabilities
-    phased_probs, _ = phased_probabilities
-
-    with pytest.raises(ValueError):
-        phased_probabilities_to_hard_calls(unphased_probs)
-
-    with pytest.raises(ValueError):
-        unphased_probabilities_to_hard_calls(phased_probs)

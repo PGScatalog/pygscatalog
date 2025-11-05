@@ -16,7 +16,7 @@ def imputed_effect_dosage(missing_dosage_array):
 
 def test_good_impute(missing_dosage_array, imputed_effect_dosage):
     assert imputed_effect_dosage.shape[0] == missing_dosage_array.shape[0]
-    assert np.all(0 <= imputed_effect_dosage) and np.all(2 >= imputed_effect_dosage), (
+    assert np.all(imputed_effect_dosage >= 0) and np.all(imputed_effect_dosage <= 2), (
         "Dosage must be between 0 and 2"
     )
 

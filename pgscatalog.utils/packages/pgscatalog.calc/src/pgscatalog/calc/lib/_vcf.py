@@ -12,10 +12,9 @@ import pysam
 import pysam.bcftools
 
 from .constants import MISSING_GENOTYPE_TUPLE
-from .targetvariant import TargetVariant
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable, Iterator
+    from collections.abc import Generator, Iterable
 
     from numpy import typing as npt
 
@@ -44,7 +43,7 @@ def vcf_buffer_variants(
     position_batch: Iterable[tuple[str, int]],
     target_path: Pathish,
     cache_dir: Pathish,
-) -> Iterator[TargetVariant]:
+):
     """
     Query a target genome with a tabix subprocess, buffering results to a temporary
      VCF file

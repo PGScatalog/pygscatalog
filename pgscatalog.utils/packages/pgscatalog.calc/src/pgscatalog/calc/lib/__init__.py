@@ -11,13 +11,12 @@ from .legacy.principalcomponents import PopulationType, PrincipalComponents
 from .scorefile import Scorefiles
 from .scorepipeline import ScorePipeline
 from .targetgenome import TargetGenome
-from .targetvariant import TargetVariant, TargetVariants
+from .targetvariants import TargetVariants
 from .types import Pathish, PathishList
 
 __all__ = [
     "Scorefiles",
     "TargetGenome",
-    "TargetVariant",
     "TargetVariants",
     "ScorePipeline",
     "GenomeFileType",

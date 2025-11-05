@@ -14,14 +14,12 @@ from .lib import (
     Scorefiles,
     ScorePipeline,
     TargetGenome,
-    TargetVariant,
     TargetVariants,
 )
 
 __all__ = [
     "Scorefiles",
     "TargetGenome",
-    "TargetVariant",
     "TargetVariants",
     "ScorePipeline",
     "GenomeFileType",

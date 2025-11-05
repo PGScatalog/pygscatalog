@@ -152,9 +152,8 @@ def test_var_overlap_missing(
     if not use_score_files:
         [unlink(x) for x in copied_score_files]
 
-    with pytest.raises(FileNotFoundError):
-        with patch("sys.argv", flargs):
-            run_aggregate()
+    with pytest.raises(FileNotFoundError), patch("sys.argv", flargs):
+        run_aggregate()
 
 
 def test_var_overlap_fails(
@@ -183,8 +182,7 @@ def test_var_overlap_fails(
     ]
     flargs = list(itertools.chain(*args))
 
-    with pytest.raises(ValueError) as excinfo:
-        with patch("sys.argv", flargs):
-            run_aggregate()
+    with pytest.raises(ValueError) as excinfo, patch("sys.argv", flargs):
+        run_aggregate()
 
     assert "Missing variants" in str(excinfo.value)

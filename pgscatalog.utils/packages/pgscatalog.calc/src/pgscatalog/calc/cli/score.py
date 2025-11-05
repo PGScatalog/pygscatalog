@@ -20,7 +20,7 @@ from pgscatalog.calc import ScorePipeline
 if TYPE_CHECKING:
     import argparse
 
-logger = logging.getLogger("pgscatalog.wgs")
+logger = logging.getLogger(__name__)
 
 logging.basicConfig(
     level="INFO",

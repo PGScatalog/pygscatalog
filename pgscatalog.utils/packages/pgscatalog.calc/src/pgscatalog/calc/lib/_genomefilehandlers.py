@@ -19,14 +19,15 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from .targetvariant import TargetVariant
+    from .targetvariants import TargetVariants
     from .types import Pathish
 
 
 class GenomeFileHandler(ABC):
-    def __init__(self, path: Pathish, cache_dir: Pathish):
+    def __init__(self, path: Pathish, cache_dir: Pathish, sampleset: str):
         self._target_path = pathlib.Path(path).resolve()
         self._cache_dir = pathlib.Path(cache_dir).resolve()
+        self._sampleset = sampleset
 
         if not self._target_path.exists():
             raise FileNotFoundError(self._target_path)
@@ -65,11 +66,11 @@ class GenomeFileHandler(ABC):
 
 
 class VCFHandler(GenomeFileHandler):
-    def __init__(self, path: Pathish, cache_dir: Pathish):
+    def __init__(self, path: Pathish, cache_dir: Pathish, sampleset: str):
         if not pathlib.Path(path).suffixes[-2:] == [".vcf", ".gz"]:
             raise ValueError(f"{self.target_path} is not a .vcf.gz file")
 
-        super().__init__(path=path, cache_dir=cache_dir)
+        super().__init__(path=path, cache_dir=cache_dir, sampleset=sampleset)
 
         csi_path = pathlib.Path(str(self._target_path) + ".csi")
         if csi_path.exists():
@@ -118,8 +119,10 @@ class VCFHandler(GenomeFileHandler):
 
 
 class BgenFileHandler(GenomeFileHandler):
-    def __init__(self, path: Pathish, cache_dir: Pathish, sample_file: Pathish):
-        super().__init__(path=path, cache_dir=cache_dir)
+    def __init__(
+        self, path: Pathish, cache_dir: Pathish, sample_file: Pathish, sampleset: str
+    ):
+        super().__init__(path=path, cache_dir=cache_dir, sampleset=sampleset)
         self._sample_file = pathlib.Path(sample_file)
         self._index_path = self._target_path.with_suffix(".bgen.bgi")
 
@@ -161,7 +164,7 @@ class BgenFileHandler(GenomeFileHandler):
     def query_variants(
         self,
         positions: Sequence[tuple[str, int]],
-    ) -> Iterable[TargetVariant]:
+    ) -> TargetVariants:
         # important to copy the bgen index to the local cache
         # indexes are often mounted read-only and they need to be modified for queries
         # (they're just sqlite databases! very cool)
@@ -170,6 +173,8 @@ class BgenFileHandler(GenomeFileHandler):
             cache_dir=self._cache_dir,
             position_batch=positions,
             target_path=self.target_path,
+            sample_path=self.sample_file,
+            sampleset=self._sampleset,
             idx_path=self._index_path,
             target_chroms=self.chroms,
         )
@@ -203,13 +208,16 @@ def get_file_handler(
     *,
     cache_dir: Pathish,
     sample_file: Pathish | None = None,
+    sampleset: str,
 ) -> GenomeFileHandler:
     path = pathlib.Path(path)
 
     if path.suffixes[-2:] == [".vcf", ".gz"]:
-        return VCFHandler(path=path, cache_dir=cache_dir)
+        return VCFHandler(path=path, cache_dir=cache_dir, sampleset=sampleset)
     if path.suffix == ".bgen":
         if sample_file is None:
             raise ValueError("BGEN files require a sample file")
-        return BgenFileHandler(path=path, cache_dir=cache_dir, sample_file=sample_file)
+        return BgenFileHandler(
+            path=path, cache_dir=cache_dir, sample_file=sample_file, sampleset=sampleset
+        )
     raise ValueError(f"Unsupported genome file type: {path}")
