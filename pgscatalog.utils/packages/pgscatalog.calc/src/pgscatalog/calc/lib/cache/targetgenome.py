@@ -14,8 +14,9 @@ import zarr
 import zarr.errors
 from filelock import BaseFileLock, FileLock
 
-from ._genomefilehandlers import GenomeFileHandler, GenomeFileType, get_file_handler
-from .constants import (
+from ._genomefilehandlers import GenomeFileHandler, get_file_handler
+from .genomefiletypes import GenomeFileType
+from ..constants import (
     MISSING_GENOTYPE_SENTINEL_VALUE,
     ZARR_COMPRESSOR,
     ZARR_MAX_N_VARIANTS,

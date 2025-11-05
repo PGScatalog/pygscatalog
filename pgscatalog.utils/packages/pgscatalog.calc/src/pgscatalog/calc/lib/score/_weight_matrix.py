@@ -8,12 +8,12 @@ import numpy as np
 import polars as pl
 import zarr
 
-from .constants import ZARR_VARIANT_CHUNK_SIZE
+from ..constants import ZARR_VARIANT_CHUNK_SIZE
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
-    from .types import Pathish
+    from ..types import Pathish
 
 
 logger = logging.getLogger(__name__)

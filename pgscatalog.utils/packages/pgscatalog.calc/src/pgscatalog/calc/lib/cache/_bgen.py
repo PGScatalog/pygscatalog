@@ -53,8 +53,7 @@ import numpy as np
 import numpy.typing as npt
 from bgen import BgenReader  # type: ignore[import-untyped]
 
-from .constants import MISSING_GENOTYPE_SENTINEL_VALUE
-from .genomefiletypes import GenomeFileType
+from ..constants import MISSING_GENOTYPE_SENTINEL_VALUE
 from .targetvariants import TargetVariants
 
 logger = logging.getLogger(__name__)
@@ -62,7 +61,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from .types import Pathish
+    from ..types import Pathish
 
 
 GT_LOOKUP_TABLE = np.array(
@@ -270,7 +269,6 @@ def parse_target_variants(
         refs=ref_alleles,
         alts=alt_alleles,
         gts=hard_calls,
-        filetype=GenomeFileType.BGEN,
         samples=samples,
         target_path=target_path,
         sampleset=sampleset

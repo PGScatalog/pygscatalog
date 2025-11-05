@@ -22,7 +22,7 @@ from ._pgs import (
     write_scores,
 )
 from ._weight_matrix import store_group_weight_arrays
-from .scorefile import load_scoring_files
+from ..scorefile import load_scoring_files
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     import polars as pl
 
-    from .types import Pathish, PathishList
+    from ..types import Pathish, PathishList
 
 
 logger = logging.getLogger(__name__)

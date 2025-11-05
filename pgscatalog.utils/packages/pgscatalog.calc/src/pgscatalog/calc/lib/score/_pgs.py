@@ -9,13 +9,13 @@ import polars as pl
 from dask import array as da
 from numpy import typing as npt
 
-from .constants import ZARR_VARIANT_CHUNK_SIZE
+from ..constants import ZARR_VARIANT_CHUNK_SIZE
 
 if TYPE_CHECKING:
     import zarr
 
     from ._dosage import ScoreStats
-    from .types import Pathish
+    from ..types import Pathish
 
 
 logger = logging.getLogger(__name__)

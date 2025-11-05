@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from .targetvariants import TargetVariants
-    from .types import Pathish
+    from ..types import Pathish
 
 
 class GenomeFileHandler(ABC):

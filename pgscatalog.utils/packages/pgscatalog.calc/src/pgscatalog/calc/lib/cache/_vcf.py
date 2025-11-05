@@ -11,14 +11,14 @@ import numpy as np
 import pysam
 import pysam.bcftools
 
-from .constants import MISSING_GENOTYPE_TUPLE
+from ..constants import MISSING_GENOTYPE_TUPLE
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
 
     from numpy import typing as npt
 
-    from .types import Pathish
+    from ..types import Pathish
 
 logger = logging.getLogger(__name__)
 

@@ -30,9 +30,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import polars as pl
 
-from .constants import MISSING_GENOTYPE_SENTINEL_VALUE
-from .genomefiletypes import GenomeFileType
-from .types import Pathish
+from ..constants import MISSING_GENOTYPE_SENTINEL_VALUE
+from ..types import Pathish
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,6 @@ class TargetVariants:
         refs: list[str],
         alts: list[str],
         gts: list[npt.NDArray[np.uint8]],
-        filetype: GenomeFileType,
         samples: list[str],
         target_path: Pathish,
         sampleset: str
@@ -58,7 +56,6 @@ class TargetVariants:
         self._refs = refs
         self._alts = alts
         self._genotypes = np.stack(gts)
-        self._filetype = filetype
         self._samples = samples
         self._target_path = target_path
         self._sampleset = sampleset
