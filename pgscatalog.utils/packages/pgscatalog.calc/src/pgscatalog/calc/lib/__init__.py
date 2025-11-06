@@ -1,6 +1,7 @@
 from .cache.genomefiletypes import GenomeFileType
 from .cache.targetgenome import TargetGenome
 from .cache.targetvariants import TargetVariants
+from .constants import VALID_CHROMOSOMES
 
 # legacy stuff
 from .legacy.polygenicscore import (
@@ -22,6 +23,7 @@ __all__ = [
     "GenomeFileType",
     "Pathish",
     "PathishList",
+    "VALID_CHROMOSOMES",
     # legacy stuff exported
     "PolygenicScore",
     "PopulationType",

@@ -148,6 +148,7 @@ class TargetVariants:
         self._write_zarr_array(zarr_group)
 
     def _write_zarr_array(self, zarr_group: zarr.Group) -> None:
+        """Store a 3D genotype array in the genotypes group"""
         start_time = time.perf_counter()
         try:
             logger.info("Creating zarr array")
@@ -183,14 +184,18 @@ class TargetVariants:
         Sample names in a sampleset may differ across files (e.g. a VCF might be split
         into batches of 100,000 samples).
         """
-        sample_metadata: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(self.samples)
+        sample_metadata: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(
+            self.samples
+        )
 
         if "samples" not in zarr_group.attrs:
             logger.info(f"Adding {len(sample_metadata)} sample IDs to zarr attribute")
             zarr_group.attrs["samples"] = sample_metadata.model_dump()
         else:
             logger.info("Checking that sample IDs are consistent")
-            existing_samples: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(zarr_group.attrs["samples"])
+            existing_samples: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(
+                zarr_group.attrs["samples"]
+            )
 
             if existing_samples.model_dump() != sample_metadata.model_dump():
                 logger.critical(
@@ -200,26 +205,40 @@ class TargetVariants:
             logger.info("Samples IDs are consistent")
 
     def _write_zarr_variants(self, zarr_group: zarr.Group) -> None:
-        start_time = time.perf_counter()
-        variant_metadata: ZarrVariantMetadata = self.variant_metadata
+        """Store variant metadata as a set of 1D arrays in the meta group
 
-        if "variants" not in zarr_group.attrs:
-            logger.info(
-                f"Initialising variant metadata with {len(variant_metadata)} variants"
-            )
-            zarr_group.attrs["variants"] = variant_metadata.model_dump()
-        else:
-            logger.info("Updating existing variant metadata")
-            existing_variants: ZarrVariantMetadata = ZarrVariantMetadata(
-                **zarr_group.attrs["variants"]
-            )
-            logger.info(f"{len(existing_variants)} variants present in metadata")
-            merged = existing_variants.merge(variant_metadata).model_dump()
-            zarr_group.attrs["variants"] = merged
-            logger.info(f"{len(merged)} variants present after metadata update")
+        This means that variant metadata supports compression and the numpy arrays
+        can be read into polars
 
-        end_time = time.perf_counter()
-        logger.info(
-            f"{len(variant_metadata)} variants written to disk in "
-            f"{end_time - start_time} seconds"
+        See https://github.com/zarr-developers/zarr-specs/discussions/365
+        """
+        meta_arrays = self.variant_metadata.to_numpy()
+        zarr_chunks = (ZARR_VARIANT_CHUNK_SIZE,)
+        meta_root = zarr.open_group(
+            store=zarr_group.store, path=f"{zarr_group.path}/meta"
         )
+        logger.info(f"Writing variant metadata to zarr group {meta_root.info}")
+
+        for metadata, array in meta_arrays.items():
+            start_time = time.perf_counter()
+
+            try:
+                logger.info(f"Creating variant {metadata=} zarr array")
+                meta_root.create_array(
+                    chunks=zarr_chunks,
+                    data=array,
+                    name=metadata,
+                    compressors=ZARR_COMPRESSOR,
+                )
+                logger.info(f"Zarr array {array.shape=} created")
+            except zarr.errors.ContainsArrayError:
+                # array has already been initialised
+                logger.info("Array already exists, appending")
+                metadata_arr = meta_root[metadata]
+                metadata_arr.append(array)
+
+            end_time = time.perf_counter()
+            logger.info(
+                f"{metadata} {array.shape=} written to disk in "
+                f"{end_time - start_time} seconds"
+            )

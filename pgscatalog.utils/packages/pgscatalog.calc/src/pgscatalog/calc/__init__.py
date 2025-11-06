@@ -1,6 +1,7 @@
 import importlib.metadata
 
 from .lib import (
+    VALID_CHROMOSOMES,
     AdjustArguments,
     AdjustResults,
     AggregatedPGS,
@@ -25,6 +26,7 @@ __all__ = [
     "GenomeFileType",
     "Pathish",
     "PathishList",
+    "VALID_CHROMOSOMES",
     # legacy stuff
     "PolygenicScore",
     "PrincipalComponents",

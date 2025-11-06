@@ -6,6 +6,10 @@ import pathlib
 from typing import TYPE_CHECKING
 
 import duckdb
+import polars as pl
+import zarr
+
+from .cache.zarrmodels import get_position_df
 
 if TYPE_CHECKING:
     from .types import Pathish, PathishList
@@ -43,15 +47,31 @@ class Scorefiles:
         """Return the list of scoring file paths."""
         return self._score_paths
 
-    def get_unique_positions(self, chrom: str | None = None) -> list[tuple[str, int]]:
+    def get_unique_positions(
+        self, chrom: str | None = None, zarr_group: zarr.Group | None = None
+    ) -> list[tuple[str, int]]:
         path_strings: list[str] = [str(pathlib.Path(x).resolve()) for x in self.paths]
+        logger.info(f"Querying unique positions from scoring files: {path_strings}")
 
+        # first, check the zarr metadata cache
+        # the zarr group = sampleset + filename
+        # _ prefix for duckdb object scan / ruff complaining
+        _cached_positions = pl.DataFrame({"chr_name": [], "chr_pos": []})
+        if zarr_group is not None:
+            _cached_positions: pl.DataFrame = get_position_df(zarr_group)
+
+        # now query the scoring files, excluding cached positions
         with duckdb.connect() as conn:
             try:
                 query = conn.sql(f"""
-                    SELECT DISTINCT chr_name, chr_position
+                WITH scorefile_positions AS (
+                    SELECT DISTINCT chr_name, chr_position AS chr_pos
                     FROM read_csv({path_strings}, columns={self.column_types})
-                    WHERE chr_name IS NOT NULL AND chr_position IS NOT NULL
+                    WHERE chr_name IS NOT NULL AND chr_pos IS NOT NULL
+                )
+                SELECT chr_name, chr_pos
+                FROM scorefile_positions
+                ANTI JOIN _cached_positions USING (chr_name, chr_pos);
                 """)
             except duckdb.InvalidInputException as e:
                 logger.critical(
@@ -60,17 +80,22 @@ class Scorefiles:
                     f"Error: {e}"
                 )
                 raise
+            else:
+                # optionally filter out
+                if chrom is not None:
+                    query = query.filter(f"chr_name = '{chrom}'")
+                else:
+                    # TODO: be nicer about X / Y / MT / patches
+                    query = query.filter(
+                        f"chr_name IN {[str(x) for x in range(1, 23)]}"
+                    )
 
-            if chrom is not None:
-                query = query.filter(f"chr_name = '{chrom}'")
+                results: list[tuple[str, int]] = query.order(
+                    "chr_name, chr_pos"
+                ).fetchall()
 
-            logger.info(f"Querying unique positions from scoring files: {path_strings}")
-
-            results: list[tuple[str, int]] = query.order(
-                "chr_name, chr_position"
-            ).fetchall()
-            logger.info(f"Found {len(results)} unique positions")
-            return results
+                logger.info(f"Found {len(results)} unique and uncached positions")
+                return results
 
 
 def load_scoring_files(

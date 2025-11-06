@@ -15,7 +15,7 @@ import zarr.storage
 from ._genomefilehandlers import GenomeFileHandler, get_file_handler
 from .genomefiletypes import GenomeFileType
 from .targetvariants import TargetVariants
-from .zarrmodels import ZarrVariantMetadata
+from .zarrmodels import get_position_df
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -84,7 +84,7 @@ class TargetGenome:
 
     @property
     def _zarr_archive_name(self):
-        """ The name of the directory containing the zarr array root """
+        """The name of the directory containing the zarr array root"""
         return self.cache_dir / "genotypes.zarr"
 
     @property
@@ -100,16 +100,18 @@ class TargetGenome:
 
     @property
     def _zarr_store(self) -> zarr.storage.StoreLike:
-        """ A directory on the local filesystem contains the zarr array """
+        """A directory on the local filesystem contains the zarr array"""
         return zarr.storage.LocalStore(root=self._zarr_archive_name, read_only=False)
 
     @property
     def zarr_group(self) -> zarr.Group:
-        return zarr.group(store=self._zarr_store,
-                          path=self._zarr_group_path,
-                          overwrite=False,
-                          zarr_version=3,
-                          zarr_format=3)
+        return zarr.group(
+            store=self._zarr_store,
+            path=self._zarr_group_path,
+            overwrite=False,
+            zarr_version=3,
+            zarr_format=3,
+        )
 
     @property
     def chrom(self) -> str | None:
@@ -121,19 +123,10 @@ class TargetGenome:
 
         Contains two columns: chr_name and chr_pos
         """
-        try:
-            cached_positions = (
-                ZarrVariantMetadata(**self.zarr_group.attrs["variants"])
-                .to_df()
-                .select("chr_name", "chr_pos")
-            )
-        except KeyError:
-            cached_positions = pl.DataFrame({"chr_name": [], "chr_pos": []})
-
-        return cached_positions
+        return get_position_df(self.zarr_group)
 
     def cache_variants(self, positions: Sequence[tuple[str, int]]) -> None:
-        """ Query an indexed target genome and store variants in a zarr array """
+        """Query an indexed target genome and store variants in a zarr array"""
         logger.info(f"{len(positions)} positions requested")
 
         # no support for X / XY / Y / patches yet
