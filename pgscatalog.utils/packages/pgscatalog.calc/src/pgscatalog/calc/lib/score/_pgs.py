@@ -14,8 +14,8 @@ from ..constants import ZARR_VARIANT_CHUNK_SIZE
 if TYPE_CHECKING:
     import zarr
 
-    from ._dosage import ScoreStats
     from ..types import Pathish
+    from ._dosage import ScoreStats
 
 
 logger = logging.getLogger(__name__)

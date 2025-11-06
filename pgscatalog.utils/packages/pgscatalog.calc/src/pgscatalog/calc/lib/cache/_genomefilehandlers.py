@@ -17,10 +17,10 @@ from .genomefiletypes import GenomeFileType
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Sequence
 
-    from .targetvariants import TargetVariants
     from ..types import Pathish
+    from .targetvariants import TargetVariants
 
 
 class GenomeFileHandler(ABC):
@@ -60,9 +60,7 @@ class GenomeFileHandler(ABC):
     def index_path(self, path: pathlib.Path) -> None: ...
 
     @abstractmethod
-    def query_variants(
-        self, positions: Sequence[tuple[str, int]]
-    ) -> Iterable[TargetVariant]: ...
+    def query_variants(self, positions: list[tuple[str, int]]) -> TargetVariants: ...
 
 
 class VCFHandler(GenomeFileHandler):
@@ -106,7 +104,7 @@ class VCFHandler(GenomeFileHandler):
     def query_variants(
         self,
         positions: Sequence[tuple[str, int]],
-    ) -> Iterable[TargetVariant]:
+    ) -> TargetVariants:
         return vcf_buffer_variants(
             position_batch=positions,
             cache_dir=self._cache_dir,

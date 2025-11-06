@@ -9,6 +9,7 @@ import duckdb
 import zarr
 import zarr.storage
 
+from ..scorefile import load_scoring_files
 from ._dosage import (
     store_dosage_from_chunks,
 )
@@ -22,7 +23,6 @@ from ._pgs import (
     write_scores,
 )
 from ._weight_matrix import store_group_weight_arrays
-from ..scorefile import load_scoring_files
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

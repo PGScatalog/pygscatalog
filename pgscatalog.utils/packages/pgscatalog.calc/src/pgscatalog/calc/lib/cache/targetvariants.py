@@ -22,16 +22,24 @@ The module depends on:
 - numpy for genotype matrix ops
 - polars for building variant metadata tables quickly
 """
+
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 import numpy as np
-import polars as pl
+import zarr
+import zarr.errors
 
-from ..constants import MISSING_GENOTYPE_SENTINEL_VALUE
+from ..constants import (
+    MISSING_GENOTYPE_SENTINEL_VALUE,
+    ZARR_COMPRESSOR,
+    ZARR_VARIANT_CHUNK_SIZE,
+)
 from ..types import Pathish
+from .zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +52,12 @@ class TargetVariants:
         self,
         chr_name: list[str],
         pos: list[int],
-        refs: list[str],
-        alts: list[str],
+        refs: list[str | None],
+        alts: list[list[str] | None],
         gts: list[npt.NDArray[np.uint8]],
         samples: list[str],
         target_path: Pathish,
-        sampleset: str
+        sampleset: str,
     ):
         self._chr_name = chr_name
         self._pos = pos
@@ -97,29 +105,126 @@ class TargetVariants:
     def genotypes(self) -> npt.NDArray[np.uint8]:
         return self._genotypes
 
-    def metadata_to_df(self, sampleset: str) -> pl.DataFrame:
-        """ Convert variant metadata to a polars dataframe """
+    @property
+    def variant_ids(self) -> list[str]:
+        def _alt_to_str(alt: list[str] | None) -> str:
+            if alt is None:
+                return ""
+
+            return "/".join(alt)
+
+        ids = []
+        for chrom, pos, ref, alt in zip(
+            self._chr_name, self._pos, self._refs, self._alts, strict=True
+        ):
+            ids.append(f"{chrom}:{pos}:{ref or ''}:{_alt_to_str(alt)}")
+
+        return ids
+
+    @property
+    def variant_metadata(self) -> ZarrVariantMetadata:
+        """Convert variant metadata to a dict"""
         logger.info("Converting TargetVariants to polars dataframe")
 
-        merged = {}
-        merged["chr_name"] = self._chr_name
-        merged["chr_pos"] = self._pos
-        merged["ref"] = self._refs
-        merged["alts"] = self._alts
-
-        df = pl.DataFrame(merged).with_columns(
-            pl.col("chr_name").cast(pl.String),
-            pl.col("chr_pos").cast(pl.UInt32),
-            pl.col("ref").cast(pl.String),
-            pl.col("alts").cast(pl.List(pl.String)),
-            sampleset=pl.lit(self._sampleset),
-            filename=pl.lit(str(self._target_path)),
-            variant_id=pl.concat_str(
-                [pl.col("chr_name"), pl.col("chr_pos"), pl.col("ref"), pl.col("alts")],
-                separator=":",
-                ignore_nulls=True,
-            ),
+        return ZarrVariantMetadata(
+            **{
+                "chr_name": self._chr_name,
+                "chr_pos": self._pos,
+                "ref": self._refs,
+                "alts": self._alts,
+                "sampleset": [self._sampleset] * len(self._chr_name),
+                "filename": [str(self._target_path)] * len(self._chr_name),
+                "variant_id": self.variant_ids,
+            }
         )
 
-        logger.info("Polars dataframe ready")
-        return df
+    def write_zarr(self, zarr_group: zarr.Group) -> None:
+        """Write TargetVariants to a zarr group
+
+        Sample IDs, variant metadata, and a genotype array is written to the zarr group
+
+        The group must be at a file level in the hierarchy
+        """
+        self._write_zarr_samples(zarr_group)
+        self._write_zarr_variants(zarr_group)
+        self._write_zarr_array(zarr_group)
+
+    def _write_zarr_array(self, zarr_group: zarr.Group) -> None:
+        start_time = time.perf_counter()
+        try:
+            logger.info("Creating zarr array")
+            zarr_chunks = (
+                ZARR_VARIANT_CHUNK_SIZE,
+                self.genotypes.shape[1],
+                self.genotypes.shape[2],
+            )
+
+            zarr_group.create_array(
+                chunks=zarr_chunks,
+                data=self._genotypes,
+                fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,
+                name="genotypes",
+                compressors=ZARR_COMPRESSOR,
+            )
+            logger.info(f"Zarr array {self.genotypes.shape=} created")
+        except zarr.errors.ContainsArrayError:
+            # array has already been initialised
+            logger.info("Array already exists, appending")
+            gt_arr = zarr_group["genotypes"]
+            gt_arr.append(self._genotypes)
+
+        end_time = time.perf_counter()
+        logger.info(
+            f"{self._genotypes.shape} genotypes written to disk in "
+            f"{end_time - start_time} seconds"
+        )
+
+    def _write_zarr_samples(self, zarr_group: zarr.Group) -> None:
+        """Add sample metadata to the file group. A file must always have the same samples.
+
+        Sample names in a sampleset may differ across files (e.g. a VCF might be split
+        into batches of 100,000 samples).
+        """
+        sample_metadata: ZarrSampleMetadata = ZarrSampleMetadata(
+            **{"samples": self.samples}
+        )
+
+        if "samples" not in zarr_group.attrs:
+            logger.info(f"Adding {len(sample_metadata)} sample IDs to zarr attribute")
+            zarr_group.attrs["samples"] = sample_metadata.model_dump()
+        else:
+            logger.info("Checking that sample IDs are consistent")
+            existing_samples: ZarrSampleMetadata = ZarrSampleMetadata(
+                **zarr_group.attrs["samples"]
+            )
+            if existing_samples.model_dump() != sample_metadata.model_dump():
+                logger.critical(
+                    f"Inconsistent sample IDs {self._target_path} (this should never happen)"
+                )
+                raise ValueError
+            logger.info("Samples IDs are consistent")
+
+    def _write_zarr_variants(self, zarr_group: zarr.Group) -> None:
+        start_time = time.perf_counter()
+        variant_metadata: ZarrVariantMetadata = self.variant_metadata
+
+        if "variants" not in zarr_group.attrs:
+            logger.info(
+                f"Initialising variant metadata with {len(variant_metadata)} variants"
+            )
+            zarr_group.attrs["variants"] = variant_metadata.model_dump()
+        else:
+            logger.info("Updating existing variant metadata")
+            existing_variants: ZarrVariantMetadata = ZarrVariantMetadata(
+                **zarr_group.attrs["variants"]
+            )
+            logger.info(f"{len(existing_variants)} variants present in metadata")
+            merged = existing_variants.merge(variant_metadata).model_dump()
+            zarr_group.attrs["variants"] = merged
+            logger.info(f"{len(merged)} variants present after metadata update")
+
+        end_time = time.perf_counter()
+        logger.info(
+            f"{len(variant_metadata)} variants written to disk in "
+            f"{end_time - start_time} seconds"
+        )

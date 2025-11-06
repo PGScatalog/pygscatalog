@@ -1,4 +1,6 @@
 from .cache.genomefiletypes import GenomeFileType
+from .cache.targetgenome import TargetGenome
+from .cache.targetvariants import TargetVariants
 
 # legacy stuff
 from .legacy.polygenicscore import (
@@ -8,10 +10,8 @@ from .legacy.polygenicscore import (
     PolygenicScore,
 )
 from .legacy.principalcomponents import PopulationType, PrincipalComponents
-from .scorefile import Scorefiles
 from .score.scorepipeline import ScorePipeline
-from .cache.targetgenome import TargetGenome
-from .cache.targetvariants import TargetVariants
+from .scorefile import Scorefiles
 from .types import Pathish, PathishList
 
 __all__ = [

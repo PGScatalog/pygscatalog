@@ -15,7 +15,6 @@ from shutil import rmtree
 from threading import Thread
 from typing import TYPE_CHECKING
 
-import duckdb
 from rich.logging import RichHandler
 from rich.progress import (
     BarColumn,
@@ -164,29 +163,6 @@ def get_jobs(
     return sample(cache_jobs, k=len(cache_jobs))
 
 
-def get_cached_positions(cache_path: Pathish) -> set[tuple[str, int]]:
-    # get cached positions from the DB before launching workers
-    db_path = pathlib.Path(cache_path) / "variants.db"
-    if db_path.exists():
-        with duckdb.connect(str(db_path)) as db:
-            pos = set(
-                db.execute(
-                    "SELECT DISTINCT chr_name, chr_pos FROM variants_table;"
-                ).fetchall()
-            )
-    else:
-        pos = set()
-    return pos
-
-
-def get_query_positions(
-    scorefiles: Scorefiles, cache_dir: Pathish
-) -> list[tuple[str, int]]:
-    unique_positions: list[tuple[str, int]] = scorefiles.get_unique_positions()
-    cached_positions = get_cached_positions(cache_path=cache_dir)
-    return list(set(unique_positions) - cached_positions)
-
-
 def load_cli(args: argparse.Namespace) -> None:
     if args.format == GenomeFileType.BGEN and not args.bgen_sample_file:
         raise argparse.ArgumentTypeError(
@@ -235,9 +211,7 @@ def load_cli(args: argparse.Namespace) -> None:
         )
         is_vcfs_split_by_chrom: bool = is_vcfs_split(target_genomes=target_genomes)
         scorefiles: Scorefiles = Scorefiles(args.score_paths)
-        positions_to_query = get_query_positions(
-            scorefiles=scorefiles, cache_dir=args.cache_dir
-        )
+        positions_to_query = scorefiles.get_unique_positions()
 
         if len(positions_to_query) == 0:
             progress.print("All variants are already cached. Yay!")

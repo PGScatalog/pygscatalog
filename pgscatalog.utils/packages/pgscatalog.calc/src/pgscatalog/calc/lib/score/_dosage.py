@@ -10,12 +10,12 @@ import zarr
 import zarr.storage
 from dask import array as da
 
-from ._impute import calculate_mean_dosage
 from ..constants import (
     MISSING_GENOTYPE_SENTINEL_VALUE,
     ZARR_COMPRESSOR,
     ZARR_VARIANT_CHUNK_SIZE,
 )
+from ._impute import calculate_mean_dosage
 
 if TYPE_CHECKING:
     import polars as pl

@@ -37,6 +37,7 @@ Notes:
     Multiallelic variants are not yet supported but internal data structures expect
     a list of alternate alleles
 """
+
 from __future__ import annotations
 
 import logging
@@ -201,7 +202,7 @@ def parse_target_variants(
     chroms: list[str] = []
     positions: list[int] = []
     ref_alleles: list[str | None] = []
-    alt_alleles: list[str | None] = []
+    alt_alleles: list[list[str] | None] = []
     hard_calls: list[npt.NDArray[np.uint8]] = []
 
     with BgenReader(
@@ -229,7 +230,8 @@ def parse_target_variants(
             fetched_chrom = normalise_chrom(variant.chrom)
             fetched_pos = variant.pos
             ref: str = variant.alleles[0] if ref_first else variant.alleles[1]
-            alt: str = variant.alleles[1] if ref_first else variant.alleles[0]
+            # store as a list for future multiallelic support
+            alt: list[str] = [variant.alleles[1]] if ref_first else [variant.alleles[0]]
             seen_positions.add((fetched_chrom, fetched_pos))
 
             # convert probabilities to uint8 genotypes ASAP
@@ -271,7 +273,7 @@ def parse_target_variants(
         gts=hard_calls,
         samples=samples,
         target_path=target_path,
-        sampleset=sampleset
+        sampleset=sampleset,
     )
 
 
@@ -332,7 +334,7 @@ def bgen_buffer_variants(
             ref_first=ref_first,
             bgen_sample_path=sample_path,
             target_path=target_path,
-            sampleset=sampleset
+            sampleset=sampleset,
         )
     finally:
         buffered_bgen_file.close()
