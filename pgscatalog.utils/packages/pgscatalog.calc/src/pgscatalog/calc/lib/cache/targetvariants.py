@@ -132,8 +132,6 @@ class TargetVariants:
                 "chr_pos": self._pos,
                 "ref": self._refs,
                 "alts": self._alts,
-                "sampleset": [self._sampleset] * len(self._chr_name),
-                "filename": [str(self._target_path)] * len(self._chr_name),
                 "variant_id": self.variant_ids,
             }
         )
@@ -185,18 +183,15 @@ class TargetVariants:
         Sample names in a sampleset may differ across files (e.g. a VCF might be split
         into batches of 100,000 samples).
         """
-        sample_metadata: ZarrSampleMetadata = ZarrSampleMetadata(
-            **{"samples": self.samples}
-        )
+        sample_metadata: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(self.samples)
 
         if "samples" not in zarr_group.attrs:
             logger.info(f"Adding {len(sample_metadata)} sample IDs to zarr attribute")
             zarr_group.attrs["samples"] = sample_metadata.model_dump()
         else:
             logger.info("Checking that sample IDs are consistent")
-            existing_samples: ZarrSampleMetadata = ZarrSampleMetadata(
-                **zarr_group.attrs["samples"]
-            )
+            existing_samples: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(zarr_group.attrs["samples"])
+
             if existing_samples.model_dump() != sample_metadata.model_dump():
                 logger.critical(
                     f"Inconsistent sample IDs {self._target_path} (this should never happen)"

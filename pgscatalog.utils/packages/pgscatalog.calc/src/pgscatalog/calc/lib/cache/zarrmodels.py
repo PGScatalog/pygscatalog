@@ -13,7 +13,7 @@ from copy import deepcopy
 from typing import Annotated
 
 import polars as pl
-from pydantic import AfterValidator, BaseModel, PositiveInt, model_validator
+from pydantic import AfterValidator, BaseModel, PositiveInt, model_validator, RootModel
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,6 @@ class ZarrVariantMetadata(BaseModel):
     chr_pos: list[PositiveInt]
     ref: Annotated[list[str | None], AfterValidator(is_valid_allele)]
     alts: Annotated[list[list[str] | None], AfterValidator(is_valid_allele)]
-    sampleset: list[str]
-    filename: list[str]
     variant_id: list[str]
 
     def __len__(self):
@@ -65,8 +63,5 @@ def is_valid_allele(alleles: list[list[str] | None] | list[str | None]):
     return alleles
 
 
-class ZarrSampleMetadata(BaseModel):
-    samples: list[str]
-
-    def __len__(self) -> int:
-        return len(self.samples)
+class ZarrSampleMetadata(RootModel):
+    root: list[str]
