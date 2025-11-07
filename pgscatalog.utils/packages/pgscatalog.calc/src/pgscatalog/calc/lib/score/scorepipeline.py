@@ -9,7 +9,8 @@ import duckdb
 import zarr
 import zarr.storage
 
-from ..scorefile import load_scoring_files
+from pgscatalog.calc.lib.scorefile import load_scoring_files
+
 from ._dosage import (
     store_dosage_from_chunks,
 )
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     import polars as pl
 
-    from ..types import Pathish, PathishList
+    from pgscatalog.calc.lib.types import Pathish, PathishList
 
 
 logger = logging.getLogger(__name__)
@@ -43,19 +44,21 @@ class ScorePipeline:
         cache_dir: Pathish,
         max_memory_gb: float,
         threads: int,
-        db_path: Pathish | None = None,
+        out_dir: Pathish,
         minimum_samples_for_impute: int = 50,
     ):
-        self._cache_dir = pathlib.Path(cache_dir)
+        self._out_dir = pathlib.Path(out_dir).resolve()
 
-        if db_path is None:
-            self._db_path = self._cache_dir / "scores.db"
+        # the output directory contains results, so don't overwrite stuff
+        if self._out_dir.exists():
+            if not self._out_dir.is_dir():
+                raise NotADirectoryError(f"{self._out_dir} must be a directory")
+            if any(self._out_dir.iterdir()):
+                raise FileExistsError(f"Directory {self._out_dir} must be empty")
         else:
-            self._db_path = pathlib.Path(db_path)
+            self._out_dir.mkdir(parents=True, exist_ok=False)
 
-        if self._db_path.exists():
-            logger.warning("Score database file exists, overwriting")
-            self._db_path.unlink()
+        self._cache_dir = pathlib.Path(cache_dir)
 
         self._n_minimum_samples_for_impute = minimum_samples_for_impute
         # note: duckdb will use 90% of available memory and all threads by default
@@ -63,8 +66,12 @@ class ScorePipeline:
         self._threads = threads
 
     @property
+    def out_dir(self) -> pathlib.Path:
+        return self._out_dir
+
+    @property
     def db_path(self) -> pathlib.Path:
-        return self._db_path
+        return self._out_dir / "pgs.db"
 
     def load_scores(self, scorefile_paths: Pathish | PathishList) -> None:
         """Copy scores processed with pgscatalog-format into a duckDB database table
@@ -74,7 +81,7 @@ class ScorePipeline:
             scorefile_paths = [scorefile_paths]
 
         load_scoring_files(
-            db_path=self._db_path,
+            db_path=self.db_path,
             scorefile_paths=scorefile_paths,
             max_memory_gb=self._max_memory_gb,
             threads=self._threads,
@@ -165,11 +172,14 @@ class ScorePipeline:
         )
 
     @property
+    def zarr_root(self) -> zarr.Group:
+        store = zarr.storage.LocalStore(self._cache_dir / "genotypes.zarr")
+        return zarr.open_group(store=store, mode="r")
+
+    @property
     def samplesets(self) -> list[str]:
         """Get samplesets in the zarr store"""
-        store = zarr.storage.LocalStore(self._cache_dir / "gts")
-        root = zarr.open_group(store=store, mode="r")
-        samplesets = list(root.keys())
+        samplesets = list(self.zarr_root.keys())
         if len(samplesets) > 1:
             raise NotImplementedError
         return samplesets

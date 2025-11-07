@@ -21,5 +21,5 @@ ZARR_COMPRESSOR = zarr.codecs.ZstdCodec(level=5)
 # variant metadata is cached in fixed with string arrays
 NUMPY_STRING_DTYPE = "<U255"
 
-# TODO: fix in next release
+# TODO: fix in next release  # noqa: TD002 TD003
 VALID_CHROMOSOMES = {str(x) for x in range(1, 23)}.union({None})

@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from dask import array as da
 
-from ..constants import ZARR_PLOIDY
+from pgscatalog.calc.lib.constants import ZARR_PLOIDY
 
 logger = logging.getLogger(__name__)
 

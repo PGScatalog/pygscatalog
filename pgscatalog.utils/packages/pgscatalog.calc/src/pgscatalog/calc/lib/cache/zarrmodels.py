@@ -10,17 +10,17 @@ from __future__ import annotations
 
 import logging
 from copy import deepcopy
-from typing import TYPE_CHECKING, Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated
 
 import polars as pl
-import zarr
-import zarr.errors
 from pydantic import AfterValidator, BaseModel, PositiveInt, RootModel, model_validator
 
-from calc.lib.constants import NUMPY_STRING_DTYPE
+from pgscatalog.calc.lib.constants import NUMPY_STRING_DTYPE
 
 if TYPE_CHECKING:
-    import numpy as np
+    from collections.abc import Mapping, Sequence
+    from typing import Any
+
     import numpy.typing as npt
 
 logger = logging.getLogger(__name__)
@@ -34,13 +34,13 @@ class ZarrVariantMetadata(BaseModel):
     Each target genome file will have its own variant metadata.
     """
 
-    chr_name: list[str]
-    chr_pos: list[PositiveInt]
-    ref: Annotated[list[str | None], AfterValidator(is_valid_allele)]
-    alts: Annotated[list[list[str] | None], AfterValidator(is_valid_allele)]
-    variant_id: list[str]
+    chr_name: Sequence[str]
+    chr_pos: Sequence[PositiveInt]
+    ref: Annotated[Sequence[str | None], AfterValidator(is_valid_allele)]
+    alts: Annotated[Sequence[Sequence[str] | None], AfterValidator(is_valid_allele)]
+    variant_id: Sequence[str]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.chr_name)
 
     @model_validator(mode="after")
@@ -61,7 +61,7 @@ class ZarrVariantMetadata(BaseModel):
     def to_df(self) -> pl.DataFrame:
         return pl.DataFrame(self.model_dump())
 
-    def to_numpy(self) -> VariantArrays:
+    def to_numpy(self) -> Mapping[str, npt.NDArray[Any]]:
         """Convert the dataframe into 1D arrays
 
         Handles converting strings to a consistent fixed width dtype
@@ -92,39 +92,14 @@ class ZarrVariantMetadata(BaseModel):
         }
 
 
-class VariantArrays(TypedDict):
-    chr_name: npt.NDArray[np.str_]
-    chr_pos: npt.NDArray[np.int64]
-    ref: npt.NDArray[np.str_]
-    alts: npt.NDArray[np.str_]
-    variant_id: npt.NDArray[np.str_]
-
-
-def is_valid_allele(alleles: list[list[str] | None] | list[str | None]):
+def is_valid_allele(
+    alleles: list[list[str] | None] | list[str | None],
+) -> list[list[str] | None] | list[str | None]:
     valid_alleles = {"A", "C", "T", "G"}
     for allele in alleles:
         if allele is not None and not set(allele).issubset(valid_alleles):
             raise ValueError(f"Invalid allele: {allele}")
     return alleles
-
-
-def get_position_df(zarr_group: zarr.Group) -> pl.DataFrame:
-    """Get variants from the "meta" zarr group array"""
-    try:
-        meta_root = zarr.open_group(
-            path=f"{zarr_group.path}/meta", store=zarr_group.store, mode="r"
-        )
-    except zarr.errors.GroupNotFoundError:
-        logger.info("No variants in cache")
-        cached_positions = pl.DataFrame({"chr_name": [], "chr_pos": []})
-    else:
-        logger.info(f"{meta_root} exists, getting cached positions")
-        cached_positions = pl.DataFrame(
-            {"chr_name": meta_root["chr_name"][:], "chr_pos": meta_root["chr_pos"][:]}
-        )
-
-    logger.info(f"Found {cached_positions.shape[0]} variants in cache")
-    return cached_positions
 
 
 class ZarrSampleMetadata(RootModel):

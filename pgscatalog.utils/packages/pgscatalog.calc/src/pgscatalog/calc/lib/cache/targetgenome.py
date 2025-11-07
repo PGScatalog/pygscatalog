@@ -12,15 +12,17 @@ import zarr
 import zarr.errors
 import zarr.storage
 
+from pgscatalog.calc.lib.scorefile import get_position_df
+
 from ._genomefilehandlers import GenomeFileHandler, get_file_handler
-from .genomefiletypes import GenomeFileType
-from .targetvariants import TargetVariants
-from .zarrmodels import get_position_df
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from ..types import Pathish
+    from pgscatalog.calc.lib.types import Pathish
+
+    from .genomefiletypes import GenomeFileType
+    from .targetvariants import TargetVariants
 
 
 logger = logging.getLogger(__name__)
@@ -83,12 +85,12 @@ class TargetGenome:
         return pathlib.Path(self._target_path)
 
     @property
-    def _zarr_archive_name(self):
+    def _zarr_archive_name(self) -> pathlib.Path:
         """The name of the directory containing the zarr array root"""
         return self.cache_dir / "genotypes.zarr"
 
     @property
-    def _zarr_group_path(self):
+    def _zarr_group_path(self) -> str:
         """The group hierarchy:
 
         / (root of zarr array
@@ -144,13 +146,13 @@ class TargetGenome:
                 WITH cached AS (SELECT * FROM cached),
                     queries AS (SELECT * FROM query),
                     missing AS (SELECT * FROM queries
-                        ANTI JOIN cached 
+                        ANTI JOIN cached
                         USING (chr_name, chr_pos))
                 SELECT chr_name, chr_pos
                 FROM missing
                 WHERE chr_name IN (
                     SELECT CAST(i AS VARCHAR)
-                    FROM UNNEST(range(1, 23)) AS t(i) 
+                    FROM UNNEST(range(1, 23)) AS t(i)
                 )
                 ORDER BY (chr_name, chr_pos);
             """).fetchall()

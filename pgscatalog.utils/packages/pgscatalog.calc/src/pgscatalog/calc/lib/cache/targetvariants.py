@@ -27,35 +27,39 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import zarr
 import zarr.errors
 
-from ..constants import (
+from pgscatalog.calc.lib.constants import (
     MISSING_GENOTYPE_SENTINEL_VALUE,
     ZARR_COMPRESSOR,
     ZARR_VARIANT_CHUNK_SIZE,
 )
-from ..types import Pathish
+
 from .zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import numpy.typing as npt
+
+    from pgscatalog.calc.lib.types import Pathish
 
 
 class TargetVariants:
     def __init__(
         self,
-        chr_name: list[str],
-        pos: list[int],
-        refs: list[str | None],
-        alts: list[list[str] | None],
-        gts: list[npt.NDArray[np.uint8]],
-        samples: list[str],
+        chr_name: Sequence[str],
+        pos: Sequence[int],
+        refs: Sequence[str | None],
+        alts: Sequence[Sequence[str] | None],
+        gts: Sequence[npt.NDArray[np.uint8]],
+        samples: Sequence[str],
         target_path: Pathish,
         sampleset: str,
     ):
@@ -69,16 +73,14 @@ class TargetVariants:
         self._sampleset = sampleset
 
         # check that all input lists have the same length
-        lengths = set(
-            map(
-                len,
-                [self._chr_name, self._pos, self._refs, self._alts, gts],
-            )
-        )
+        lengths = {
+            len(x) for x in [self._chr_name, self._pos, self._refs, self._alts, gts]
+        }
 
         if len(lengths) != 1:
             raise ValueError(f"Input lists have different lengths: {lengths=}")
 
+        pass
         # check that the genotypes look sensible
         if not np.all(
             np.isin(self._genotypes, [0, 1, MISSING_GENOTYPE_SENTINEL_VALUE])
@@ -88,7 +90,7 @@ class TargetVariants:
     def __len__(self) -> int:
         return len(self._chr_name)  # number of variants
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         n_variants = len(self._pos)
         n_samples = len(self._samples)
         gt_shape = self._genotypes.shape
@@ -99,7 +101,7 @@ class TargetVariants:
 
     @property
     def samples(self) -> list[str]:
-        return self._samples
+        return list(self._samples)
 
     @property
     def genotypes(self) -> npt.NDArray[np.uint8]:
@@ -107,7 +109,7 @@ class TargetVariants:
 
     @property
     def variant_ids(self) -> list[str]:
-        def _alt_to_str(alt: list[str] | None) -> str:
+        def _alt_to_str(alt: Sequence[str] | None) -> str:
             if alt is None:
                 return ""
 
@@ -127,13 +129,11 @@ class TargetVariants:
         logger.info("Converting TargetVariants to polars dataframe")
 
         return ZarrVariantMetadata(
-            **{
-                "chr_name": self._chr_name,
-                "chr_pos": self._pos,
-                "ref": self._refs,
-                "alts": self._alts,
-                "variant_id": self.variant_ids,
-            }
+            chr_name=list(self._chr_name),
+            chr_pos=list(self._pos),
+            ref=list(self._refs),
+            alts=list(self._alts),
+            variant_id=list(self.variant_ids),
         )
 
     def write_zarr(self, zarr_group: zarr.Group) -> None:
@@ -169,7 +169,7 @@ class TargetVariants:
         except zarr.errors.ContainsArrayError:
             # array has already been initialised
             logger.info("Array already exists, appending")
-            gt_arr = zarr_group["genotypes"]
+            gt_arr = cast("zarr.Array", zarr_group["genotypes"])
             gt_arr.append(self._genotypes)
 
         end_time = time.perf_counter()
@@ -179,7 +179,8 @@ class TargetVariants:
         )
 
     def _write_zarr_samples(self, zarr_group: zarr.Group) -> None:
-        """Add sample metadata to the file group. A file must always have the same samples.
+        """Add sample metadata to the file group. A file must always have the same
+        samples.
 
         Sample names in a sampleset may differ across files (e.g. a VCF might be split
         into batches of 100,000 samples).
@@ -199,7 +200,8 @@ class TargetVariants:
 
             if existing_samples.model_dump() != sample_metadata.model_dump():
                 logger.critical(
-                    f"Inconsistent sample IDs {self._target_path} (this should never happen)"
+                    f"Inconsistent sample IDs {self._target_path} "
+                    f"(this should never happen)"
                 )
                 raise ValueError
             logger.info("Samples IDs are consistent")
@@ -219,9 +221,15 @@ class TargetVariants:
         )
         logger.info(f"Writing variant metadata to zarr group {meta_root.info}")
 
+        # mypy can't work out what to do when iterating over a TypedDict
         for metadata, array in meta_arrays.items():
+            meta_root.create_array(
+                chunks=zarr_chunks,
+                data=array,
+                name=metadata,
+                compressors=ZARR_COMPRESSOR,
+            )
             start_time = time.perf_counter()
-
             try:
                 logger.info(f"Creating variant {metadata=} zarr array")
                 meta_root.create_array(
@@ -234,7 +242,7 @@ class TargetVariants:
             except zarr.errors.ContainsArrayError:
                 # array has already been initialised
                 logger.info("Array already exists, appending")
-                metadata_arr = meta_root[metadata]
+                metadata_arr = cast("zarr.Array", meta_root[metadata])
                 metadata_arr.append(array)
 
             end_time = time.perf_counter()
@@ -242,3 +250,32 @@ class TargetVariants:
                 f"{metadata} {array.shape=} written to disk in "
                 f"{end_time - start_time} seconds"
             )
+
+
+def add_missing_positions_to_lists(
+    *,
+    chroms: list[str],
+    positions: list[int],
+    ref_alleles: list[str | None],
+    alt_alleles: list[list[str] | None],
+    hard_calls: list[npt.NDArray[np.uint8]],
+    scoring_file_regions: Sequence[tuple[str, int]],
+    seen_positions: set[tuple[str, int]],
+    n_samples: int,
+) -> None:
+    """Mutates lists in place!"""
+    # represent missing genotypes with a sentinel value of the same shape
+    missing_gts = np.full(
+        shape=(n_samples, 2),
+        fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,
+        dtype=np.uint8,
+    )
+
+    missing_positions = set(scoring_file_regions) - seen_positions
+    for chr_name, chr_pos in missing_positions:
+        # important to prevent future cache misses
+        chroms.append(chr_name)
+        positions.append(chr_pos)
+        ref_alleles.append(None)
+        alt_alleles.append(None)
+        hard_calls.append(missing_gts)

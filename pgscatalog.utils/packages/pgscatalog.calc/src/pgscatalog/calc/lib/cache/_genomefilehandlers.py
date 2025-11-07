@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from ..types import Pathish
+    from pgscatalog.calc.lib.types import Pathish
+
     from .targetvariants import TargetVariants
 
 
@@ -109,6 +110,7 @@ class VCFHandler(GenomeFileHandler):
             position_batch=positions,
             cache_dir=self._cache_dir,
             target_path=self._target_path,
+            sampleset=self._sampleset,
         )
 
     @property

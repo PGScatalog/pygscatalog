@@ -60,6 +60,7 @@ def score_cli(args: argparse.Namespace) -> None:
             cache_dir=args.cache_dir,
             max_memory_gb=args.max_memory_gb,
             threads=args.threads,
+            out_dir=out_dir,
         )
 
         progress.start_task(tasks["Load scoring files"])

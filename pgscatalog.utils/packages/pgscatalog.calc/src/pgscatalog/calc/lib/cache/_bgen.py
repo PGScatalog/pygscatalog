@@ -16,10 +16,10 @@ Key functionality includes:
     0-padding. Queries are translated from PGS Catalog style to match the target genome
     format.
 
-    bgenix subprocess: bgenix is used to create new temporary bgen files. The new bgen files
-    get iterated over. This is motivated to promote batch caching, and allow checkpointing
-    in case jobs fail. To avoid bgenix query limitations, the index file (a SQLite database)
-    is copied and modified.
+    bgenix subprocess: bgenix is used to create new temporary bgen files. The new bgen
+    files get iterated over. This is motivated to promote batch caching, and allow
+    checkpointing in case jobs fail. To avoid bgenix query limitations, the index file
+    (a SQLite database) is copied and modified.
 
     Variant parsing: Transform BGEN variants in a temporary bgen file into a validated
     TargetVariants object suitable for downstream data pipelines.
@@ -54,15 +54,16 @@ import numpy as np
 import numpy.typing as npt
 from bgen import BgenReader  # type: ignore[import-untyped]
 
-from ..constants import MISSING_GENOTYPE_SENTINEL_VALUE
-from .targetvariants import TargetVariants
+from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
+
+from .targetvariants import TargetVariants, add_missing_positions_to_lists
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from ..types import Pathish
+    from pgscatalog.calc.lib.types import Pathish
 
 
 GT_LOOKUP_TABLE = np.array(
@@ -90,7 +91,10 @@ def unphased_to_hardcall(probs: npt.NDArray[np.float64]) -> npt.NDArray[np.uint8
          Columns in probs array correspond to homozygous first allele (AA),
          heterozygous (Aa), and homozygous second allele (aa).
     """
-    return GT_LOOKUP_TABLE[np.argmax(probs, axis=1).astype(np.uint8)]
+    return cast(
+        "npt.NDArray[np.uint8]",
+        GT_LOOKUP_TABLE[np.argmax(probs, axis=1).astype(np.uint8)],
+    )
 
 
 def phased_to_hardcall(probs: npt.NDArray[np.float64]) -> npt.NDArray[np.uint8]:
@@ -252,18 +256,16 @@ def parse_target_variants(
         f"Processed {i / (end - start):.2f} variants per second in local buffer"
     )
 
-    # represent missing genotypes with a sentinel value of the same shape
-    missing_gts = np.full(
-        shape=(n_samples, 2), fill_value=MISSING_GENOTYPE_SENTINEL_VALUE, dtype=np.uint8
+    add_missing_positions_to_lists(
+        chroms=chroms,
+        positions=positions,
+        ref_alleles=ref_alleles,
+        alt_alleles=alt_alleles,
+        hard_calls=hard_calls,
+        scoring_file_regions=scoring_file_regions,
+        seen_positions=seen_positions,
+        n_samples=n_samples,
     )
-    missing_positions = set(scoring_file_regions) - seen_positions
-    for chr_name, chr_pos in missing_positions:
-        # important to prevent future cache misses
-        chroms.append(chr_name)
-        positions.append(chr_pos)
-        ref_alleles.append(None)
-        alt_alleles.append(None)
-        hard_calls.append(missing_gts)
 
     return TargetVariants(
         chr_name=chroms,

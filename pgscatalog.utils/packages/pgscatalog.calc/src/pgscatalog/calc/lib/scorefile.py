@@ -3,13 +3,14 @@ from __future__ import annotations
 import logging
 import os
 import pathlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import duckdb
 import polars as pl
 import zarr
+import zarr.errors
 
-from .cache.zarrmodels import get_position_df
+from .constants import VALID_CHROMOSOMES
 
 if TYPE_CHECKING:
     from .types import Pathish, PathishList
@@ -56,9 +57,11 @@ class Scorefiles:
         # first, check the zarr metadata cache
         # the zarr group = sampleset + filename
         # _ prefix for duckdb object scan / ruff complaining
-        _cached_positions = pl.DataFrame({"chr_name": [], "chr_pos": []})
-        if zarr_group is not None:
-            _cached_positions: pl.DataFrame = get_position_df(zarr_group)
+        _cached_positions: pl.DataFrame
+        if zarr_group is None:
+            _cached_positions = pl.DataFrame({"chr_name": [], "chr_pos": []})
+        else:
+            _cached_positions = get_position_df(zarr_group)
 
         # now query the scoring files, excluding cached positions
         with duckdb.connect() as conn:
@@ -85,9 +88,8 @@ class Scorefiles:
                 if chrom is not None:
                     query = query.filter(f"chr_name = '{chrom}'")
                 else:
-                    # TODO: be nicer about X / Y / MT / patches
                     query = query.filter(
-                        f"chr_name IN {[str(x) for x in range(1, 23)]}"
+                        f"chr_name IN {list(VALID_CHROMOSOMES - {None})}"
                     )
 
                 results: list[tuple[str, int]] = query.order(
@@ -167,3 +169,22 @@ def load_scoring_files(
             [path_strings],
         )
         logger.info("Finished loading score_variant_table")
+
+
+def get_position_df(zarr_group: zarr.Group) -> pl.DataFrame:
+    """Get variants from the "meta" zarr group array"""
+    try:
+        meta_root = zarr.open_group(
+            path=f"{zarr_group.path}/meta", store=zarr_group.store, mode="r"
+        )
+    except zarr.errors.GroupNotFoundError:
+        logger.info("No variants in cache")
+        cached_positions = pl.DataFrame({"chr_name": [], "chr_pos": []})
+    else:
+        logger.info(f"{meta_root} exists, getting cached positions")
+        chr_name = cast("zarr.Array", meta_root["chr_name"])[:]
+        chr_pos = cast("zarr.Array", meta_root["chr_pos"])[:]
+        cached_positions = pl.DataFrame({"chr_name": chr_name, "chr_pos": chr_pos})
+
+    logger.info(f"Found {cached_positions.shape[0]} variants in cache")
+    return cached_positions

@@ -89,7 +89,14 @@ def parser_load_args(parser: argparse.ArgumentParser) -> None:
         type=pathlib.Path,
         default=pathlib.Path.cwd() / "pgscatalog-genome-cache",
         dest="cache_dir",
-        help="A directory to store cached parquet files.",
+        help="A directory to store the cache.",
+    )
+    parser.add_argument(
+        "--zarr_zip_file",
+        type=pathlib.Path,
+        dest="zarr_zip_file",
+        required=False,
+        help="An existing zarr cache to update.",
     )
     parser.add_argument(
         "--target_genomes",

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import duckdb
 
 if TYPE_CHECKING:
-    from ..types import Pathish
+    from pgscatalog.calc.lib.types import Pathish
 
 logger = logging.getLogger(__name__)
 
