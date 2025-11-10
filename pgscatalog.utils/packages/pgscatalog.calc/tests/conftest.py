@@ -9,9 +9,9 @@ import pysam
 import pysam.bcftools
 import pytest
 import zarr
+from pgscatalog.calc.lib._dosage import calculate_effect_allele_dosage
 
 from pgscatalog.calc import Scorefiles, TargetGenome
-from pgscatalog.calc.lib._dosage import calculate_effect_allele_dosage
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
 

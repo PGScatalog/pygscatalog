@@ -34,7 +34,7 @@ FROM python:3.12-slim-bookworm
 COPY --from=builder --chown=app:app /app /app
 
 # for running in a nextflow workflow
-RUN apt-get update && apt-get install -y procps
+RUN apt-get update && apt-get install -y procps p7zip
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"

@@ -634,20 +634,18 @@ dependencies = [
     { name = "dask" },
     { name = "duckdb" },
     { name = "numpy" },
+    { name = "pandas" },
     { name = "pgscatalog-core" },
     { name = "polars" },
     { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pysam" },
     { name = "rich" },
+    { name = "scikit-learn" },
     { name = "zarr" },
 ]
 
 [package.dev-dependencies]
-legacy = [
-    { name = "pandas" },
-    { name = "scikit-learn" },
-]
 lint = [
     { name = "mypy" },
     { name = "ruff" },
@@ -663,20 +661,18 @@ requires-dist = [
     { name = "dask", specifier = ">=2025.9.1" },
     { name = "duckdb", specifier = ">=1.4.1" },
     { name = "numpy", specifier = ">=1.26.4" },
+    { name = "pandas", specifier = ">=2.3.3" },
     { name = "pgscatalog-core", editable = "packages/pgscatalog.core" },
     { name = "polars", specifier = ">=0.20.30" },
     { name = "pyarrow", specifier = ">=15.0.2" },
     { name = "pydantic", specifier = ">=2.12.4" },
     { name = "pysam", specifier = ">=0.23.3" },
     { name = "rich", specifier = ">=14.1.0" },
+    { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "zarr", specifier = ">=2.18.3" },
 ]
 
 [package.metadata.requires-dev]
-legacy = [
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "scikit-learn", specifier = ">=1.7.2" },
-]
 lint = [
     { name = "mypy", specifier = ">=1.14.1" },
     { name = "ruff", specifier = ">=0.9.4" },
