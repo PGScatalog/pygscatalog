@@ -27,9 +27,8 @@ RUN uv sync --frozen --package $PACKAGE_NAME --no-editable
 FROM condaforge/miniforge3:25.3.1-0
 
 # use a new runtime container to get rid of build time bloat
-# just grabbing bgen apps + the venv
-
-RUN conda install -y -c bioconda bgen-cpp
+# just grabbing bgen apps + 7zip + the venv
+RUN conda install -y -c bioconda bgen-cpp p7zip
 
 COPY --from=builder /workspace/.venv /workspace/.venv
 
