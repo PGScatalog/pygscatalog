@@ -64,9 +64,6 @@ test = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-default-groups = ["legacy"]
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/pgscatalog"]
 artifacts = ["pgscatalog/calc/py.typed"]

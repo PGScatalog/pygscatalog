@@ -17,8 +17,6 @@ from .genomefiletypes import GenomeFileType
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from pgscatalog.calc.lib.types import Pathish
 
     from .targetvariants import TargetVariants
@@ -104,7 +102,7 @@ class VCFHandler(GenomeFileHandler):
 
     def query_variants(
         self,
-        positions: Sequence[tuple[str, int]],
+        positions: list[tuple[str, int]],
     ) -> TargetVariants:
         return vcf_buffer_variants(
             position_batch=positions,
@@ -163,7 +161,7 @@ class BgenFileHandler(GenomeFileHandler):
 
     def query_variants(
         self,
-        positions: Sequence[tuple[str, int]],
+        positions: list[tuple[str, int]],
     ) -> TargetVariants:
         # important to copy the bgen index to the local cache
         # indexes are often mounted read-only and they need to be modified for queries

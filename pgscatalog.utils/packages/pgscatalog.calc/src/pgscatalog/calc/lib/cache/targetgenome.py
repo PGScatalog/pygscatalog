@@ -113,7 +113,7 @@ class TargetGenome:
         return f"{self.sampleset}/{pathlib.Path(self.filename).name}"
 
     @property
-    def _zarr_store(self) -> zarr.storage.StoreLike:
+    def _zarr_store(self) -> zarr.storage.LocalStore:
         """A directory on the local filesystem contains the zarr array"""
         return zarr.storage.LocalStore(root=self._zarr_archive_name, read_only=False)
 

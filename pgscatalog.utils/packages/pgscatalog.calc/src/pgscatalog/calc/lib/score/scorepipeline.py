@@ -28,6 +28,8 @@ from ._pgs import (
 from ._weight_matrix import store_group_weight_arrays
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     import numpy as np
     import numpy.typing as npt
 
@@ -112,7 +114,7 @@ class ScorePipeline:
             threads=self._threads,
         )
 
-    def _load_variants_from_zarr(self, conn):
+    def _load_variants_from_zarr(self, conn: duckdb.DuckDBPyConnection) -> None:
         """Load variant metadata from zarr groups into targetvariants table
 
         Variant metadata is stored as 1D arrays in "meta" groups
@@ -121,7 +123,7 @@ class ScorePipeline:
         """
         store = zarr.storage.LocalStore(root=self.genotypes_root_path)
         # load the sampleset group ready for traversing
-        group = zarr.open_group(store=store, path=self.sampleset, mode="r")
+        group: zarr.Group = zarr.open_group(store=store, path=self.sampleset, mode="r")
 
         conn.sql("""
         CREATE TABLE IF NOT EXISTS targetvariants (
@@ -162,7 +164,9 @@ class ScorePipeline:
             )
 
             # check the number of variants in metadata matches the genotype array shape
-            n_geno_variants = cast("zarr.Array", group[filename]["genotypes"]).shape[0]
+            sub_group = cast("zarr.Group", group[filename])
+            n_geno_variants: int = cast("zarr.Array", sub_group["genotypes"]).shape[0]
+
             if n_geno_variants == (n_meta_variants := _df.shape[0]):
                 logger.info(
                     "Number of variants in metadata matches number of variants in "
@@ -282,14 +286,18 @@ class ScorePipeline:
         create_score_table(db_path=self.db_path)
 
         for sampleset in self.samplesets:
-            store = zarr.storage.LocalStore(self.out_dir)
-            pgs_group = zarr.open_group(store=store, mode="w", path=f"pgs/{sampleset}")
+            pgs_store = zarr.storage.LocalStore(self.out_dir)
+            pgs_group = zarr.open_group(
+                store=pgs_store, mode="w", path=f"pgs/{sampleset}"
+            )
 
+            # get accessions to include in score calculation
+            # (based on variant match thresholds)
             accessions_to_calculate = get_ok_accessions(
                 db_path=self.db_path, sampleset=sampleset
             )
 
-            # metadata df for each zarr group
+            # get wide effect weights (a matrix) for each zarr genotype group
             grouped_dfs: dict[str, pl.DataFrame] = store_group_weight_arrays(
                 db_path=self.db_path,
                 sampleset=sampleset,
@@ -297,11 +305,11 @@ class ScorePipeline:
                 accessions=accessions_to_calculate,
             )
 
-            # store dosage in zarr and adjust it
-            is_missing_zarr, dosage_zarr = store_dosage_from_chunks(
+            # calculate and adjust dosage with dask
+            is_missing_zarr, dosage_zarr = make_dosage_arrays(
                 genotypes_group=self.genotypes_root,
                 df_groups=grouped_dfs,
-                pgs_store=store,
+                pgs_store=pgs_store,
                 sampleset=sampleset,
                 db_path=self.db_path,
                 n_workers=self._threads,
@@ -337,7 +345,9 @@ class ScorePipeline:
             logger.info(f"Score calculation {sampleset=} finished")
 
 
-def get_variants_from_zarr(group: zarr.Group):
+def get_variants_from_zarr(
+    group: zarr.Group,
+) -> Generator[tuple[str, dict[str, npt.NDArrayLike]], None, None]:
     # traverse a zarr group and extract all 1D meta arrays
     # returning a dataframe structure
     for name, subgrp in group.groups():

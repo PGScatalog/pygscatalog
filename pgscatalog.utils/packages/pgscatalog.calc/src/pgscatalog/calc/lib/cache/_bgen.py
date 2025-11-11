@@ -61,7 +61,7 @@ from .targetvariants import TargetVariants, add_missing_positions_to_lists
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence
+    from collections.abc import Callable, Iterable
 
     from pgscatalog.calc.lib.types import Pathish
 
@@ -195,7 +195,7 @@ def parse_target_variants(
     target_path: Pathish,
     buffered_path: Pathish,
     bgen_sample_path: Pathish,
-    scoring_file_regions: Sequence[tuple[str, int]],
+    scoring_file_regions: list[tuple[str, int]],
     sampleset: str,
     skip_multiallelic: bool = True,
     ref_first: bool = True,
@@ -282,7 +282,7 @@ def parse_target_variants(
 def bgen_buffer_variants(
     *,
     cache_dir: Pathish,
-    position_batch: Sequence[tuple[str, int]],
+    position_batch: list[tuple[str, int]],
     target_path: Pathish,
     sample_path: Pathish,
     sampleset: str,
@@ -352,7 +352,7 @@ def create_bgen_index_query(
     *,
     idx_path: Pathish,
     temp_target_path: Pathish,
-    regions: Sequence[tuple[str, int, int]],
+    regions: list[tuple[str, int, int]],
 ) -> tuple[str, str]:
     """
     Create a new bgen index from a copy of the existing index and add a new table

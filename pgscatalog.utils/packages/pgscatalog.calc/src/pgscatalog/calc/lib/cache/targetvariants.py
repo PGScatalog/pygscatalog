@@ -44,7 +44,7 @@ from .zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Sized
 
     import numpy.typing as npt
 
@@ -54,12 +54,12 @@ if TYPE_CHECKING:
 class TargetVariants:
     def __init__(
         self,
-        chr_name: Sequence[str],
-        pos: Sequence[int],
-        refs: Sequence[str | None],
-        alts: Sequence[Sequence[str] | None],
-        gts: Sequence[npt.NDArray[np.uint8]],
-        samples: Sequence[str],
+        chr_name: list[str],
+        pos: list[int],
+        refs: list[str | None],
+        alts: list[list[str] | None],
+        gts: list[npt.NDArray[np.uint8]],
+        samples: list[str],
         target_path: Pathish,
         sampleset: str,
     ):
@@ -73,9 +73,8 @@ class TargetVariants:
         self._sampleset = sampleset
 
         # check that all input lists have the same length
-        lengths = {
-            len(x) for x in [self._chr_name, self._pos, self._refs, self._alts, gts]
-        }
+        to_check: list[Sized] = [self._chr_name, self._pos, self._refs, self._alts, gts]
+        lengths = {len(x) for x in to_check}
 
         if len(lengths) != 1:
             raise ValueError(f"Input lists have different lengths: {lengths=}")
@@ -108,7 +107,7 @@ class TargetVariants:
 
     @property
     def variant_ids(self) -> list[str]:
-        def _alt_to_str(alt: Sequence[str] | None) -> str:
+        def _alt_to_str(alt: list[str] | None) -> str:
             if alt is None:
                 return ""
 
@@ -258,7 +257,7 @@ def add_missing_positions_to_lists(
     ref_alleles: list[str | None],
     alt_alleles: list[list[str] | None],
     hard_calls: list[npt.NDArray[np.uint8]],
-    scoring_file_regions: Sequence[tuple[str, int]],
+    scoring_file_regions: list[tuple[str, int]],
     seen_positions: set[tuple[str, int]],
     n_samples: int,
 ) -> None:

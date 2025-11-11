@@ -19,7 +19,6 @@ from pgscatalog.calc.lib.constants import (
 from ._impute import calculate_mean_dosage
 
 if TYPE_CHECKING:
-    import dask.delayed.Delayed
     import polars as pl
     from numpy import typing as npt
 
@@ -122,7 +121,7 @@ def make_dosage_arrays(
         n_minimum_impute=n_minimum_impute,
         dosage_array=dosage_array,
         missing_array=missing_array,
-        n_workers=n_workers
+        n_workers=n_workers,
     )
 
     # in these arrays the fill value (np.nan) has been replaced with computed values
@@ -135,7 +134,7 @@ def write_dosage_regions(
     n_minimum_impute: int,
     dosage_array: zarr.Array,
     missing_array: zarr.Array,
-    n_workers: int = 1
+    n_workers: int = 1,
 ) -> None:
     """
     Compute and write per-region genotype dosages into Zarr arrays.
@@ -204,18 +203,21 @@ def write_dosage_regions(
         end = start + n_group_variants
 
         # write specific regions to the zarr array to minimise memory usage
-        dask_tasks: list[dask.delayed.Delayed] = [effect_type_adjusted.to_zarr(
-            url=dosage_array,
-            component="dosage",
-            # region is important to avoid writing the entire array
-            region=(slice(start, end), slice(None)),
-            compute=False,
-        ), is_dosage_nan.to_zarr(
-            url=missing_array,
-            component="missing",
-            region=(slice(start, end), slice(None)),
-            compute=False,
-        )]
+        dask_tasks = [
+            effect_type_adjusted.to_zarr(
+                url=dosage_array,
+                component="dosage",
+                # region is important to avoid writing the entire array
+                region=(slice(start, end), slice(None)),
+                compute=False,
+            ),
+            is_dosage_nan.to_zarr(
+                url=missing_array,
+                component="missing",
+                region=(slice(start, end), slice(None)),
+                compute=False,
+            ),
+        ]
         start = end
 
         # after some testing, I don't think the dask scheduler is aware of the to_zarr
@@ -234,20 +236,23 @@ def write_dosage_regions(
             dask.compute(*dask_tasks)
 
     with dask.config.set(scheduler="threads", num_workers=n_workers):
-        def has_nan(zarr_path):
-            return da.any(da.isnan(da.from_zarr(zarr_path))).compute()
+
+        def has_nan(zarr_array: zarr.Array) -> np.bool_:
+            return cast(
+                "np.bool_", da.any(da.isnan(da.from_zarr(zarr_array))).compute()
+            )
 
         is_any_nan = has_nan(dosage_array) or has_nan(missing_array)
 
     logger.info("Finished calculating effect allele dosage")
 
     if is_any_nan:
-        logger.critical("NaNs detected in dosage array or missing array after "
-                        "calculating dosage. Impossible to continue PGS calculation.")
+        logger.critical(
+            "NaNs detected in dosage array or missing array after "
+            "calculating dosage. Impossible to continue PGS calculation."
+        )
         raise ValueError("NaN values detected in dosage array or missing array")
-    else:
-        logger.info("Dosage/missing arrays doesn't contain NaN values (good!)")
-
+    logger.info("Dosage/missing arrays doesn't contain NaN values (good!)")
 
 
 def calculate_effect_allele_dosage(
@@ -501,4 +506,7 @@ def get_sample_ids(group: zarr.Group, sampleset: str) -> list[str]:
                 raise NotImplementedError(
                     "Different samples across target genome files"
                 )
+    if samples is None:
+        raise TypeError("Couldn't get samples from zarr attribute")
+
     return samples

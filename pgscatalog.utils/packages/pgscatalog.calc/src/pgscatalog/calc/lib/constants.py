@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from numpy.dtypes import StringDType
 import zarr.codecs
+from numpy.dtypes import StringDType
 
 # ./. (no call) needs to be represented in np.uint8 (np.nan requires float)
 MISSING_GENOTYPE_SENTINEL_VALUE: Literal[255] = 255
