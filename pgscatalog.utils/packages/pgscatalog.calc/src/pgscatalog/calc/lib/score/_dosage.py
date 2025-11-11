@@ -19,6 +19,7 @@ from pgscatalog.calc.lib.constants import (
 from ._impute import calculate_mean_dosage
 
 if TYPE_CHECKING:
+    import dask.delayed.Delayed
     import polars as pl
     from numpy import typing as npt
 
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def store_dosage_from_chunks(
+def make_dosage_arrays(
     df_groups: dict[str, pl.DataFrame],
     genotypes_group: zarr.Group,
     pgs_store: zarr.storage.StoreLike,
@@ -41,8 +42,8 @@ def store_dosage_from_chunks(
     Calculate and adjust effect allele dosage, storing dosage and missingness masks in
     Zarr arrays (disk-backed).
 
-    This function basically queries multiple Zarr arrays in different groups to create
-    a single 2D dosage array where rows = samples and columns = dosage.
+    This function basically iterates over all 3D genotype arrays in zarr groups to
+    create a 2D dosage array where rows = samples and columns = dosage.
 
     Missing dosages are imputed from mean effect allele frequency.
 
@@ -113,8 +114,53 @@ def store_dosage_from_chunks(
         compressors=ZARR_COMPRESSOR,
     )
 
+    # calculate dosage for each genotype group (sampleset/filename) and store
+    # it in a specific region (contiguous row range) in the big dosage array
+    write_dosage_regions(
+        genotypes_group=genotypes_group,
+        df_groups=df_groups,
+        n_minimum_impute=n_minimum_impute,
+        dosage_array=dosage_array,
+        missing_array=missing_array,
+        n_workers=n_workers
+    )
+
+    # in these arrays the fill value (np.nan) has been replaced with computed values
+    return missing_array, dosage_array
+
+
+def write_dosage_regions(
+    genotypes_group: zarr.Group,
+    df_groups: dict[str, pl.DataFrame],
+    n_minimum_impute: int,
+    dosage_array: zarr.Array,
+    missing_array: zarr.Array,
+    n_workers: int = 1
+) -> None:
+    """
+    Compute and write per-region genotype dosages into Zarr arrays.
+
+    For each zarr subgroup (sampleset/filename) in `df_groups`, this function:
+
+    1. Loads genotype data from the genotypes (read-only) Zarr group.
+    2. Calculates effect allele dosages and imputes missing values.
+    3. Adjusts for dominant/recessive effect types.
+    4. Writes the resulting array to a region of the dosage and missingness arrays.
+
+    Args:
+        genotypes_group: Root Zarr group containing subgroups per region.
+        df_groups: Mapping of region names to DataFrames with variant metadata.
+        n_minimum_impute: Minimum number of samples required to impute missing dosages.
+        dosage_array: Target Zarr array to store computed dosages.
+        missing_array: Target Zarr array to store missingness flags.
+
+    Notes:
+        The dosage_array and missing_array are initialised with np.nan. If any NaN
+        values remain after all writes are finished an exception will be raised.
+
+        The input arrays dosage_array and missing_array are modified in place.
+    """
     start = 0
-    dask_tasks = []
     for zarr_group, df in df_groups.items():
         logger.info(f"Calculating and storing dosage for {zarr_group=}")
         target_group = genotypes_group[zarr_group]
@@ -158,31 +204,50 @@ def store_dosage_from_chunks(
         end = start + n_group_variants
 
         # write specific regions to the zarr array to minimise memory usage
-        dask_tasks.append(effect_type_adjusted.to_zarr(
+        dask_tasks: list[dask.delayed.Delayed] = [effect_type_adjusted.to_zarr(
             url=dosage_array,
             component="dosage",
             # region is important to avoid writing the entire array
             region=(slice(start, end), slice(None)),
             compute=False,
-        ))
-        dask_tasks.append(is_dosage_nan.to_zarr(
+        ), is_dosage_nan.to_zarr(
             url=missing_array,
             component="missing",
             region=(slice(start, end), slice(None)),
             compute=False,
-        ))
+        )]
         start = end
 
+        # after some testing, I don't think the dask scheduler is aware of the to_zarr
+        # region argument (NaNs - the fill value - end up sneaking into the output)
+        # background:
+        # multiple processes can write to a zarr array if each worker uses a different
+        # chunk. otherwise you need a chunk-level lock or something complicated
+
+        # to keep things as simple as possible, avoid this implementation pattern
+        # here each zarr subgroup writes to the dosage array serially (bottleneck?)
+        # but the creation of the arrays that get inserted uses multiple dask workers
+        with dask.config.set(scheduler="threads", num_workers=n_workers):
+            logger.info(
+                f"Computing effect allele dosage and missing calls with {n_workers=}"
+            )
+            dask.compute(*dask_tasks)
 
     with dask.config.set(scheduler="threads", num_workers=n_workers):
-        logger.info(f"Computing effect allele dosage and missing calls with "
-                    f"{n_workers=}")
-        # compute all the tasks in parallel
-        dask.compute(*dask_tasks)
+        def has_nan(zarr_path):
+            return da.any(da.isnan(da.from_zarr(zarr_path))).compute()
+
+        is_any_nan = has_nan(dosage_array) or has_nan(missing_array)
 
     logger.info("Finished calculating effect allele dosage")
 
-    return missing_array, dosage_array
+    if is_any_nan:
+        logger.critical("NaNs detected in dosage array or missing array after "
+                        "calculating dosage. Impossible to continue PGS calculation.")
+        raise ValueError("NaN values detected in dosage array or missing array")
+    else:
+        logger.info("Dosage/missing arrays doesn't contain NaN values (good!)")
+
 
 
 def calculate_effect_allele_dosage(

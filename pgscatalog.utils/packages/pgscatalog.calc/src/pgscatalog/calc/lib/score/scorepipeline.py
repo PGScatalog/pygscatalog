@@ -14,7 +14,7 @@ from pgscatalog.calc.lib.scorefile import load_scoring_files
 
 from ._dosage import (
     get_sample_ids,
-    store_dosage_from_chunks,
+    make_dosage_arrays,
 )
 from ._matchlog import add_match_log, get_ok_accessions
 from ._matchvariants import update_match_table
@@ -28,7 +28,6 @@ from ._pgs import (
 from ._weight_matrix import store_group_weight_arrays
 
 if TYPE_CHECKING:
-
     import numpy as np
     import numpy.typing as npt
 
@@ -310,6 +309,7 @@ class ScorePipeline:
             )
 
             with dask.config.set(scheduler="threads", num_workers=self._threads):
+                # calculate weighted sum of scores
                 effect_weights: zarr.Array = cast(
                     "zarr.Array", pgs_group["weight_matrix"]
                 )
@@ -329,6 +329,7 @@ class ScorePipeline:
                     is_missing_array=is_missing_zarr,
                 )
 
+            # insert scores into duckdb for final cleanup and export
             insert_scores(
                 db_path=self.db_path,
                 _score_df=_score_df,
