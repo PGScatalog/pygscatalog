@@ -67,7 +67,7 @@ def update_match_table(
             target.filename,
             target.sampleset
         FROM score_variant_table AS score
-        JOIN target_variants.variants_table AS target
+        JOIN targetvariants AS target
         ON score.chr_name = target.chr_name
         AND score.chr_position = target.chr_pos
         WHERE target.ref IS NOT NULL AND target.sampleset = ?;

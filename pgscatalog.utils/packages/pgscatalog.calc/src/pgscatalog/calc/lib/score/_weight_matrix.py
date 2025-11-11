@@ -147,7 +147,7 @@ def create_wide_weights_table(
 
 
 def store_group_weight_arrays(
-    db_path: Pathish, sampleset: str, zarr_group: zarr.Group, accessions: list[str]
+    db_path: Pathish, sampleset: str, pgs_group: zarr.Group, accessions: list[str]
 ) -> dict[str, pl.DataFrame]:
     """Generate weight matrices for each zarr group by pivoting scoring file weights
     from long to wide form.
@@ -164,7 +164,7 @@ def store_group_weight_arrays(
         Path to the DuckDB database file.
     sampleset : str
         Identifier for the set of samples to pivot.
-    zarr_group : zarr.Group
+    pgs_group : zarr.Group
         Writable zarr group for this sampleset
     accessions : list[str]
         List of accessions to pivot (must pass match rate)
@@ -175,35 +175,27 @@ def store_group_weight_arrays(
         A dictionary mapping each zarr group name to its index metadata dataframe,
         which is used to calculate dosage.
     """
-    # reset zarr group state when this function is called
-    for array in zarr_group.array_keys():
-        logger.info(f"Deleting {array=}")
-        del zarr_group[array]
-
     group_paths = create_wide_weights_table(
         db_path=db_path, sampleset=sampleset, accessions=accessions
     )
 
     metadata_dfs = []
     for group in group_paths:
-        store_results_in_zarr(db_path=db_path, group_path=group, zarr_group=zarr_group)
+        store_results_in_zarr(db_path=db_path, group_path=group, pgs_group=pgs_group)
         metadata_dfs.append(get_variant_metadata(db_path=db_path, group_path=group))
 
     logger.info("Finished storing arrays in zarr")
 
     if not metadata_dfs:
-        raise ValueError(f"{zarr_group=} {group_paths=} returned empty dataframe")
+        raise ValueError(f"{pgs_group=} {group_paths=} returned empty dataframe")
     logger.info("Creating dataframe with variant/effect allele index metadata")
-    grouped_metadata_dfs = pl.concat(metadata_dfs).partition_by(
+    return pl.concat(metadata_dfs).partition_by(
         "zarr_group", as_dict=True, include_key=False
     )
 
-    # partition_by returns keys as tuples, extract and explicitly convert to strings
-    return {str(k[0]): v for k, v in grouped_metadata_dfs.items()}
-
 
 def store_results_in_zarr(
-    db_path: Pathish, group_path: str, zarr_group: zarr.Group
+    db_path: Pathish, group_path: str, pgs_group: zarr.Group
 ) -> None:
     """
     Store a weight matrix for a specific Zarr group in a zarr array.
@@ -225,15 +217,15 @@ def store_results_in_zarr(
 
     try:
         # initialise the array and metadata
-        zarr_group.create_array(
+        pgs_group.create_array(
             "weight_matrix",
             overwrite=False,
             data=weights,
             chunks=(ZARR_VARIANT_CHUNK_SIZE, weights.shape[1]),
         )
-        zarr_group.attrs["accessions"] = accessions
+        pgs_group.attrs["accessions"] = accessions
     except zarr.errors.ContainsArrayError:
-        weight_mat = zarr_group["weight_matrix"]
+        weight_mat = pgs_group["weight_matrix"]
         if not isinstance(weight_mat, zarr.Array):
             raise TypeError("weight_matrix must be a zarr array") from None
 

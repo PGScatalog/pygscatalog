@@ -37,11 +37,12 @@ def main() -> None:
 def parser_score_args(parser: argparse.ArgumentParser) -> None:
     """Arguments for the score program"""
     parser.add_argument(
-        "--cache_dir",
+        "--zarr_zip_file",
         type=pathlib.Path,
-        dest="cache_dir",
-        help="Genome cache directory.",
+        nargs="+",
+        dest="zarr_zip_file",
         required=True,
+        help="A list of zarr zip files created by pgsc_calc load.",
     )
     parser.add_argument(
         "--score_paths",

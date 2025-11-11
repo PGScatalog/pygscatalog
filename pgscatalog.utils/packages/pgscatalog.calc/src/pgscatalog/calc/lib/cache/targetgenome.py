@@ -11,6 +11,7 @@ import polars as pl
 import zarr
 import zarr.errors
 import zarr.storage
+from zarr.core.group import GroupMetadata
 
 from pgscatalog.calc.lib.scorefile import get_position_df
 
@@ -49,6 +50,12 @@ class TargetGenome:
             sample_file=sample_file,
             cache_dir=self._cache_dir,
             sampleset=self._sampleset,
+        )
+
+        # create the group hierarchy in a single operation
+        zarr.create_hierarchy(
+            store=self._zarr_store,
+            nodes={f"{self._zarr_group_path}/meta": GroupMetadata()},
         )
 
     def __repr__(self) -> str:
@@ -97,6 +104,11 @@ class TargetGenome:
         └── <sampleset> zarr group
             └── <filename> zarr group
                 └── genotypes (n_variants, n_samples, PLOIDY) uint8 array
+                └── meta zarr group
+                    └── chr_pos
+                    └── ...
+                    └──
+                    └──
         """
         return f"{self.sampleset}/{pathlib.Path(self.filename).name}"
 

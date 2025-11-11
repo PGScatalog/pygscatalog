@@ -164,7 +164,9 @@ def load_scoring_files(
             'is_duplicated': 'BOOLEAN',
             'accession': 'VARCHAR',
             'row_nr': 'UINTEGER'
-        });
+        })
+        -- this data can't be matched so drop it
+        WHERE chr_name IS NOT NULL AND chr_position IS NOT NULL;
         """,
             [path_strings],
         )

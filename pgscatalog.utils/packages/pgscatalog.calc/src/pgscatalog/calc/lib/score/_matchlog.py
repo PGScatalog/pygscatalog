@@ -82,8 +82,9 @@ def add_match_log(
               LEFT JOIN allele_match_table matches
                         ON score.accession = matches.accession
                             AND score.row_nr = matches.row_nr
-              LEFT JOIN target_variants.variants_table target
+              LEFT JOIN targetvariants target
                         ON target.geno_index = matches.target_row_nr
+                            AND target.filename = matches.filename
      ORDER BY sampleset, score.accession, score.row_nr;
     """,
         [sampleset],

@@ -142,6 +142,15 @@ def load_cli(args: argparse.Namespace) -> None:
         unzip_zarr(zip_path=args.zarr_zip_file, cache_path=args.cache_dir)
     else:
         logger.info("--zarr_zip_file not set, creating new cache")
+        if is_cache_dir_empty := any(args.cache_dir.iterdir()):
+            # if a zarr DirectoryStore exists in the cache directory it will be updated
+            # implicitly. it's best to be explicit, so raise an exception unless
+            # --zarr_zip_file is set
+            logger.critical(f"Creating a new cache but {is_cache_dir_empty=}")
+            raise FileExistsError(
+                "Set --zarr_zip_file to update a cache "
+                "or  --cache_dir to empty directory"
+            )
 
     scorefiles: Scorefiles = Scorefiles(args.score_paths)
 

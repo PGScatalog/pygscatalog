@@ -18,7 +18,7 @@ from pydantic import AfterValidator, BaseModel, PositiveInt, RootModel, model_va
 from pgscatalog.calc.lib.constants import NUMPY_STRING_DTYPE
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Mapping
     from typing import Any
 
     import numpy.typing as npt
@@ -34,11 +34,11 @@ class ZarrVariantMetadata(BaseModel):
     Each target genome file will have its own variant metadata.
     """
 
-    chr_name: Sequence[str]
-    chr_pos: Sequence[PositiveInt]
-    ref: Annotated[Sequence[str | None], AfterValidator(is_valid_allele)]
-    alts: Annotated[Sequence[Sequence[str] | None], AfterValidator(is_valid_allele)]
-    variant_id: Sequence[str]
+    chr_name: list[str]
+    chr_pos: list[PositiveInt]
+    ref: Annotated[list[str | None], AfterValidator(is_valid_allele)]
+    alts: Annotated[list[list[str] | None], AfterValidator(is_valid_allele)]
+    variant_id: list[str]
 
     def __len__(self) -> int:
         return len(self.chr_name)
@@ -96,7 +96,9 @@ def is_valid_allele(
     alleles: list[list[str] | None] | list[str | None],
 ) -> list[list[str] | None] | list[str | None]:
     valid_alleles = {"A", "C", "T", "G"}
-    for allele in alleles:
+    # get a flat list of non-missing alleles
+    flat = [x for sub in alleles if sub is not None for x in sub]
+    for allele in flat:
         if allele is not None and not set(allele).issubset(valid_alleles):
             raise ValueError(f"Invalid allele: {allele}")
     return alleles

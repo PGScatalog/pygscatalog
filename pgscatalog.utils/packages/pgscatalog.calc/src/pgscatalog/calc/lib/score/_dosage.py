@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict, cast
 
 import dask.config
 import duckdb
@@ -30,7 +30,8 @@ logger = logging.getLogger(__name__)
 
 def store_dosage_from_chunks(
     df_groups: dict[str, pl.DataFrame],
-    store: zarr.storage.StoreLike,
+    genotypes_group: zarr.Group,
+    pgs_store: zarr.storage.StoreLike,
     sampleset: str,
     db_path: Pathish,
     n_workers: int = 1,
@@ -56,8 +57,10 @@ def store_dosage_from_chunks(
         - ``effect_allele_idx``: allele index for effect allele dosage calculation
         - ``is_recessive``: boolean mask for recessive effect type
         - ``is_dominant``: boolean mask for dominant effect type
-    store : zarr.storage.StoreLike
-        Zarr store where dosage and missing arrays will be written
+    genotypes_group: zarr.Group
+        A read only group which contains genotype arrays
+    pgs_store : zarr.storage.StoreLike
+        A writable zarr store where dosage and missing arrays will be written
     sampleset : str
         Identifier of the sample set within the Zarr store
     db_path : Pathish
@@ -84,9 +87,9 @@ def store_dosage_from_chunks(
     - Both arrays are created with chunking along the variant dimension,
       using ``ZARR_VARIANT_CHUNK_SIZE`` and compressed with ``ZARR_COMPRESSOR``.
     """
-    n_samples = get_n_samples(store=store, sampleset=sampleset)
+    n_samples = get_n_samples(group=genotypes_group, sampleset=sampleset)
     n_variants = get_n_score_variants(db_path=db_path)
-    pgs_group = zarr.open_group(store=store, path=f"pgs/{sampleset}")
+    pgs_group = zarr.open_group(store=pgs_store, path=f"pgs/{sampleset}")
 
     # an array to record dosage of effect alleles
     dosage_array: zarr.Array = pgs_group.create_array(
@@ -110,13 +113,10 @@ def store_dosage_from_chunks(
         compressors=ZARR_COMPRESSOR,
     )
 
-    # prepare target gts
-    gt_group = zarr.open_group(store=store, path="gts", mode="r")
-
     start = 0
     for zarr_group, df in df_groups.items():
         logger.info(f"Calculating and storing dosage for {zarr_group=}")
-        target_group = gt_group[zarr_group]
+        target_group = genotypes_group[zarr_group]
 
         if not isinstance(target_group, zarr.Group):
             raise TypeError
@@ -401,14 +401,14 @@ def get_n_score_variants(db_path: Pathish) -> int:
     return int(query[0])
 
 
-def get_n_samples(store: zarr.storage.StoreLike, sampleset: str) -> int:
+def get_n_samples(group: zarr.Group, sampleset: str) -> int:
     """
     Get the number of samples in a given sample set stored in Zarr.
 
     Parameters
     ----------
-    store : zarr.storage.StoreLike
-        Zarr store containing genotype data.
+    store : zarr.Group
+        Read only zarr group which contains 3D genotype arrays.
     sampleset : str
         Name of the sample set (group) in the store.
 
@@ -416,15 +416,21 @@ def get_n_samples(store: zarr.storage.StoreLike, sampleset: str) -> int:
     -------
     n_samples : int
         Number of samples in the sample set.
-
-    Raises
-    ------
-    ValueError
-        If the `samples` attribute in the Zarr group is not a list.
     """
-    group = zarr.open_group(store=store, path=f"gts/{sampleset}", mode="r")
-    samples = group.attrs["samples"]
-    if not isinstance(samples, list):
-        raise ValueError("Expected samples attribute to be a list")
+    return len(get_sample_ids(group=group, sampleset=sampleset))
 
-    return len(samples)
+
+def get_sample_ids(group: zarr.Group, sampleset: str) -> list[str]:
+    samples = None
+    root = cast("zarr.Group", group[sampleset])
+    for x in root:
+        if samples is None:
+            # initialise the sample list
+            samples = cast("list[str]", root[x].attrs["samples"])
+        else:
+            # compare sample names
+            if samples != cast("list[str]", root[x].attrs["samples"]):
+                raise NotImplementedError(
+                    "Different samples across target genome files"
+                )
+    return samples

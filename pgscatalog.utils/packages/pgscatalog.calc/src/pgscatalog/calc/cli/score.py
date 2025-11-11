@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import pathlib
 from typing import TYPE_CHECKING
 
 from rich.logging import RichHandler
@@ -17,6 +16,8 @@ from rich.progress import (
 
 from pgscatalog.calc import ScorePipeline
 
+from .load import unzip_zarr
+
 if TYPE_CHECKING:
     import argparse
 
@@ -31,8 +32,21 @@ logging.basicConfig(
 
 
 def score_cli(args: argparse.Namespace) -> None:
-    out_dir = pathlib.Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # check the output directory is empty
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+
+    if any(files := [str(x) for x in args.out_dir.iterdir()]):
+        logger.critical(f"{str(args.out_dir)} directory must be empty")
+        raise FileExistsError(files)
+
+    # check all zip files exist and unzip them
+    for zip_file in args.zarr_zip_file:
+        if not zip_file.exists():
+            raise FileNotFoundError(f"{zip_file} does not exist")
+
+        unzip_zarr(zip_file, args.out_dir)
+
+    # zarr directory called genotypes.zarr now contains all variant and genotypes data
 
     with Progress(
         SpinnerColumn(),
@@ -52,15 +66,12 @@ def score_cli(args: argparse.Namespace) -> None:
         ]
         tasks = {stage: progress.add_task(stage, total=1) for stage in stages}
 
-        progress.print(
-            ":test_tube:", "pgscatalog-calculate-scores", ":dna:", "starting..."
-        )
+        progress.print(":test_tube:", "pgsc_calc score", ":dna:", "starting...")
 
         pipeline = ScorePipeline(
-            cache_dir=args.cache_dir,
             max_memory_gb=args.max_memory_gb,
             threads=args.threads,
-            out_dir=out_dir,
+            out_dir=args.out_dir,
         )
 
         progress.start_task(tasks["Load scoring files"])
@@ -72,8 +83,10 @@ def score_cli(args: argparse.Namespace) -> None:
         progress.update(tasks["Match variants"], advance=1)
 
         progress.start_task(tasks["Export logs"])
-        pipeline.export_full_match_log(out_directory=out_dir / "logs")
-        pipeline.export_summary_match_log(out_path=out_dir / "logs" / "summary.csv")
+        pipeline.export_full_match_log(out_directory=args.out_dir / "logs")
+        pipeline.export_summary_match_log(
+            out_path=args.out_dir / "logs" / "summary.csv"
+        )
         progress.update(tasks["Export logs"], advance=1)
 
         progress.start_task(tasks["Calculate scores"])
@@ -81,7 +94,7 @@ def score_cli(args: argparse.Namespace) -> None:
         progress.update(tasks["Calculate scores"], advance=1)
 
         progress.start_task(tasks["Export scores"])
-        pipeline.export_scores(out_path=out_dir / "scores")
+        pipeline.export_scores(out_path=args.out_dir / "scores")
         progress.update(tasks["Export scores"], advance=1)
 
         progress.print("Finished calculating :tada: Goodbye!")

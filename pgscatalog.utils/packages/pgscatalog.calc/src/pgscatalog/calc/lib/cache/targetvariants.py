@@ -80,7 +80,6 @@ class TargetVariants:
         if len(lengths) != 1:
             raise ValueError(f"Input lists have different lengths: {lengths=}")
 
-        pass
         # check that the genotypes look sensible
         if not np.all(
             np.isin(self._genotypes, [0, 1, MISSING_GENOTYPE_SENTINEL_VALUE])
@@ -223,12 +222,12 @@ class TargetVariants:
 
         # mypy can't work out what to do when iterating over a TypedDict
         for metadata, array in meta_arrays.items():
-            meta_root.create_array(
-                chunks=zarr_chunks,
-                data=array,
-                name=metadata,
-                compressors=ZARR_COMPRESSOR,
-            )
+            if self.genotypes.shape[0] != array.shape[0]:
+                raise ValueError(
+                    "1D variant metadata array must have same number of rows as "
+                    "3D genotype array"
+                )
+
             start_time = time.perf_counter()
             try:
                 logger.info(f"Creating variant {metadata=} zarr array")
