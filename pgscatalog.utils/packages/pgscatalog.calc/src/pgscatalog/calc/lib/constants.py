@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from numpy.dtypes import StringDType
 import zarr.codecs
 
 # ./. (no call) needs to be represented in np.uint8 (np.nan requires float)
@@ -18,8 +19,9 @@ ZARR_VARIANT_CHUNK_SIZE: int = 5_000
 # numerical arrays will compress quite well with lower compression levels
 ZARR_COMPRESSOR = zarr.codecs.ZstdCodec(level=5)
 
-# variant metadata is cached in fixed with string arrays
-NUMPY_STRING_DTYPE = "<U255"
+# variable-width string
+# https://numpy.org/devdocs/user/basics.strings.html#variable-width-strings
+NUMPY_STRING_DTYPE = StringDType()
 
 # TODO: fix in next release  # noqa: TD002 TD003
 VALID_CHROMOSOMES = {str(x) for x in range(1, 23)}.union({None})
