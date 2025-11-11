@@ -114,6 +114,7 @@ def store_dosage_from_chunks(
     )
 
     start = 0
+    dask_tasks = []
     for zarr_group, df in df_groups.items():
         logger.info(f"Calculating and storing dosage for {zarr_group=}")
         target_group = genotypes_group[zarr_group]
@@ -157,26 +158,28 @@ def store_dosage_from_chunks(
         end = start + n_group_variants
 
         # write specific regions to the zarr array to minimise memory usage
-        with dask.config.set(scheduler="threads", num_workers=n_workers):
-            logger.info(f"Writing dosage region {start=} {end=} to zarr array")
-            effect_type_adjusted.to_zarr(
-                url=dosage_array,
-                component="dosage",
-                # region is important to avoid writing the entire array
-                region=(slice(start, end), slice(None)),
-                compute=True,
-            )
-            logger.info("Finished writing dosage region")
-
-            logger.info("Writing missing calls to array")
-            is_dosage_nan.to_zarr(
-                url=missing_array,
-                component="missing",
-                region=(slice(start, end), slice(None)),
-                compute=True,
-            )
-
+        dask_tasks.append(effect_type_adjusted.to_zarr(
+            url=dosage_array,
+            component="dosage",
+            # region is important to avoid writing the entire array
+            region=(slice(start, end), slice(None)),
+            compute=False,
+        ))
+        dask_tasks.append(is_dosage_nan.to_zarr(
+            url=missing_array,
+            component="missing",
+            region=(slice(start, end), slice(None)),
+            compute=False,
+        ))
         start = end
+
+
+    with dask.config.set(scheduler="threads", num_workers=n_workers):
+        logger.info(f"Computing effect allele dosage and missing calls with "
+                    f"{n_workers=}")
+        # compute all the tasks in parallel
+        dask.compute(*dask_tasks)
+
     logger.info("Finished calculating effect allele dosage")
 
     return missing_array, dosage_array
