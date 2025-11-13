@@ -9,11 +9,11 @@ import pathlib
 import tempfile
 import urllib
 
-import tenacity
 import httpx
+import tenacity
 
-from pgscatalog.core.lib.pgsexceptions import ScoreDownloadError, ScoreChecksumError
 from pgscatalog.core.lib._config import Config
+from pgscatalog.core.lib.pgsexceptions import ScoreChecksumError, ScoreDownloadError
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +147,9 @@ def https_download(*, url, out_path, directory, overwrite):
             # if an exception was thrown, get rid of the temporary file
             tempf.close()
             os.remove(tempf.name)
-            logger.info(f"HTTPS download failed, deleting {tempf.name}")  # pragma: no cover
+            logger.info(
+                f"HTTPS download failed, deleting {tempf.name}"
+            )  # pragma: no cover
         except FileNotFoundError:
             # file has been renamed, that's OK
             pass

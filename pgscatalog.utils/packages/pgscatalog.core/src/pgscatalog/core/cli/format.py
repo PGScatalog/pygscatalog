@@ -6,15 +6,13 @@ import pathlib
 import shutil
 import tempfile
 from itertools import islice
-from typing import Optional
 
 import pydantic
 from xopen import xopen
 
-from pgscatalog.core import ScoringFile, GenomeBuild
+from pgscatalog.core import GenomeBuild, ScoringFile
 from pgscatalog.core.lib import EffectTypeError
 from pgscatalog.core.lib.models import ScoreLog, VariantLog
-
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +40,7 @@ def format_and_write(
     liftover_kwargs: dict,
     batch_size: int = 100_000,
     gzip_output: bool = False,
-) -> Optional[ScoreLog]:
+) -> ScoreLog | None:
     """Take a PGS Catalog scoring file and write a subset of fields to a consistent structure
 
     Returns a score log generated from the score header and variant statistics

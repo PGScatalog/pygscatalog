@@ -6,17 +6,16 @@ import csv
 import itertools
 import logging
 import pathlib
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager
-from typing import Iterator, Generator
 
 from pydantic import ValidationError
 from xopen import xopen
 
-from pgscatalog.core.lib import GenomeBuild
-from pgscatalog.core.lib import models
-from pgscatalog.core.lib.catalogapi import ScoreQueryResult, CatalogQuery
-from pgscatalog.core.lib._normalise import normalise
+from pgscatalog.core.lib import GenomeBuild, models
 from pgscatalog.core.lib._download import https_download
+from pgscatalog.core.lib._normalise import normalise
+from pgscatalog.core.lib.catalogapi import CatalogQuery, ScoreQueryResult
 from pgscatalog.core.lib.models import ScoreVariant
 from pgscatalog.core.lib.pgsexceptions import ScoreFormatError
 
@@ -147,7 +146,7 @@ class ScoringFile:
             self._init_from_path(target_build=target_build)
         except (FileNotFoundError, TypeError):
             # was it an accession?
-            self.include_children = kwargs.get("include_children", None)
+            self.include_children = kwargs.get("include_children")
             self._init_from_accession(self._identifier, target_build=target_build)
 
     def _init_from_accession(self, accession, target_build):
@@ -211,8 +210,7 @@ class ScoringFile:
     def genome_build(self) -> GenomeBuild:
         if self.is_harmonised:
             return self._header.HmPOS_build
-        else:
-            return self._header.genome_build
+        return self._header.genome_build
 
     @property
     def header(self):
@@ -243,8 +241,7 @@ class ScoringFile:
     def __repr__(self):
         if self.local_path is not None:
             return f"{type(self).__name__}({repr(str(self.local_path))}, target_build={repr(self.target_build)})"
-        else:
-            return f"{type(self).__name__}({repr(self.pgs_id)}, target_build={repr(self.target_build)})"
+        return f"{type(self).__name__}({repr(self.pgs_id)}, target_build={repr(self.target_build)})"
 
     def __hash__(self):
         return hash(self.pgs_id)
@@ -567,7 +564,7 @@ class ScoringFiles:
                     logger.info(
                         "Term associated with multiple scores detected (PGP or trait)"
                     )
-                    self.include_children = kwargs.get("include_children", None)
+                    self.include_children = kwargs.get("include_children")
                     traitpub_query = CatalogQuery(
                         accession=arg, include_children=self.include_children
                     ).score_query()
@@ -628,10 +625,8 @@ class ScoringFiles:
             if self.target_build == other.target_build:
                 new_elements = self._elements + other.elements
                 return ScoringFiles(new_elements, target_build=self.target_build)
-            else:
-                return NotImplemented
-        else:
             return NotImplemented
+        return NotImplemented
 
     def __mul__(self, other):
         """Intentionally not implemented. Cannot contain duplicate elements."""

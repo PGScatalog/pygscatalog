@@ -8,10 +8,10 @@ import pathlib
 
 import pyliftover
 
+from pgscatalog.core.lib.effecttype import EffectType
 from pgscatalog.core.lib.genomebuild import GenomeBuild
 from pgscatalog.core.lib.models import Allele
-from pgscatalog.core.lib.pgsexceptions import LiftoverError, EffectTypeError
-from pgscatalog.core.lib.effecttype import EffectType
+from pgscatalog.core.lib.pgsexceptions import EffectTypeError, LiftoverError
 
 logger = logging.getLogger(__name__)
 

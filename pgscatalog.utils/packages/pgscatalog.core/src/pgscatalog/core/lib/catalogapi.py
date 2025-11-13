@@ -6,10 +6,9 @@ import logging
 import httpx
 import tenacity
 
-from pgscatalog.core.lib.pgsexceptions import QueryError, InvalidAccessionError
-from pgscatalog.core.lib.genomebuild import GenomeBuild
 from pgscatalog.core.lib._config import Config
-
+from pgscatalog.core.lib.genomebuild import GenomeBuild
+from pgscatalog.core.lib.pgsexceptions import InvalidAccessionError, QueryError
 
 logger = logging.getLogger(__name__)
 
@@ -223,8 +222,7 @@ class CatalogQuery:
 
                     if "request limit exceeded" in r.get("message", ""):
                         raise httpx.RequestError("request limit exceeded")
-                    else:
-                        results += r["results"]
+                    results += r["results"]
 
                 # return the same type as the accession input to be consistent
                 match self.accession:
