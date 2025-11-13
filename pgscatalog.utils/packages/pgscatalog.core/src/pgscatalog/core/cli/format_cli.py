@@ -8,14 +8,24 @@ import textwrap
 from tqdm import tqdm
 
 from pgscatalog.core.cli.format import format_and_write
-from pgscatalog.core.lib.models import ScoreLog, ScoreLogs
 from pgscatalog.core.lib import GenomeBuild, ScoringFile
+from pgscatalog.core.lib.models import ScoreLog, ScoreLogs
 
 logger = logging.getLogger(__name__)
 
 
-def run():
-    args = parse_args()
+def main():
+    parser = argparse.ArgumentParser(
+        description=_description_text,
+        epilog=_epilog_text,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    add_format_args(parser)
+    args = parser.parse_args()
+    format_cli(args)
+
+
+def format_cli(args):
     if args.verbose:  # pragma: no cover
         logging.getLogger("pgscatalog.core").setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
@@ -158,12 +168,7 @@ _epilog_text = textwrap.dedent(
 )
 
 
-def parse_args(args=None):
-    parser = argparse.ArgumentParser(
-        description=_description_text,
-        epilog=_epilog_text,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
+def add_format_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "-s",
         "--scorefiles",
@@ -247,8 +252,6 @@ def parse_args(args=None):
         help="<Optional> Number of Python worker processes to use",
     )
 
-    return parser.parse_args(args)
-
 
 if __name__ == "__main__":
-    run()
+    main()
