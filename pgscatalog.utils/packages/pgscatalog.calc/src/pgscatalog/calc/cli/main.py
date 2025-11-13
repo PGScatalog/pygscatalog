@@ -8,6 +8,9 @@ from pgscatalog.calc.cli._utils import check_positive, zero_one_float
 from pgscatalog.calc.cli.load import load_cli
 from pgscatalog.calc.cli.score import score_cli
 
+from pgscatalog.core.cli.format_cli import add_format_args, format_cli
+from pgscatalog.core.cli.download_cli import add_download_args, download_cli
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -28,10 +31,30 @@ def main() -> None:
     parser_score = subparsers.add_parser("score", help="Calculate polygenic scores")
     parser_score_args(parser_score)
 
+    parser_format = subparsers.add_parser(
+        "format", help="Format scoring files to a consistent structure "
+    )
+    parser_format_args(parser_format)
+
+    parser_download = subparsers.add_parser(
+        "download", help="Download PGS Catalog scoring files "
+    )
+    parser_download_args(parser_download)
+
     args = parser.parse_args()
 
     # dispatch args to correct function
     args.func(args)
+
+
+def parser_download_args(parser: argparse.ArgumentParser) -> None:
+    add_download_args(parser)
+    parser.set_defaults(func=download_cli)
+
+
+def parser_format_args(parser: argparse.ArgumentParser) -> None:
+    add_format_args(parser)
+    parser.set_defaults(func=format_cli)
 
 
 def parser_score_args(parser: argparse.ArgumentParser) -> None:
