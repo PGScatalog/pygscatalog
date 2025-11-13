@@ -8,6 +8,7 @@ import logging.handlers
 import shutil
 import subprocess
 from dataclasses import dataclass
+from itertools import batched
 from shutil import rmtree
 from typing import TYPE_CHECKING
 
@@ -136,27 +137,21 @@ def load_cli(args: argparse.Namespace) -> None:
     # check chromosome input
     check_chromosomes(target_genomes=target_genomes)
 
-    # has an existing cache been provided?
-    if args.zarr_zip_file is not None:
-        logger.info("--zarr_zip_file set, updating existing cache")
-        unzip_zarr(zip_path=args.zarr_zip_file, cache_path=args.cache_dir)
-    else:
-        logger.info("--zarr_zip_file not set, creating new cache")
-        if is_cache_dir_empty := any(args.cache_dir.iterdir()):
-            # if a zarr DirectoryStore exists in the cache directory it will be updated
-            # implicitly. it's best to be explicit, so raise an exception unless
-            # --zarr_zip_file is set
-            logger.critical(f"Creating a new cache but {is_cache_dir_empty=}")
-            raise FileExistsError(
-                "Set --zarr_zip_file to update a cache "
-                "or  --cache_dir to empty directory"
-            )
-
     scorefiles: Scorefiles = Scorefiles(args.score_paths)
 
     for target_genome in track(
         target_genomes, description="Querying target genome index..."
     ):
+        if args.zarr_zip_file is not None:
+            group_path = f"genotypes.zarr/{target_genome._zarr_group_path}"
+            logger.info(f"--zarr_zip_file set, extracting {group_path=}")
+            unzip_zarr(
+                zip_path=args.zarr_zip_file,
+                cache_path=args.cache_dir,
+                group_path=group_path,
+            )
+            logger.info("Cache set up")
+
         positions_to_query = scorefiles.get_unique_positions(
             chrom=target_genome.chrom, zarr_group=target_genome.zarr_group
         )
@@ -164,7 +159,16 @@ def load_cli(args: argparse.Namespace) -> None:
         if len(positions_to_query) == 0:
             print("All variants are already cached. Yay!")
             continue
-        target_genome.cache_variants(positions_to_query)
+
+        # extract variants from target genomes in batches of ~5_000
+        # build genotype / variant arrays, and then write to zarr
+        # (see --batch_size parameter)
+        position_batches = list(batched(positions_to_query, args.batch_size))
+        for i, positions in enumerate(position_batches, start=1):
+            logger.info(
+                f"Processing batch {i} of {len(position_batches)} ({args.batch_size=})"
+            )
+            target_genome.cache_variants(positions)
 
     # move the zarr array into a read-only single file archive
     logger.info("Packaging zarr zip store")
@@ -179,23 +183,27 @@ def load_cli(args: argparse.Namespace) -> None:
     print("Finished caching :tada: Goodbye!")
 
 
-def unzip_zarr(zip_path: pathlib.Path, cache_path: pathlib.Path) -> None:
+def unzip_zarr(
+    zip_path: pathlib.Path, cache_path: pathlib.Path, group_path: str | None = None
+) -> None:
     """Run a 7z subprocess to unzip a zarr store
 
     This means zarr can work with a DirectoryStore to update an exising cache
+
+    Optionally extract a specific group path from the zip file
     """
     if not zip_path.exists():
         raise FileNotFoundError(
             f"{zip_path=} does not existRemove --zarr_zip_file argument"
         )
 
-    if (zarr_archive := cache_path / "genotypes.zarr").exists():
-        raise FileExistsError(
-            f"{zarr_archive=} already existsChoose a different --cache_dir"
-        )
-
     logger.info(f"Extracting zarr zip store to directory {cache_path}")
     cmd = ["7z", "x", str(zip_path), f"-o{str(cache_path)}"]
+
+    if group_path is not None:
+        logger.info(f"Only extracting {group_path=} from zip")
+        cmd.append(f"-ir!{group_path}/*")
+
     logger.info(f"Running subprocess {cmd=}")
     result = subprocess.run(cmd, check=True, capture_output=True, text=True)
 

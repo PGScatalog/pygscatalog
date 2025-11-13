@@ -126,29 +126,18 @@ def parser_load_args(parser: argparse.ArgumentParser) -> None:
         help="PGS Catalog scoring file paths",
         required=True,
     )
-    parser.add_argument(
-        "--update_cache", action="store_true", help="Update an existing cache"
-    )
     parser.add_argument("--verbose", action="store_true", help="More logging!")
     parser.add_argument(
-        "--workers",
+        "--threads",
         type=check_positive,
         default=1,
-        help="Number of Python worker processes to use (adjust to be ~number of "
-        "cores).",
+        help="Number of dask threads to use (between 2 - 4 is good)",
     )
     parser.add_argument(
         "--batch_size",
         type=check_positive,
         default=10_000,
-        help="Number of variants to buffer before writing to database",
-    )
-    parser.add_argument(
-        "--timeout_seconds",
-        type=check_positive,
-        default=3600,
-        help="Timeout for worker jobs in seconds. Helpful to kill workers that get "
-        "stuck after crashing and not raising a valid Python exception",
+        help="Number of variants to buffer before writing to zarr",
     )
     parser.add_argument(
         "--bgen_sample_file",
