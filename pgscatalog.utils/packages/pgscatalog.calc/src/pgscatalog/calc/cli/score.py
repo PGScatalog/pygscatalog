@@ -94,7 +94,7 @@ def score_cli(args: argparse.Namespace) -> None:
         progress.update(tasks["Calculate scores"], advance=1)
 
         progress.start_task(tasks["Export scores"])
-        pipeline.export_scores(out_path=args.out_dir / "scores")
+        pipeline.export_scores(out_path=args.out_dir)
         progress.update(tasks["Export scores"], advance=1)
 
         progress.print("Finished calculating :tada: Goodbye!")

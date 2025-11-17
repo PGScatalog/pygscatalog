@@ -66,7 +66,7 @@ def insert_scores(db_path: Pathish, _score_df: pl.DataFrame) -> None:
 def write_scores(
     db_path: Pathish, out_dir: Pathish, max_memory_gb: str, threads: int, scale: int = 6
 ) -> None:
-    """Write the score table to a directory in hive-partitioned format
+    """Write the score table to a compressed TSV file
 
     Scores are written out with a fixed width to preserve privacy (rounding limits
     identifiability). All calculations are done using internal cache data which is
@@ -77,7 +77,7 @@ def write_scores(
     db_path : Pathish
         Path to the score database
     out_dir : Pathish
-        Path to the output directory. Files in the directory will be overwritten.
+        Path to the output directory.
     max_memory_gb : str
         Maximum RAM that duckdb can use before intermediate results spilling to disk
     threads : int
@@ -87,36 +87,45 @@ def write_scores(
     """
     logger.info(f"Copying score table to {out_dir}")
     logger.info(f"Score columns will have {scale} digits after the decimal point")
+    out_file = str((out_dir / "scores.txt.gz").resolve())
     with duckdb.connect(
         str(db_path),
         config={"max_memory": max_memory_gb, "threads": str(threads)},
     ) as conn:
-        conn.sql(f"""
-        COPY (
-            SELECT
+        score_rel = (
+            conn.table("score_table")
+            .project(
+                f"""
                 sampleset,
                 accession,
                 sample_id,
                 n_matched,
                 allele_count,
-                -- export fixed-width decimals
                 CAST(dosage_sum AS DECIMAL(18, {scale})) AS dosage_sum,
                 CAST(score AS DECIMAL(18, {scale})) AS score,
-                CAST(score_avg AS DECIMAL(18, {scale})) AS score_avg,
-            FROM score_table
-            ORDER BY sampleset, accession, sample_id
+                CAST(score_avg AS DECIMAL(18, {scale})) AS score_avg
+                """
+            )
+            .select(
+                "sampleset",
+                "accession",
+                "sample_id",
+                "n_matched",
+                "allele_count",
+                "dosage_sum",
+                "score",
+                "score_avg",
+            )
+            .order("sampleset, accession, sample_id")
         )
-        TO '{str(out_dir)}'
-        (
-            FORMAT CSV,
-            HEADER,
-            DELIMITER ',',
-            COMPRESSION GZIP,
-            PARTITION_BY (sampleset, accession),
-            WRITE_PARTITION_COLUMNS true,
-            OVERWRITE true
-        );
-        """)
+        logger.info(f"Writing scores to {out_file}")
+        score_rel.write_csv(
+            out_file,
+            header=True,
+            sep=",",
+            compression="gzip",
+        )
+
     logger.info("Finished copying score table")
 
 

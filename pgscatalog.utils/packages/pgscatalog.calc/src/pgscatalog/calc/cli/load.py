@@ -227,7 +227,7 @@ def zip_zarr(zip_path: pathlib.Path, zarr_path: pathlib.Path) -> None:
         "a",
         "-tzip",  # make a zip archive
         "-mx0",  # don't compress (zarr already compresses arrays)
-        str(zip_path),
+        zip_path.name,  # intentionally only the archive name
         zarr_path.name,  # intentionally only the directory name
     ]
 
