@@ -228,11 +228,15 @@ def zip_zarr(zip_path: pathlib.Path, zarr_path: pathlib.Path) -> None:
         "-tzip",  # make a zip archive
         "-mx0",  # don't compress (zarr already compresses arrays)
         str(zip_path),
-        str(zarr_path),
+        zarr_path.name,  # intentionally only the directory name
     ]
 
     logger.info(f"Running subprocess {cmd=}")
-    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    # change working directory to parent keeps zip files portable
+    # (same internal directory structure, with genotypes.zarr at the top level)
+    result = subprocess.run(
+        cmd, check=True, capture_output=True, text=True, cwd=zarr_path.parent
+    )
 
     if result.stdout:
         logger.info(result.stdout)
