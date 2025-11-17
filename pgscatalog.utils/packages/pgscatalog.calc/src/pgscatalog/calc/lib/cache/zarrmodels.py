@@ -59,7 +59,16 @@ class ZarrVariantMetadata(BaseModel):
         return ZarrVariantMetadata(**merged)
 
     def to_df(self) -> pl.DataFrame:
-        return pl.DataFrame(self.model_dump())
+        return pl.DataFrame(
+            self.model_dump(),
+            schema={
+                "chr_name": pl.String,
+                "chr_pos": pl.Int64,
+                "ref": pl.String,
+                "alts": pl.List(pl.String),
+                "variant_id": pl.String,
+            },
+        )
 
     def to_numpy(self) -> Mapping[str, npt.NDArray[Any]]:
         """Convert the dataframe into 1D arrays
