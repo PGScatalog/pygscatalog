@@ -90,8 +90,8 @@ def vcf_buffer_variants(
                 sampleset=sampleset,
             )
     finally:
-        pathlib.Path(region_file.name).unlink()
-        pathlib.Path(variant_buffer.name).unlink()
+        pathlib.Path(region_file.name).resolve().unlink(missing_ok=True)
+        pathlib.Path(variant_buffer.name).resolve().unlink(missing_ok=True)
 
 
 def parse_target_variants(
