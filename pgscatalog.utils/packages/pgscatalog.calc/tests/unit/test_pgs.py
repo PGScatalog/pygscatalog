@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 import zarr
 
-from pgscatalog.calc.lib._pgs import calculate_scores, create_score_table, write_scores
+from pgscatalog.calc.lib.score._pgs import calculate_scores, create_score_table, write_scores
 
 RANDOM_SEED = 42
 

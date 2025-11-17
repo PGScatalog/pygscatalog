@@ -3,7 +3,7 @@ import pathlib
 import duckdb
 import pytest
 
-from pgscatalog.calc import Scorefiles
+from pgscatalog.calc import VALID_CHROMOSOMES, Scorefiles
 
 
 @pytest.fixture
@@ -41,12 +41,13 @@ def test_scorefiles(pgs000001, pgs001229):
     # test getting unique variants manually
     scorefile_variants = frozenset(sfs.get_unique_positions())
 
-    variants = frozenset(
-        duckdb.read_csv([pgs001229, pgs000001], dtype={"chr_name": str})
+    query = (duckdb.read_csv([pgs001229, pgs000001], dtype={"chr_name": str})
         .select("chr_name", "chr_position")
-        .filter("chr_name is not null")
-        .distinct()
-        .fetchall()
-    )
+        .filter("chr_name is not null and chr_position is not null"))
 
-    assert scorefile_variants == variants
+    query = query.filter(
+                        f"chr_name IN {list(VALID_CHROMOSOMES - {None})}"
+                    )
+
+    assert scorefile_variants == frozenset(query.distinct().fetchall())
+

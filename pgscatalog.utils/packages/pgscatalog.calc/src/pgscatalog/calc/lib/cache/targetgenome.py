@@ -123,7 +123,6 @@ class TargetGenome:
             store=self._zarr_store,
             path=self._zarr_group_path,
             overwrite=False,
-            zarr_version=3,
             zarr_format=3,
         )
 

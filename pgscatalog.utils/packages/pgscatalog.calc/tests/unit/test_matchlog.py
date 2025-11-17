@@ -1,7 +1,7 @@
 import duckdb
 import pytest
 
-from pgscatalog.calc.lib._matchlog import add_complement_macro
+from pgscatalog.calc.lib.score._matchlog import add_complement_macro
 
 
 @pytest.mark.parametrize(

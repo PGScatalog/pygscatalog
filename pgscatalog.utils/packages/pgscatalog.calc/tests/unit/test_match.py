@@ -1,6 +1,6 @@
 import pytest
 
-from pgscatalog.calc.lib._matchvariants import (
+from pgscatalog.calc.lib.score._matchvariants import (
     MatchPriority,
     MatchResult,
     classify_match,

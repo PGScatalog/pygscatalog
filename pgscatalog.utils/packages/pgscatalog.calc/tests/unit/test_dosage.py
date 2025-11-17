@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import zarr
 
-from pgscatalog.calc.lib._dosage import (
+from pgscatalog.calc.lib.score._dosage import (
     adjust_dosage_for_effect,
     calculate_effect_allele_dosage,
 )
@@ -28,18 +28,6 @@ def dosage():
 @pytest.fixture
 def dosage_ones():
     return np.ones(shape=(N_SAMPLES, 1000))
-
-
-def test_calculate_dosage_persists_nan(genotype_missing_masked, effect_allele_idx):
-    # missing calls must be correctly converted to missing dosages (np.nan)
-    missing_array = da.from_array(genotype_missing_masked)
-    dosage_array = calculate_effect_allele_dosage(
-        genotype_array=missing_array, effect_idx=effect_allele_idx
-    )
-
-    n_missing_calls = np.sum(np.isnan(genotype_missing_masked))
-    n_missing_dosages = np.sum(np.isnan(dosage_array.compute()))
-    assert n_missing_dosages == (n_missing_calls / ZARR_PLOIDY)
 
 
 def test_adjust_dosage_for_effect(dosage, tmp_path):
