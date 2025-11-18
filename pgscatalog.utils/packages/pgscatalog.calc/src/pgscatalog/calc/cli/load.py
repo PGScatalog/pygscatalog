@@ -198,7 +198,7 @@ def unzip_zarr(
         )
 
     logger.info(f"Extracting zarr zip store to directory {cache_path}")
-    cmd = ["7z", "x", str(zip_path), f"-o{str(cache_path)}"]
+    cmd = ["7z", "x", "-y", str(zip_path), f"-o{str(cache_path)}"]
 
     if group_path is not None:
         logger.info(f"Only extracting {group_path=} from zip")
