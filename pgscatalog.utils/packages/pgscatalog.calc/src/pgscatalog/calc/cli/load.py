@@ -12,6 +12,8 @@ from itertools import batched
 from shutil import rmtree
 from typing import TYPE_CHECKING
 
+import zarr
+import zarr.storage
 from rich import print
 from rich.logging import RichHandler
 from rich.progress import track
@@ -158,6 +160,7 @@ def load_cli(args: argparse.Namespace) -> None:
 
         if len(positions_to_query) == 0:
             print("All variants are already cached. Yay!")
+            cleanup_empty_zarr_group(group=target_genome.zarr_group)
             continue
 
         # extract variants from target genomes in batches of ~5_000
@@ -170,10 +173,24 @@ def load_cli(args: argparse.Namespace) -> None:
             )
             target_genome.cache_variants(positions)
 
-    # move the zarr array into a read-only single file archive
+    # prepare to move the zarr array into a read-only single file archive
     logger.info("Packaging zarr zip store")
     zip_path = args.cache_dir / "genotypes.zarr.zip"
     zarr_path = args.cache_dir / "genotypes.zarr"
+
+    # check if any arrays were written to the zarr store
+    store = zarr.storage.LocalStore(zarr_path)
+    group = zarr.open_group(store=store)
+
+    if not has_any_arrays(group):
+        logger.warning(
+            "No arrays in zarr store, so not creating the standard zip output. "
+            "This is normal if all index queries returned no variants. "
+            "If you're not expecting this: do your genotypes have good "
+            "variant density? Are they imputed? Are your scorefile positions/build OK?"
+        )
+        return
+
     zip_zarr(zip_path=zip_path, zarr_path=zarr_path)
 
     # clean up the original directory store
@@ -181,6 +198,36 @@ def load_cli(args: argparse.Namespace) -> None:
     shutil.rmtree(zarr_path)
 
     print("Finished caching :tada: Goodbye!")
+
+
+def has_any_arrays(group):
+    """Does a zarr group contain any arrays? Recurses the hierarchy"""
+    for key in group:
+        item = group[key]
+
+        if isinstance(item, zarr.Array):
+            return True
+
+        if isinstance(item, zarr.Group) and has_any_arrays(item):
+            return True
+
+    return False
+
+
+def cleanup_empty_zarr_group(group: zarr.Group) -> None:
+    """
+    Delete  a group that doesn't contain a genotype array.
+
+    This can happen if no results were returned after querying an index.
+
+    Empty groups won't have the correct interface for consumers, so delete them
+    """
+    try:
+        _ = group["genotypes"]
+    except KeyError:
+        root = zarr.open_group(store=group.store)
+        logger.info(f"No genotypes array found, deleting {group.path=}")
+        del root[group.path]
 
 
 def unzip_zarr(
@@ -206,7 +253,7 @@ def unzip_zarr(
         # also unzip the zarr.json file for the root and sampleset groups
         # otherwise the zarr hierarchy won't parse properly for downstream processes
         root_zarr_json = group_path.split("/")[0] + "/zarr.json"
-        sampleset_zarr_json =  "/".join(group_path.split("/")[0:2]) + "/zarr.json"
+        sampleset_zarr_json = "/".join(group_path.split("/")[0:2]) + "/zarr.json"
         [cmd.append(x) for x in [root_zarr_json, sampleset_zarr_json]]
 
     logger.info(f"Running subprocess {cmd=}")
