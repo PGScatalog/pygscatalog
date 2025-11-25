@@ -47,6 +47,8 @@ def update_match_table(
         "match_variant",
         match_variant_function,
         return_type=MatchResult.struct_type,
+        # important or missing other alleles will return NULL automatically
+        null_handling="special",
     )
 
     _setup_enums(conn=conn)

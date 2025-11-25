@@ -1,3 +1,5 @@
+import duckdb
+import polars as pl
 import pytest
 
 from pgscatalog.calc.lib.score._matchvariants import (
@@ -7,6 +9,7 @@ from pgscatalog.calc.lib.score._matchvariants import (
     get_variant_match_priority,
     is_biallelic_variant_ambiguous,
     match_variant,
+    update_match_table,
 )
 
 
@@ -428,3 +431,61 @@ def test_matchresult(
 def test_match_variant_udf(match_dict: dict, result: dict) -> None:
     """Test match_variant, a user defined function for duckdb"""
     assert match_variant(**match_dict) == result
+
+
+def test_update_match_table(tmp_path) -> None:
+    """ Test that the match table contains the expected match types """
+    db_path = str(tmp_path / "test.duckdb")
+    with duckdb.connect(db_path) as conn:
+        _score_variants = pl.DataFrame(
+            [
+                # handling null cases (other_allele) is very important
+                {
+                    "chr_name": "1",
+                    "chr_position": 55030366,
+                    "effect_allele": "T",
+                    "other_allele": None,
+                    "row_nr": 2,
+                    "accession": "PGS000010_hmPOS_GRCh38",
+                },
+                {
+                    "chr_name": "1",
+                    "chr_position": 109275908,
+                    "effect_allele": "T",
+                    "other_allele": "C",
+                    "row_nr": 0,
+                    "accession": "PGS000010_hmPOS_GRCh38",
+                },
+            ]
+        )
+        conn.sql("CREATE TABLE score_variant_table AS SELECT * FROM _score_variants")
+        _target_variants = pl.DataFrame(
+            [
+                {
+                    "chr_name": "1",
+                    "chr_pos": 55030366,
+                    "ref": "T",
+                    "alts": ["C"],
+                    "filename": "test.bgen",
+                    "sampleset": "test",
+                    "geno_index": 0,
+                },
+                {
+                    "chr_name": "1",
+                    "chr_pos": 109275908,
+                    "ref": "C",
+                    "alts": ["T"],
+                    "filename": "test.bgen",
+                    "sampleset": "test",
+                    "geno_index": 1,
+                },
+            ]
+        )
+        conn.sql("CREATE TABLE targetvariants AS SELECT * FROM _target_variants")
+        update_match_table(
+            conn=conn, match_ambiguous=False, match_multiallelic=False, sampleset="test"
+        )
+        match_results = conn.sql(
+            "SELECT match_result.match_type FROM allele_match_table"
+        ).fetchall()
+        assert match_results == [('ALTREF',), ('REF_NO_OA',)]
