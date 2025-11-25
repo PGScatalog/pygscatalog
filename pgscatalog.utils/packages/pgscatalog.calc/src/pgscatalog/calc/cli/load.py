@@ -156,6 +156,9 @@ def load_cli(args: argparse.Namespace) -> None:
             chrom=target_genome.chrom, zarr_group=target_genome.zarr_group
         )
 
+        # always write samples to the zarr group attributes
+        target_genome.write_zarr_samples()
+
         if len(positions_to_query) == 0:
             print("All variants are already cached. Yay!")
             continue

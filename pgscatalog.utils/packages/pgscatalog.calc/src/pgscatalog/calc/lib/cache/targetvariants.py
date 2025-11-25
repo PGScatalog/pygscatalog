@@ -39,7 +39,7 @@ from pgscatalog.calc.lib.constants import (
     ZARR_VARIANT_CHUNK_SIZE,
 )
 
-from .zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
+from .zarrmodels import ZarrVariantMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +141,6 @@ class TargetVariants:
 
         The group must be at a file level in the hierarchy
         """
-        self._write_zarr_samples(zarr_group)
         self._write_zarr_variants(zarr_group)
         self._write_zarr_array(zarr_group)
 
@@ -175,34 +174,6 @@ class TargetVariants:
             f"{self._genotypes.shape} genotypes written to disk in "
             f"{end_time - start_time} seconds"
         )
-
-    def _write_zarr_samples(self, zarr_group: zarr.Group) -> None:
-        """Add sample metadata to the file group. A file must always have the same
-        samples.
-
-        Sample names in a sampleset may differ across files (e.g. a VCF might be split
-        into batches of 100,000 samples).
-        """
-        sample_metadata: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(
-            self.samples
-        )
-
-        if "samples" not in zarr_group.attrs:
-            logger.info(f"Adding {len(sample_metadata)} sample IDs to zarr attribute")
-            zarr_group.attrs["samples"] = sample_metadata.model_dump()
-        else:
-            logger.info("Checking that sample IDs are consistent")
-            existing_samples: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(
-                zarr_group.attrs["samples"]
-            )
-
-            if existing_samples.model_dump() != sample_metadata.model_dump():
-                logger.critical(
-                    f"Inconsistent sample IDs {self._target_path} "
-                    f"(this should never happen)"
-                )
-                raise ValueError
-            logger.info("Samples IDs are consistent")
 
     def _write_zarr_variants(self, zarr_group: zarr.Group) -> None:
         """Store variant metadata as a set of 1D arrays in the meta group

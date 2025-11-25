@@ -16,6 +16,7 @@ from zarr.core.group import GroupMetadata
 from pgscatalog.calc.lib.scorefile import get_position_df
 
 from ._genomefilehandlers import GenomeFileHandler, get_file_handler
+from .zarrmodels import ZarrSampleMetadata
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -127,6 +128,15 @@ class TargetGenome:
         )
 
     @property
+    def zarr_sampleset_group(self) -> zarr.Group:
+        return zarr.group(
+            store=self._zarr_store,
+            path=self.sampleset,
+            overwrite=False,
+            zarr_format=3,
+        )
+
+    @property
     def chrom(self) -> str | None:
         return self._chrom
 
@@ -182,3 +192,32 @@ class TargetGenome:
             logger.warning("No variants to write. This is weird!")
 
         logger.info(f"{self} finished caching")
+
+    def write_zarr_samples(self) -> None:
+        """Add sample metadata to sampleset group. A file must always have the same
+        samples.
+
+        Sample names in a sampleset may differ across files (e.g. a VCF might be split
+        into batches of 100,000 samples).
+        """
+        sample_metadata: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(
+            self.samples
+        )
+
+        if "samples" not in self.zarr_sampleset_group.attrs:
+            logger.info(f"Adding {len(sample_metadata)} sample IDs to zarr attribute")
+            self.zarr_sampleset_group.attrs["samples"] = sample_metadata.model_dump()
+        else:
+            logger.info("Checking that sample IDs are consistent")
+            existing_samples: ZarrSampleMetadata = ZarrSampleMetadata.model_validate(
+                self.zarr_sampleset_group.attrs["samples"]
+            )
+
+            if existing_samples.model_dump() != sample_metadata.model_dump():
+                logger.critical(
+                    f"Inconsistent sample IDs {self._target_path} "
+                    f"(this should never happen)"
+                )
+                raise ValueError
+            logger.info("Samples IDs are consistent")
+
