@@ -15,6 +15,7 @@ from rich.progress import (
 )
 
 from pgscatalog.calc import ScorePipeline
+from pgscatalog.calc.lib.config import config
 
 from .load import unzip_zarr
 
@@ -32,6 +33,11 @@ logging.basicConfig(
 
 
 def score_cli(args: argparse.Namespace) -> None:
+    # update zarr chunk size
+    logger.info(f"Default value {config.ZARR_VARIANT_CHUNK_SIZE=}")
+    config.ZARR_VARIANT_CHUNK_SIZE = args.batch_size
+    logger.info(f"After update {config.ZARR_VARIANT_CHUNK_SIZE=}")
+
     # check the output directory is empty
     args.out_dir.mkdir(parents=True, exist_ok=True)
 

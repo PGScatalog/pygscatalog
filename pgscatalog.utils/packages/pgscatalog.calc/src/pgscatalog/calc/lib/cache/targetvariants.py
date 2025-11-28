@@ -33,11 +33,8 @@ import numpy as np
 import zarr
 import zarr.errors
 
-from pgscatalog.calc.lib.constants import (
-    MISSING_GENOTYPE_SENTINEL_VALUE,
-    ZARR_COMPRESSOR,
-    ZARR_VARIANT_CHUNK_SIZE,
-)
+from pgscatalog.calc.lib.config import config
+from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
 from .zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
 
@@ -147,11 +144,12 @@ class TargetVariants:
 
     def _write_zarr_array(self, zarr_group: zarr.Group) -> None:
         """Store a 3D genotype array in the genotypes group"""
+        logger.info(f"{config.ZARR_VARIANT_CHUNK_SIZE=} {config.ZARR_COMPRESSOR=}")
         start_time = time.perf_counter()
         try:
             logger.info("Creating zarr array")
             zarr_chunks = (
-                ZARR_VARIANT_CHUNK_SIZE,
+                config.ZARR_VARIANT_CHUNK_SIZE,
                 self.genotypes.shape[1],
                 self.genotypes.shape[2],
             )
@@ -161,7 +159,7 @@ class TargetVariants:
                 data=self._genotypes,
                 fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,
                 name="genotypes",
-                compressors=ZARR_COMPRESSOR,
+                compressors=config.ZARR_COMPRESSOR,
             )
             logger.info(f"Zarr array {self.genotypes.shape=} created")
         except zarr.errors.ContainsArrayError:
@@ -213,7 +211,7 @@ class TargetVariants:
         See https://github.com/zarr-developers/zarr-specs/discussions/365
         """
         meta_arrays = self.variant_metadata.to_numpy()
-        zarr_chunks = (ZARR_VARIANT_CHUNK_SIZE,)
+        zarr_chunks = (config.ZARR_VARIANT_CHUNK_SIZE,)
         meta_root = zarr.open_group(
             store=zarr_group.store, path=f"{zarr_group.path}/meta"
         )
@@ -234,7 +232,7 @@ class TargetVariants:
                     chunks=zarr_chunks,
                     data=array,
                     name=metadata,
-                    compressors=ZARR_COMPRESSOR,
+                    compressors=config.ZARR_COMPRESSOR,
                 )
                 logger.info(f"Zarr array {array.shape=} created")
             except zarr.errors.ContainsArrayError:

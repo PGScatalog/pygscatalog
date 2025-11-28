@@ -257,9 +257,11 @@ class ScorePipeline:
             self.db_path,
             config={"max_memory": self._max_memory_gb, "threads": str(self._threads)},
         ) as conn:
-            (conn.table("summary_log_table")
-             .order("sampleset,accession,match_summary")
-             .write_csv(file_name=str(out_path)))
+            (
+                conn.table("summary_log_table")
+                .order("sampleset,accession,match_summary")
+                .write_csv(file_name=str(out_path))
+            )
 
         logger.info("Summary match log exported")
 

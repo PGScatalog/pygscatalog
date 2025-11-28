@@ -25,6 +25,7 @@ from pgscatalog.calc import (
     Scorefiles,
     TargetGenome,
 )
+from pgscatalog.calc.lib.config import config
 
 if TYPE_CHECKING:
     import pathlib
@@ -105,6 +106,9 @@ def check_chromosomes(target_genomes: list[TargetGenome]) -> None:
 
 
 def load_cli(args: argparse.Namespace) -> None:
+    # override zarr chunk size
+    config.ZARR_VARIANT_CHUNK_SIZE = args.batch_size
+
     if args.format == GenomeFileType.BGEN and not args.bgen_sample_file:
         raise argparse.ArgumentTypeError(
             "--bgen_sample_file is required when --format is 'bgen'"

@@ -7,9 +7,8 @@ from pgscatalog.calc import GenomeFileType
 from pgscatalog.calc.cli._utils import check_positive, zero_one_float
 from pgscatalog.calc.cli.load import load_cli
 from pgscatalog.calc.cli.score import score_cli
-
-from pgscatalog.core.cli.format_cli import add_format_args, format_cli
 from pgscatalog.core.cli.download_cli import add_download_args, download_cli
+from pgscatalog.core.cli.format_cli import add_format_args, format_cli
 
 
 def main() -> None:
@@ -96,6 +95,12 @@ def parser_score_args(parser: argparse.ArgumentParser) -> None:
         default=1,
     )
     parser.add_argument(
+        "--batch_size",
+        type=check_positive,
+        default=5_000,
+        help="Number of variants to buffer before writing to zarr",
+    )
+    parser.add_argument(
         "--max_memory_gb",
         # have to double %: argparse uses % to parse strings
         help="Maximum RAM to use in GB (default: ~90%% of system RAM if not set)",
@@ -159,7 +164,7 @@ def parser_load_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--batch_size",
         type=check_positive,
-        default=10_000,
+        default=5_000,
         help="Number of variants to buffer before writing to zarr",
     )
     parser.add_argument(

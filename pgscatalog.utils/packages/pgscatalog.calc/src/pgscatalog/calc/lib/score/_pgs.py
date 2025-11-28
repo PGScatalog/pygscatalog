@@ -9,7 +9,7 @@ import polars as pl
 from dask import array as da
 from numpy import typing as npt
 
-from pgscatalog.calc.lib.constants import ZARR_VARIANT_CHUNK_SIZE
+from pgscatalog.calc.lib.config import config
 
 if TYPE_CHECKING:
     import zarr
@@ -147,8 +147,10 @@ def calculate_scores(dosage_array: zarr.Array, effect_weights: zarr.Array) -> da
     np.ndarray
         1D NumPy array of scores for each sample
     """
-    dosage = da.from_zarr(dosage_array, chunks=(ZARR_VARIANT_CHUNK_SIZE, None))
-    weights = da.from_zarr(effect_weights, chunks=(ZARR_VARIANT_CHUNK_SIZE, None))
+    dosage = da.from_zarr(dosage_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None))
+    weights = da.from_zarr(
+        effect_weights, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
+    )
     if not dosage.shape[0] == weights.shape[0]:
         raise ValueError("dosage and weights must have same shape in axis 0")
 
@@ -211,6 +213,7 @@ def calculate_score_statistics(
     of zero (which would be very weird), these would get filtered out before calculating
     these statistics.
     """
+    logger.info(f"{config.ZARR_VARIANT_CHUNK_SIZE=} {config.ZARR_COMPRESSOR=}")
     logger.info("Calculating dosage statistics")
 
     score_stats: ScoreStats = {
@@ -276,7 +279,7 @@ def calculate_effect_allele_dosage(
     dosage_array: zarr.Array, accession_idx: npt.NDArray[np.int64]
 ) -> npt.NDArray[np.float64]:
     dosage_dask: da.Array = da.from_zarr(
-        dosage_array, chunks=(ZARR_VARIANT_CHUNK_SIZE, None)
+        dosage_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
     )
     # returns a per-sample sum of dosages for all variants in this accession
     per_sample_dosage: npt.NDArray[np.float64] = (
@@ -291,10 +294,10 @@ def calculate_nonmissing_allele_count(
     accession_idx: npt.NDArray[np.int64],
 ) -> npt.NDArray[np.int64]:
     dosage_dask: da.Array = da.from_zarr(
-        dosage_array, chunks=(ZARR_VARIANT_CHUNK_SIZE, None)
+        dosage_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
     )
     missing_dask: da.Array = da.from_zarr(
-        is_missing_array, chunks=(ZARR_VARIANT_CHUNK_SIZE, None)
+        is_missing_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
     )
 
     # missing variants will have been imputed, so replace these positions with np.nan

@@ -8,7 +8,7 @@ import numpy as np
 import polars as pl
 import zarr
 
-from pgscatalog.calc.lib.constants import ZARR_VARIANT_CHUNK_SIZE
+from pgscatalog.calc.lib.config import config
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -212,6 +212,7 @@ def store_results_in_zarr(
         `sampleset/filename` combination used during pivoting.
     """
     logger.info(f"Getting weight matrix for {group_path=}")
+    logger.info(f"{config.ZARR_VARIANT_CHUNK_SIZE=} {config.ZARR_COMPRESSOR=}")
 
     accessions, weights = get_weight_matrix(db_path=db_path, group_path=group_path)
 
@@ -221,7 +222,7 @@ def store_results_in_zarr(
             "weight_matrix",
             overwrite=False,
             data=weights,
-            chunks=(ZARR_VARIANT_CHUNK_SIZE, weights.shape[1]),
+            chunks=(config.ZARR_VARIANT_CHUNK_SIZE, weights.shape[1]),
         )
         pgs_group.attrs["accessions"] = accessions
     except zarr.errors.ContainsArrayError:
