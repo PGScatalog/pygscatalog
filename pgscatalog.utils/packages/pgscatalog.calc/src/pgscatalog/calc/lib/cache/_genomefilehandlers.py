@@ -144,12 +144,7 @@ class BgenFileHandler(GenomeFileHandler):
 
     @property
     def index_path(self) -> pathlib.Path:
-        index_path = self.target_path.with_name(
-            f"{self.target_path.name}.bgi"
-        ).resolve()
-        if not index_path.exists():
-            raise FileNotFoundError(f"{index_path} does not exist")
-        return index_path
+        return self._index_path
 
     @index_path.setter
     def index_path(self, path: pathlib.Path) -> None:
