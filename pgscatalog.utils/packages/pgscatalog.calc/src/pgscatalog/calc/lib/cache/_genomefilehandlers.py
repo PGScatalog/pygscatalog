@@ -69,11 +69,13 @@ class VCFHandler(GenomeFileHandler):
 
         super().__init__(path=path, cache_dir=cache_dir, sampleset=sampleset)
 
-        csi_path = pathlib.Path(str(self._target_path) + ".csi")
+        # resolve the symlink -> create path with suffix = bad
+        # create path with suffix -> resolve = good
+        csi_path = pathlib.Path(str(path) + ".csi").resolve()
         if csi_path.exists():
             self._index_path = csi_path
         else:
-            tbi_path = pathlib.Path(str(self._target_path) + ".tbi")
+            tbi_path = pathlib.Path(str(path) + ".tbi").resolve()
             if tbi_path.exists():
                 self._index_path = tbi_path
             else:
@@ -121,8 +123,10 @@ class BgenFileHandler(GenomeFileHandler):
         self, path: Pathish, cache_dir: Pathish, sample_file: Pathish, sampleset: str
     ):
         super().__init__(path=path, cache_dir=cache_dir, sampleset=sampleset)
-        self._sample_file = pathlib.Path(sample_file)
-        self._index_path = self._target_path.with_suffix(".bgen.bgi")
+        # resolve the symlink -> create path with suffix = bad
+        # create path with suffix -> resolve = good
+        self._sample_file = pathlib.Path(sample_file).resolve()
+        self._index_path = pathlib.Path(path).with_suffix(".bgen.bgi").resolve()
 
         if not self._sample_file.exists():
             raise FileNotFoundError(self._sample_file)
