@@ -110,6 +110,7 @@ class VCFHandler(GenomeFileHandler):
             position_batch=positions,
             cache_dir=self._cache_dir,
             target_path=self._target_path,
+            index_path=self._index_path,
             sampleset=self._sampleset,
         )
 
