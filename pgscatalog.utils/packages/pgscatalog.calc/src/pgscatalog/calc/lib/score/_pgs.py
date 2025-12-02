@@ -32,6 +32,7 @@ def create_score_table(db_path: Pathish) -> None:
     """
     logger.info("Creating or replacing score table")
     with duckdb.connect(str(db_path)) as conn:
+        # allele_count * 2 will break when X / Y / MT added
         conn.sql("""
         CREATE OR REPLACE TABLE score_table (
             sampleset TEXT NOT NULL,
@@ -41,7 +42,7 @@ def create_score_table(db_path: Pathish) -> None:
             allele_count UINTEGER NOT NULL,
             score DOUBLE NOT NULL,
             dosage_sum DOUBLE NOT NULL,
-            score_avg GENERATED ALWAYS AS (dosage_sum / allele_count) VIRTUAL,
+            score_avg GENERATED ALWAYS AS (score / (allele_count * 2)) VIRTUAL,
             PRIMARY KEY (accession, sampleset, sample_id)
         );
         """)
