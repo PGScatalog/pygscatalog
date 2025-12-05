@@ -39,6 +39,18 @@ def bgen_sample() -> pathlib.Path:
         pathlib.Path(__file__).parent / "data" / "bgen" / "phased" / "tiny1000G.sample"
     )
 
+@pytest.fixture
+def score_variant_table() -> pathlib.Path:
+    return (
+        pathlib.Path(__file__).parent / "data" / "duckdb" / "score_variant_table.json"
+    )
+
+@pytest.fixture
+def allele_match_table() -> pathlib.Path:
+    return (
+        pathlib.Path(__file__).parent / "data" / "duckdb" / "allele_match_table.json"
+    )
+
 
 @pytest.fixture
 def bgen_samples(bgen_sample) -> list[str]:
