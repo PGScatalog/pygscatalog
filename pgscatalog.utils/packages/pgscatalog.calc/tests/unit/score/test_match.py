@@ -439,17 +439,20 @@ def test_setup_enums() -> None:
     conn = duckdb.connect(":memory:")
     _setup_enums(conn)
 
-    # Insert a row using valid enum labels
-    conn.execute(
-        "INSERT INTO enum_test (match_type, match_summary) VALUES (?, ?);",
-        [MatchPriority.REFALT.name, "matched"],
-    )
+    conn = duckdb.connect(":memory:")
+    _setup_enums(conn)
 
-    result = conn.execute(
-        "SELECT match_type, match_summary FROM enum_test"
+    # Check that match_summary_enum exists and has expected values
+    (summary_values,) = conn.execute(
+        "SELECT enum_range(NULL::match_summary_enum)"
     ).fetchone()
+    assert summary_values == ["matched", "unmatched", "excluded"]
 
-    assert result == (MatchPriority.REFALT.name, "matched")
+    # Check that match_type_enum has the same labels as MatchPriority
+    (type_values,) = conn.execute(
+        "SELECT enum_range(NULL::match_type_enum)"
+    ).fetchone()
+    assert type_values == [e.name for e in MatchPriority]
 
 def _make_test_conn(tmp_path,pgs000001) -> duckdb.DuckDBPyConnection:
     db_path = tmp_path / "test.duckdb"

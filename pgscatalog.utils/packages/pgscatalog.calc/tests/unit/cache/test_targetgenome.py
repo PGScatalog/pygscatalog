@@ -36,7 +36,7 @@ def test_targetgenome(
 
     # __repr__
     repr_str = repr(target)
-    assert "TargetGenome(" in repr_str 
+    assert "TargetGenome" in repr_str 
     assert f"target_path={os.fspath(target_path)!r}" in repr_str 
     assert "chrom=None" in repr_str 
     assert f"cache_dir={os.fspath(cache_dir)!r}" in repr_str 

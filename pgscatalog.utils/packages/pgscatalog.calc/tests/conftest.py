@@ -191,17 +191,31 @@ def gt_array_with_missingness(
     tmp_path_factory, target_with_missingness, test_positions, sampleset_name
 ):
     cache_dir = tmp_path_factory.mktemp("cache")
-    TargetGenome(
+
+    target = TargetGenome(
         target_path=target_with_missingness,
         cache_dir=cache_dir,
         sampleset=sampleset_name,
-    ).cache_variants(positions=test_positions)
+        )
+    
+    target.cache_variants(positions=test_positions)
 
     # test parquet files are written
-    store = zarr.storage.LocalStore(cache_dir / "gts")
+    store = zarr.storage.LocalStore(cache_dir / "genotypes.zarr")
     group = zarr.open_group(
         store=store, path=f"{sampleset_name}/{target_with_missingness.name}"
     )
+    """
+    zarr stucture:
+    /test/missing.vcf.gz
+    ├── genotypes (3, 3202, 2) uint8 -> (n_variants, n_samples, ploidy)
+    └── meta
+        ├── alts (3,) StringDType()
+        ├── chr_name (3,) StringDType()
+        ├── chr_pos (3,) int64
+        ├── ref (3,) StringDType()
+        └── variant_id (3,) StringDType()
+    """
     array = group["genotypes"]
 
     return np.array(array[: len(test_positions), :, :])
