@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_mean_dosage(
-    dosage_array: da.Array, 
+    dosage_array: da.Array,
     n_minimum_samples: int = 50
     ) -> da.Array:
     """
@@ -59,6 +59,5 @@ def calculate_mean_dosage(
         da.array(np.nan, dtype=float),
     )
 
-    mean_effect_allele_dosage = effect_allele_freq * ZARR_PLOIDY
-
+    mean_effect_allele_dosage: da.Array = effect_allele_freq * ZARR_PLOIDY
     return mean_effect_allele_dosage

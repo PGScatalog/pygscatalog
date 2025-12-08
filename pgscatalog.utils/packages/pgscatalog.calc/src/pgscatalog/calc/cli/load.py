@@ -204,7 +204,7 @@ def load_cli(args: argparse.Namespace) -> None:
     print("Finished caching :tada: Goodbye!")
 
 
-def has_any_arrays(group):
+def has_any_arrays(group: zarr.Group) -> bool:
     """Does a zarr group contain any arrays? Recurses the hierarchy"""
     for key in group:
         item = group[key]
@@ -258,7 +258,9 @@ def unzip_zarr(
         # otherwise the zarr hierarchy won't parse properly for downstream processes
         root_zarr_json = group_path.split("/")[0] + "/zarr.json"
         sampleset_zarr_json = "/".join(group_path.split("/")[0:2]) + "/zarr.json"
-        [cmd.append(x) for x in [root_zarr_json, sampleset_zarr_json]]
+
+        for x in (root_zarr_json, sampleset_zarr_json):
+            cmd.append(x)
 
     logger.info(f"Running subprocess {cmd=}")
     result = subprocess.run(cmd, check=True, capture_output=True, text=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 from typing import TYPE_CHECKING
 
 import duckdb
@@ -88,7 +89,7 @@ def write_scores(
     """
     logger.info(f"Copying score table to {out_dir}")
     logger.info(f"Score columns will have {scale} digits after the decimal point")
-    out_file = str((out_dir / "scores.txt.gz").resolve())
+    out_file = str((pathlib.Path(out_dir) / "scores.txt.gz").resolve())
     with duckdb.connect(
         str(db_path),
         config={"max_memory": max_memory_gb, "threads": str(threads)},
