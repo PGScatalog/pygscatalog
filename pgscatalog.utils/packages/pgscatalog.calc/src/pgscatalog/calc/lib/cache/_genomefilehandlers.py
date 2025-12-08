@@ -63,7 +63,13 @@ class GenomeFileHandler(ABC):
 
 
 class VCFHandler(GenomeFileHandler):
-    def __init__(self, path: Pathish, cache_dir: Pathish, sampleset: str):
+    def __init__(
+        self,
+        path: Pathish,
+        cache_dir: Pathish,
+        sampleset: str,
+        index_path: pathlib.Path | None,
+    ):
         if not pathlib.Path(path).suffixes[-2:] == [".vcf", ".gz"]:
             raise ValueError(f"{self.target_path} is not a .vcf.gz file")
 
@@ -71,15 +77,19 @@ class VCFHandler(GenomeFileHandler):
 
         # resolve the symlink -> create path with suffix = bad
         # create path with suffix -> resolve = good
-        csi_path = pathlib.Path(str(path) + ".csi").resolve()
-        if csi_path.exists():
-            self._index_path = csi_path
+        if index_path is not None:
+            idx = pathlib.Path(index_path).resolve()
         else:
-            tbi_path = pathlib.Path(str(path) + ".tbi").resolve()
-            if tbi_path.exists():
-                self._index_path = tbi_path
-            else:
-                raise FileNotFoundError(f"{csi_path} or {tbi_path}")
+            idx = None
+            for ext in (".csi", ".tbi"):
+                candidate = pathlib.Path(str(path) + ext)
+                if candidate.exists():
+                    idx = candidate.resolve()
+                    break
+
+        if idx is None or not idx.exists():
+            raise FileNotFoundError(f"No index found for {path}")
+        self._index_path = idx
 
     @property
     def index_path(self) -> pathlib.Path:
@@ -121,13 +131,22 @@ class VCFHandler(GenomeFileHandler):
 
 class BgenFileHandler(GenomeFileHandler):
     def __init__(
-        self, path: Pathish, cache_dir: Pathish, sample_file: Pathish, sampleset: str
+        self,
+        path: Pathish,
+        cache_dir: Pathish,
+        sample_file: Pathish,
+        sampleset: str,
+        index_path: Pathish | None,
     ):
         super().__init__(path=path, cache_dir=cache_dir, sampleset=sampleset)
         # resolve the symlink -> create path with suffix = bad
         # create path with suffix -> resolve = good
         self._sample_file = pathlib.Path(sample_file).resolve()
-        self._index_path = pathlib.Path(path).with_suffix(".bgen.bgi").resolve()
+
+        if index_path is None:
+            self._index_path = pathlib.Path(path).with_suffix(".bgen.bgi").resolve()
+        else:
+            self._index_path = pathlib.Path(index_path).resolve()
 
         if not self._sample_file.exists():
             raise FileNotFoundError(self._sample_file)
@@ -207,15 +226,22 @@ def get_file_handler(
     cache_dir: Pathish,
     sample_file: Pathish | None = None,
     sampleset: str,
+    index_path: Pathish | None = None,
 ) -> GenomeFileHandler:
     path = pathlib.Path(path)
 
     if path.suffixes[-2:] == [".vcf", ".gz"]:
-        return VCFHandler(path=path, cache_dir=cache_dir, sampleset=sampleset)
+        return VCFHandler(
+            path=path, cache_dir=cache_dir, sampleset=sampleset, index_path=index_path
+        )
     if path.suffix == ".bgen":
         if sample_file is None:
             raise ValueError("BGEN files require a sample file")
         return BgenFileHandler(
-            path=path, cache_dir=cache_dir, sample_file=sample_file, sampleset=sampleset
+            path=path,
+            cache_dir=cache_dir,
+            sample_file=sample_file,
+            sampleset=sampleset,
+            index_path=index_path,
         )
     raise ValueError(f"Unsupported genome file type: {path}")

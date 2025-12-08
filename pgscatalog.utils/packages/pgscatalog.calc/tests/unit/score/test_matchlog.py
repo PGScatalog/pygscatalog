@@ -1,19 +1,18 @@
+from decimal import *
+
 import duckdb
 import pytest
-from decimal import *
 
 from pgscatalog.calc.lib.score._matchlog import (
     add_complement_macro,
     add_match_log,
     get_ok_accessions,
 )
-
-from pgscatalog.calc.lib.scorefile import load_scoring_files
-
 from pgscatalog.calc.lib.score._matchvariants import (
-    update_match_table,
     _setup_enums,
+    update_match_table,
 )
+from pgscatalog.calc.lib.scorefile import load_scoring_files
 
 
 @pytest.mark.parametrize(

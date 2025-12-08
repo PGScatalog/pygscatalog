@@ -76,6 +76,7 @@ def parse_genome_paths(
         genomes.append(
             TargetGenome(
                 target_path=genome.path,
+                target_index_path=None,
                 chrom=genome.chrom,
                 cache_dir=cache_dir,
                 sampleset=sampleset,

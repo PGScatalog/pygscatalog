@@ -1,10 +1,10 @@
-import pytest
 import duckdb
+import pytest
 
 from pgscatalog.calc.lib.score._matchvariants import (
-    _setup_enums,
     MatchPriority,
     MatchResult,
+    _setup_enums,
     classify_match,
     get_variant_match_priority,
     is_biallelic_variant_ambiguous,

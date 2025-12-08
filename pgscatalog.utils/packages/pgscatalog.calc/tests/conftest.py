@@ -2,6 +2,7 @@ import csv
 import gzip
 import pathlib
 import random
+import shutil
 
 import dask.array as da
 import numpy as np
@@ -9,10 +10,10 @@ import pysam
 import pysam.bcftools
 import pytest
 import zarr
-from pgscatalog.calc.lib.score._dosage import calculate_effect_allele_dosage
 
 from pgscatalog.calc import Scorefiles, TargetGenome
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
+from pgscatalog.calc.lib.score._dosage import calculate_effect_allele_dosage
 
 
 @pytest.fixture
@@ -21,15 +22,18 @@ def test_positions() -> list[tuple[str, int]]:
     return [("8", 116938529), ("1", 44465567), ("10", 97611390)]
 
 
-@pytest.fixture
-def unphased_bgen_path() -> pathlib.Path:
-    return (
+@pytest.fixture(scope="function")
+def unphased_bgen_path(tmp_path) -> pathlib.Path:
+    original_index = (
         pathlib.Path(__file__).parent / "data" / "bgen" / "unphased" / "tiny1000G.bgen"
     )
+    d = tmp_path / "bgen"
+    d.mkdir()
+    return pathlib.Path(shutil.copy(original_index, d))
 
 
-@pytest.fixture
-def unphased_bgen_index_path() -> pathlib.Path:
+@pytest.fixture()
+def unphased_bgen_index_path(tmp_path) -> pathlib.Path:
     return (
         pathlib.Path(__file__).parent
         / "data"
@@ -44,8 +48,8 @@ def phased_bgen_path() -> pathlib.Path:
     return pathlib.Path(__file__).parent / "data" / "bgen" / "phased" / "tiny1000G.bgen"
 
 
-@pytest.fixture
-def phased_bgen_index_path() -> pathlib.Path:
+@pytest.fixture()
+def phased_bgen_index_path(tmp_path) -> pathlib.Path:
     return (
         pathlib.Path(__file__).parent
         / "data"
@@ -88,8 +92,8 @@ def vcf_path() -> pathlib.Path:
     return pathlib.Path(__file__).parent / "data" / "vcf" / "tiny1000G.vcf.gz"
 
 
-@pytest.fixture(scope="session")
-def vcf_index_path() -> pathlib.Path:
+@pytest.fixture()
+def vcf_index_path(tmp_path) -> pathlib.Path:
     return pathlib.Path(__file__).parent / "data" / "vcf" / "tiny1000G.vcf.gz.tbi"
 
 
@@ -221,6 +225,7 @@ def gt_array_with_missingness(
 
     target = TargetGenome(
         target_path=target_with_missingness,
+        target_index_path=str(target_with_missingness) + ".csi",
         cache_dir=cache_dir,
         sampleset=sampleset_name,
     )

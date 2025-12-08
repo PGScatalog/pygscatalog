@@ -1,18 +1,15 @@
-import pathlib
 import shutil
 
 import numpy as np
 import pytest
 
-from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
-from pgscatalog.calc.lib.cache.genomefiletypes import GenomeFileType
-from pgscatalog.calc.lib.cache.targetgenome import TargetGenome
 from pgscatalog.calc.lib.cache._bgen import (
-    bgen_buffer_variants,
     add_chrom_padding,
     add_chrom_prefix,
+    bgen_buffer_variants,
     normalise_chrom,
 )
+from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
 
 #  Chromosome value normalisation
@@ -38,6 +35,7 @@ def test_normalise_chrom():
 def test_phased_bgen(
     test_positions,
     phased_bgen_path,
+    phased_bgen_index_path,
     bgen_sample,
     n_samples,
     tmp_path_factory,
@@ -50,12 +48,11 @@ def test_phased_bgen(
         target_path=phased_bgen_path,
         cache_dir=cache_dir,
         target_chroms=chroms,
-        idx_path=phased_bgen_path.with_suffix(".bgen.bgi"),
+        idx_path=phased_bgen_index_path,
         sample_path=bgen_sample,
         sampleset="test",
     )
 
-    variants.variant_ids
     assert len(variants) == len(test_positions)
     assert len(variants.samples) == n_samples
     assert variants.genotypes.shape == (len(variants), 3202, 2)
@@ -65,6 +62,7 @@ def test_phased_bgen(
 def test_unphased_bgen(
     test_positions,
     unphased_bgen_path,
+    unphased_bgen_index_path,
     bgen_sample,
     n_samples,
     tmp_path_factory,
@@ -77,9 +75,9 @@ def test_unphased_bgen(
         target_path=unphased_bgen_path,
         cache_dir=cache_dir,
         target_chroms=chroms,
-        idx_path=unphased_bgen_path.with_suffix(".bgen.bgi"),
-        sampleset=bgen_sample,
-        sample_path="test",
+        idx_path=unphased_bgen_index_path,
+        sampleset="test",
+        sample_path=bgen_sample,
     )
 
     assert len(variants) == len(test_positions)
@@ -94,7 +92,10 @@ def test_unphased_bgen(
 def test_phase_equality(
     test_positions,
     unphased_bgen_path,
+    unphased_bgen_index_path,
     phased_bgen_path,
+    phased_bgen_index_path,
+    bgen_sample,
     bgen_samples,
     n_samples,
     tmp_path_factory,
@@ -108,9 +109,9 @@ def test_phase_equality(
         target_path=unphased_bgen_path,
         cache_dir=cache_dir,
         target_chroms=chroms,
-        idx_path=unphased_bgen_path.with_suffix(".bgen.bgi"),
-        sampleset=bgen_samples,
-        sample_path="unphased",
+        idx_path=unphased_bgen_index_path,
+        sampleset="unphased",
+        sample_path=bgen_sample,
     )
 
     phased = bgen_buffer_variants(
@@ -118,9 +119,9 @@ def test_phase_equality(
         target_path=phased_bgen_path,
         cache_dir=cache_dir,
         target_chroms=chroms,
-        idx_path=phased_bgen_path.with_suffix(".bgen.bgi"),
-        sampleset=bgen_samples,
-        sample_path="phased",
+        idx_path=phased_bgen_index_path,
+        sampleset="phased",
+        sample_path=bgen_sample,
     )
 
     assert unphased.genotypes.shape == phased.genotypes.shape
@@ -138,7 +139,11 @@ def test_phase_equality(
 
 
 def test_bgen_with_missing(
-    test_positions, unphased_bgen_path, bgen_sample, tmp_path_factory
+    test_positions,
+    unphased_bgen_path,
+    unphased_bgen_index_path,
+    bgen_sample,
+    tmp_path_factory,
 ):
     cache_dir = tmp_path_factory.mktemp("cache")
     missing_chrom, missing_pos = "1", 9067156  # definitely missing
@@ -150,9 +155,9 @@ def test_bgen_with_missing(
         target_path=unphased_bgen_path,
         cache_dir=cache_dir,
         target_chroms=chroms,
-        idx_path=unphased_bgen_path.with_suffix(".bgen.bgi"),
-        sampleset=bgen_sample,
-        sample_path="test",
+        idx_path=unphased_bgen_index_path,
+        sampleset="test",
+        sample_path=bgen_sample,
     )
 
     # test that missing variants are yielded properly
@@ -177,22 +182,19 @@ def test_bgen_with_missing(
 def test_bgen_no_index(test_positions, phased_bgen_path, bgen_sample, tmp_path_factory):
     cache_dir = tmp_path_factory.mktemp("cache")
     outdir = tmp_path_factory.mktemp("bgen_no_index")
-    shutil.copy(phased_bgen_path, outdir)
+    new_bgen_path = shutil.copy(phased_bgen_path, outdir)
     chroms = [x[0] for x in test_positions]
 
-    new_bgen_path = pathlib.Path(outdir) / phased_bgen_path
     # doesn't exist
-    new_bgen_idx = new_bgen_path.with_suffix(".bgen.bgi")
+    new_bgen_idx = new_bgen_path + ".bgi"
 
     with pytest.raises(ValueError) as e:
-        _ = list(
-            bgen_buffer_variants(
-                target_path=new_bgen_path,
-                position_batch=test_positions,
-                cache_dir=cache_dir,
-                target_chroms=chroms,
-                idx_path=new_bgen_idx.with_suffix(".bgen.bgi"),
-                sampleset=bgen_sample,
-                sample_path="test",
-            )
+        _ = bgen_buffer_variants(
+            target_path=new_bgen_path,
+            position_batch=test_positions,
+            cache_dir=cache_dir,
+            target_chroms=chroms,
+            idx_path=new_bgen_idx,
+            sampleset="test",
+            sample_path=bgen_sample,
         )

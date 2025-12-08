@@ -1,8 +1,8 @@
-import pytest
-import polars as pl
 import numpy as np
+import polars as pl
+import pytest
 
-from pgscatalog.calc.lib.cache.zarrmodels import ZarrVariantMetadata, ZarrSampleMetadata
+from pgscatalog.calc.lib.cache.zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
 from pgscatalog.calc.lib.constants import NUMPY_STRING_DTYPE
 
 

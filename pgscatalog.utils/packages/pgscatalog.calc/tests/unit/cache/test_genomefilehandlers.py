@@ -1,13 +1,10 @@
-import pathlib
 import pytest
 
 from pgscatalog.calc.lib.cache._genomefilehandlers import (
-    get_file_handler,
-    GenomeFileHandler,
-    VCFHandler,
     BgenFileHandler,
+    VCFHandler,
+    get_file_handler,
 )
-
 from pgscatalog.calc.lib.cache.genomefiletypes import GenomeFileType
 from pgscatalog.calc.lib.cache.targetvariants import TargetVariants
 

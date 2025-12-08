@@ -1,20 +1,27 @@
-import pytest
 import os
+
+import pytest
 
 from pgscatalog.calc.lib.cache.genomefiletypes import GenomeFileType
 from pgscatalog.calc.lib.cache.targetgenome import TargetGenome
 
 
 @pytest.mark.parametrize(
-    "filetype,path_fixture,sample_file_fixture",
+    "filetype,path_fixture,index_fixture,sample_file_fixture",
     [
-        (GenomeFileType.BGEN, "unphased_bgen_path", "bgen_sample"),
-        (GenomeFileType.VCF, "vcf_path", None),
+        (
+            GenomeFileType.BGEN,
+            "unphased_bgen_path",
+            "unphased_bgen_index_path",
+            "bgen_sample",
+        ),
+        (GenomeFileType.VCF, "vcf_path", "vcf_index_path", None),
     ],
 )
 def test_targetgenome(
     filetype,
     path_fixture,
+    index_fixture,
     sample_file_fixture,
     request,
     test_positions,
@@ -24,8 +31,10 @@ def test_targetgenome(
 ):
     cache_dir = tmp_path_factory.mktemp("cache")
     target_path = request.getfixturevalue(path_fixture)
+    index_path = request.getfixturevalue(index_fixture)
     kwargs = {
         "target_path": target_path,
+        "target_index_path": index_path,
         "cache_dir": cache_dir,
         "sampleset": sampleset_name,
     }

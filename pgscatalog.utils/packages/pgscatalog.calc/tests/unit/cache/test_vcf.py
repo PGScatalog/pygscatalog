@@ -1,24 +1,16 @@
-import shutil
-import pathlib
-
+import numpy as np
 import pysam
 import pytest
-import numpy as np
 
+from pgscatalog.calc.lib.cache._vcf import (
+    vcf_buffer_variants,
+    vcf_get_sample_list,
+)
 from pgscatalog.calc.lib.cache.targetvariants import (
     TargetVariants,
-    add_missing_positions_to_lists,
 )
 from pgscatalog.calc.lib.constants import (
     MISSING_GENOTYPE_TUPLE,
-)
-
-from pgscatalog.calc.lib.cache._vcf import (
-    vcf_get_genotypes,
-    vcf_get_sample_list,
-    vcf_buffer_variants,
-    parse_target_variants,
-    run_bcftools_view,
 )
 
 

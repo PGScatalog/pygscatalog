@@ -1,15 +1,10 @@
-import pathlib
-
-import dask.array as da
 import numpy as np
 import pytest
 import zarr
 
 from pgscatalog.calc.lib.score._dosage import (
     adjust_dosage_for_effect,
-    calculate_effect_allele_dosage,
 )
-from pgscatalog.calc.lib.constants import ZARR_PLOIDY
 
 N_SAMPLES = 5
 

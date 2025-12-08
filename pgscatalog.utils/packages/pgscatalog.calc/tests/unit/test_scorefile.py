@@ -1,10 +1,10 @@
 import pathlib
 
 import duckdb
+import numpy as np
+import polars as pl
 import pytest
 import zarr
-import polars as pl
-import numpy as np
 
 
 @pytest.fixture

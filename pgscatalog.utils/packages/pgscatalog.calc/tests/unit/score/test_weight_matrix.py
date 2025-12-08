@@ -1,18 +1,16 @@
-import pytest
 import duckdb
 import numpy as np
 import polars as pl
+import pytest
 import zarr
-
 
 from pgscatalog.calc.lib.score._weight_matrix import (
     create_wide_weights_table,
-    store_group_weight_arrays,
-    store_results_in_zarr,
     get_variant_metadata,
     get_weight_matrix,
+    store_group_weight_arrays,
+    store_results_in_zarr,
 )
-from pgscatalog.calc.lib.scorefile import load_scoring_files
 
 """
 The input file of the _weight_matrix is a path of a db with at least two tables: score_variant_table and allele_match_table.

@@ -1,13 +1,7 @@
-import numpy as np
-import pytest
-import zarr
 import dask.array as da
+import numpy as np
 
-from pgscatalog.calc.lib.score._dosage import (
-    fill_missing_dosages,
-)
 from pgscatalog.calc.lib.score._impute import calculate_mean_dosage
-from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
 
 def test_calculate_mean_dosage_expected_values():

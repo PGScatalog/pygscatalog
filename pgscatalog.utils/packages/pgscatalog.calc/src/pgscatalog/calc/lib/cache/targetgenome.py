@@ -34,6 +34,7 @@ class TargetGenome:
         self,
         *,
         target_path: Pathish,
+        target_index_path: Pathish | None,
         cache_dir: Pathish,
         sampleset: str,
         chrom: str | None = None,
@@ -47,6 +48,7 @@ class TargetGenome:
         self._threads = threads
         self._handler: GenomeFileHandler = get_file_handler(
             path=target_path,
+            index_path=target_index_path,
             sample_file=sample_file,
             cache_dir=self._cache_dir,
             sampleset=self._sampleset,

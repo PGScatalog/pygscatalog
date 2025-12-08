@@ -1,12 +1,12 @@
-import pytest
 import numpy as np
+import pytest
 import zarr
 
-from pgscatalog.calc.lib.cache.zarrmodels import ZarrVariantMetadata, ZarrSampleMetadata
 from pgscatalog.calc.lib.cache.targetvariants import (
     TargetVariants,
     add_missing_positions_to_lists,
 )
+from pgscatalog.calc.lib.cache.zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
 

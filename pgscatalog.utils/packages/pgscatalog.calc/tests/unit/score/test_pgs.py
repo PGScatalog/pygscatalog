@@ -7,13 +7,13 @@ import pytest
 import zarr
 
 from pgscatalog.calc.lib.score._pgs import (
-    calculate_scores,
-    insert_scores,
-    create_score_table,
-    write_scores,
-    calculate_score_statistics,
     calculate_effect_allele_dosage,
     calculate_nonmissing_allele_count,
+    calculate_score_statistics,
+    calculate_scores,
+    create_score_table,
+    insert_scores,
+    write_scores,
 )
 
 
