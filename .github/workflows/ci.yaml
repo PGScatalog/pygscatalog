@@ -56,10 +56,7 @@ jobs:
         channels: conda-forge,bioconda,nodefaults
         activate-environment: ""
 
-    - run: |
-        source ~/miniconda/etc/profile.d/conda.sh
-        conda activate base
-        nox -s "${{ matrix.session }}" -- ${{ inputs.package }}
+    - run: nox -s "${{ matrix.session }}" -- ${{ inputs.package }}
       working-directory: "pgscatalog.utils"
 
   coverage:
@@ -86,10 +83,7 @@ jobs:
           activate-environment: ""
 
       - name: Make coverage report
-        run: |
-          source ~/miniconda/etc/profile.d/conda.sh
-          conda activate base
-          nox -s coverage -- ${{ inputs.package }}
+        run:  nox -s coverage -- ${{ inputs.package }}
         working-directory: "pgscatalog.utils"
 
       - name: Upload coverage reports to Codecov
