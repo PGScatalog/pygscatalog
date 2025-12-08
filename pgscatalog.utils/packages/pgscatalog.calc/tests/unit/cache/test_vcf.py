@@ -47,7 +47,7 @@ def test_vcf_buffer_variants(test_positions, vcf_path, tmp_path_factory,samplese
     assert isinstance(variants, TargetVariants)
     # test genotype properties
     assert variants.genotypes.shape == (3, 3202, 2)
-    # test variant_metadata property
+    # test variant_metadata properties
     assert variants.variant_metadata.chr_name == ["1", "8", "10"]
     assert variants.variant_metadata.chr_pos == [44465567, 116938529, 97611390]
     assert variants.variant_metadata.ref == ['G', 'G', 'A']

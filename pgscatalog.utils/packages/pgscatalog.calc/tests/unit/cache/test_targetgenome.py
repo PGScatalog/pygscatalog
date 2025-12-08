@@ -41,7 +41,7 @@ def test_targetgenome(
     assert "chrom=None" in repr_str 
     assert f"cache_dir={os.fspath(cache_dir)!r}" in repr_str 
 
-    # test the public API of TargetGenome
+    # test the properties of TargetGenome
     assert target.filetype == filetype
     assert target.cache_dir == cache_dir
     assert target.sampleset == sampleset_name

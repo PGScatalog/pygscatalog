@@ -34,10 +34,8 @@ def test_calculate_mean_dosage_expected_values():
 
 def test_calculate_mean_dosage_accepts_zarr_array(missing_dosage_array):
     """
-    Sanity-check that calculate_mean_dosage works when passed the zarr-backed
-
+    Check that if the calculate_mean_dosage works when passed the zarr-backed
     dosage array produced in the pipeline (missing_dosage_array fixture).
-
     ~30% of samples have randomly missing genotypes in each variant
     """
     result = calculate_mean_dosage(missing_dosage_array, n_minimum_samples=1)

@@ -247,7 +247,6 @@ def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missin
     """
     accession_idx = np.array([0, 1, 2], dtype=np.int64)
 
-    # missing variants will have been imputed, so replace these positions with np.nan
     # return a per-sample sum of non-missing allele count in this accession
 
     expected = np.array([2, 2, 2], dtype=np.int64)

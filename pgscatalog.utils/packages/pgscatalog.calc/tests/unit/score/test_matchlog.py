@@ -45,9 +45,9 @@ def db_path(tmp_path):
     """Path to a temporary DuckDB file used by tests."""
     return tmp_path / "test_matchlog.duckdb"
 
-# test the add_match_log create the table score_log_table
-# Test the add_match_log insert the correct data into score_log_table
-# Test the add_match_log create the table summary_log_table
+# Test if the add_match_log create the table score_log_table
+# Test if the add_match_log insert the correct data into score_log_table
+# Test if the add_match_log create the table summary_log_table
 def _make_test_conn(tmp_path,pgs000001) -> duckdb.DuckDBPyConnection:
     db_path = tmp_path / "test.duckdb"
 
@@ -61,7 +61,7 @@ def _make_test_conn(tmp_path,pgs000001) -> duckdb.DuckDBPyConnection:
 
     conn = duckdb.connect(db_path)
 
-    # minimal targetvariants table matching your SQL in update_match_table
+    # minimal targetvariants table matching the SQL in update_match_table
     conn.execute("""
         CREATE TABLE targetvariants (
             geno_index UINTEGER,
@@ -268,8 +268,6 @@ def test_add_match_log_with_ndjson(
     sampleset = "1000G"
 
     conn = _make_conn_from_json(db_path, allele_match_table, score_variant_table)
-
-    #add_complement_macro(conn)
 
     # Test data includes two sample sets, one test data with match_rate=1.0; while 1000G with match_rate=0.93, so we set threshold 0.9 at here.
     add_match_log(conn, sampleset=sampleset, min_overlap=0.95)

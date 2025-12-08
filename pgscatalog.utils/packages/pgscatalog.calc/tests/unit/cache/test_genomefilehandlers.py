@@ -11,8 +11,6 @@ from pgscatalog.calc.lib.cache._genomefilehandlers import (
 from pgscatalog.calc.lib.cache.genomefiletypes import GenomeFileType
 from pgscatalog.calc.lib.cache.targetvariants import TargetVariants
 # Test 1 – VCF path ends with .vcf.gz → returns VCFHandler
-# .csi index existence is not checked here since it is not included in the test files
-# 1.1 -> tbi index exists; 1.2 -> tbi index does not exist
 def test_get_file_handler_vcf(vcf_path, tmp_path):
 
     handler = get_file_handler(

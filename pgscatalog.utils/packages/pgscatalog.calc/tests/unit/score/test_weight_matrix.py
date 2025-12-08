@@ -199,7 +199,7 @@ def test_store_results_in_zarr(db_with_scores,zarr_group):
 
     assert zarr_group.attrs["accessions"] == ["test"]
 
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+# @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 # DeprecationWarning: `partition_by(..., as_dict=True)` will change to always return tuples as dictionary keys. Pass `by` as a list to silence this warning, e.g. `partition_by(['zarr_group'], as_dict=True)`.
 def test_store_group_weight_arrays_success(db_with_scores, zarr_group):
     result = store_group_weight_arrays(
