@@ -192,6 +192,8 @@ def install_system_binaries(package, session) -> None:
                 "conda",
                 "install",
                 "-y",
+                "-n",
+                "base",
                 "-c",
                 "bioconda",
                 "-c",
