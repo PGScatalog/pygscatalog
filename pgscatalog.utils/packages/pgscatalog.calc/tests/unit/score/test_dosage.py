@@ -68,27 +68,7 @@ def test_bad_effect_types(dosage, tmp_path):
         )
     assert "A variant cannot be both" in str(e.value)
 
-
-@pytest.fixture
-def allele_match_table():
-    return (
-        pathlib.Path(__file__).parent.parent
-        / "data"
-        / "duckdb"
-        / "allele_match_table.json"
-    )
-
-
-@pytest.fixture
-def score_variant_table():
-    return (
-        pathlib.Path(__file__).parent.parent
-        / "data"
-        / "duckdb"
-        / "score_variant_table.json"
-    )
-
-
 @pytest.fixture
 def db_metadata():
     return "PGS001229_hmPOS_GRCh38", "1000G"
+
