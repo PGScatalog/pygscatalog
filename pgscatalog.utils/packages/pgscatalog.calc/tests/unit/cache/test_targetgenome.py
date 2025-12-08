@@ -4,6 +4,7 @@ import os
 from pgscatalog.calc.lib.cache.genomefiletypes import GenomeFileType
 from pgscatalog.calc.lib.cache.targetgenome import TargetGenome
 
+
 @pytest.mark.parametrize(
     "filetype,path_fixture,sample_file_fixture",
     [
@@ -11,7 +12,6 @@ from pgscatalog.calc.lib.cache.targetgenome import TargetGenome
         (GenomeFileType.VCF, "vcf_path", None),
     ],
 )
-
 def test_targetgenome(
     filetype,
     path_fixture,
@@ -36,10 +36,10 @@ def test_targetgenome(
 
     # __repr__
     repr_str = repr(target)
-    assert "TargetGenome" in repr_str 
-    assert f"target_path={os.fspath(target_path)!r}" in repr_str 
-    assert "chrom=None" in repr_str 
-    assert f"cache_dir={os.fspath(cache_dir)!r}" in repr_str 
+    assert "TargetGenome" in repr_str
+    assert f"target_path={os.fspath(target_path)!r}" in repr_str
+    assert "chrom=None" in repr_str
+    assert f"cache_dir={os.fspath(cache_dir)!r}" in repr_str
 
     # test the properties of TargetGenome
     assert target.filetype == filetype

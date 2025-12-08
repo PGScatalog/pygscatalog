@@ -11,9 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_mean_dosage(
-    dosage_array: da.Array,
-    n_minimum_samples: int = 50
-    ) -> da.Array:
+    dosage_array: da.Array, n_minimum_samples: int = 50
+) -> da.Array:
     """
     Impute effect allele dosage using the allelic frequency of the effect allele
 

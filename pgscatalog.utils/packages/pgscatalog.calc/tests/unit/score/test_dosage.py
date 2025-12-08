@@ -68,7 +68,7 @@ def test_bad_effect_types(dosage, tmp_path):
         )
     assert "A variant cannot be both" in str(e.value)
 
+
 @pytest.fixture
 def db_metadata():
     return "PGS001229_hmPOS_GRCh38", "1000G"
-

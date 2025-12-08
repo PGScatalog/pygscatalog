@@ -9,11 +9,12 @@ from pgscatalog.calc.lib.score._matchvariants import (
     get_variant_match_priority,
     is_biallelic_variant_ambiguous,
     match_variant,
-    update_match_table
+    update_match_table,
 )
 from pgscatalog.calc.lib.scorefile import load_scoring_files
 
 # Test functions of: update_match_table,_setup_enums, match_variant, get_variant_match_priority, is_biallelic_variant_ambiguous, classify_match(complement ,complement_table)
+
 
 @pytest.mark.parametrize(
     "ref, alt, result",
@@ -74,7 +75,6 @@ def test_bad_ambiguous(ref: str, alt: str) -> None:
         "no match",
     ],
 )
-
 def test_classify_match(
     effect_allele: str,
     other_allele: str | None,
@@ -94,6 +94,7 @@ def test_classify_match(
         )
         == result
     )
+
 
 @pytest.mark.parametrize(
     "effect_allele, other_allele, ref, alts, match_ambiguous, match_result",
@@ -172,7 +173,6 @@ def test_classify_match(
         "match altref",
     ],
 )
-
 def test_match_priority(
     effect_allele: str,
     other_allele: str | None,
@@ -180,7 +180,7 @@ def test_match_priority(
     alts: list[str],
     match_ambiguous: bool,
     match_result: MatchResult,
-    ) -> None:
+) -> None:
     """Test more complicated matching scenarios"""
     result: list[MatchResult] = list(
         get_variant_match_priority(
@@ -267,7 +267,7 @@ def test_match_priority(
 )
 def test_matchresult(
     match_dict: dict, is_matched: bool, match_type: str, match_priority: int
-    ):
+):
     """Test computed match result properties (is_matched, match_typpe)"""
     result = MatchResult(**match_dict)
     assert result.is_matched == is_matched
@@ -435,6 +435,7 @@ def test_match_variant_udf(match_dict: dict, result: dict) -> None:
     """Test match_variant, a user defined function for duckdb"""
     assert match_variant(**match_dict) == result
 
+
 def test_setup_enums() -> None:
     conn = duckdb.connect(":memory:")
     _setup_enums(conn)
@@ -449,12 +450,11 @@ def test_setup_enums() -> None:
     assert summary_values == ["matched", "unmatched", "excluded"]
 
     # Check that match_type_enum has the same labels as MatchPriority
-    (type_values,) = conn.execute(
-        "SELECT enum_range(NULL::match_type_enum)"
-    ).fetchone()
+    (type_values,) = conn.execute("SELECT enum_range(NULL::match_type_enum)").fetchone()
     assert type_values == [e.name for e in MatchPriority]
 
-def _make_test_conn(tmp_path,pgs000001) -> duckdb.DuckDBPyConnection:
+
+def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
     db_path = tmp_path / "test.duckdb"
 
     # score_variant_table loading via load_scoring_files functions from Scorefiles
@@ -487,13 +487,14 @@ def _make_test_conn(tmp_path,pgs000001) -> duckdb.DuckDBPyConnection:
         (geno_index, chr_name, chr_pos, ref, alts, filename, sampleset)
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """,
-        [10, "11", 69516650 , "T", ["C"], "file.bgen", "test"],
+        [10, "11", 69516650, "T", ["C"], "file.bgen", "test"],
     )
 
     return conn
 
-def test_update_match_table(tmp_path,pgs000001) -> None:
-    conn = _make_test_conn(tmp_path,pgs000001)
+
+def test_update_match_table(tmp_path, pgs000001) -> None:
+    conn = _make_test_conn(tmp_path, pgs000001)
 
     # This calls _setup_enums and registers match_variant UDF internally
     update_match_table(
@@ -526,20 +527,17 @@ def test_update_match_table(tmp_path,pgs000001) -> None:
     # We expect exactly one row with a REFALT match
     assert rows == [
         (
-            "test",           # sampleset
-            "PGS000001",      # accession
-            0,                # row_nr
-            0,                # effect_allele_idx
-            7,                # match_priority (REFALT)
-            "REFALT",         # match_type
-            "matched",        # match_summary
-            False,            # is_ambiguous
-            True,             # is_matched
-            False,            # is_multiallelic
-            10,               # target_row_nr (geno_index)
-            "file.bgen",      # filename
+            "test",  # sampleset
+            "PGS000001",  # accession
+            0,  # row_nr
+            0,  # effect_allele_idx
+            7,  # match_priority (REFALT)
+            "REFALT",  # match_type
+            "matched",  # match_summary
+            False,  # is_ambiguous
+            True,  # is_matched
+            False,  # is_multiallelic
+            10,  # target_row_nr (geno_index)
+            "file.bgen",  # filename
         )
     ]
-
-
-

@@ -29,8 +29,30 @@ def unphased_bgen_path() -> pathlib.Path:
 
 
 @pytest.fixture
+def unphased_bgen_index_path() -> pathlib.Path:
+    return (
+        pathlib.Path(__file__).parent
+        / "data"
+        / "bgen"
+        / "unphased"
+        / "tiny1000G.bgen.bgi"
+    )
+
+
+@pytest.fixture
 def phased_bgen_path() -> pathlib.Path:
     return pathlib.Path(__file__).parent / "data" / "bgen" / "phased" / "tiny1000G.bgen"
+
+
+@pytest.fixture
+def phased_bgen_index_path() -> pathlib.Path:
+    return (
+        pathlib.Path(__file__).parent
+        / "data"
+        / "bgen"
+        / "phased"
+        / "tiny1000G.bgen.bgi"
+    )
 
 
 @pytest.fixture
@@ -39,17 +61,17 @@ def bgen_sample() -> pathlib.Path:
         pathlib.Path(__file__).parent / "data" / "bgen" / "phased" / "tiny1000G.sample"
     )
 
+
 @pytest.fixture
 def score_variant_table() -> pathlib.Path:
     return (
         pathlib.Path(__file__).parent / "data" / "duckdb" / "score_variant_table.json"
     )
 
+
 @pytest.fixture
 def allele_match_table() -> pathlib.Path:
-    return (
-        pathlib.Path(__file__).parent / "data" / "duckdb" / "allele_match_table.json"
-    )
+    return pathlib.Path(__file__).parent / "data" / "duckdb" / "allele_match_table.json"
 
 
 @pytest.fixture
@@ -64,6 +86,11 @@ def vcf_path() -> pathlib.Path:
     """Path to an indexed version of 1000 Genomes, containing ~1000 variants randomly
     sampled from PGS001229"""
     return pathlib.Path(__file__).parent / "data" / "vcf" / "tiny1000G.vcf.gz"
+
+
+@pytest.fixture(scope="session")
+def vcf_index_path() -> pathlib.Path:
+    return pathlib.Path(__file__).parent / "data" / "vcf" / "tiny1000G.vcf.gz.tbi"
 
 
 @pytest.fixture(scope="session")
@@ -196,8 +223,8 @@ def gt_array_with_missingness(
         target_path=target_with_missingness,
         cache_dir=cache_dir,
         sampleset=sampleset_name,
-        )
-    
+    )
+
     target.cache_variants(positions=test_positions)
 
     # test parquet files are written

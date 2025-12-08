@@ -18,8 +18,9 @@ from pgscatalog.calc.lib.scorefile import load_scoring_files
 The input file of the _weight_matrix is a path of a db with at least two tables: score_variant_table and allele_match_table.
 """
 
+
 @pytest.fixture
-def db_with_scores(tmp_path,allele_match_table,score_variant_table) -> str:
+def db_with_scores(tmp_path, allele_match_table, score_variant_table) -> str:
     """
     use the load_scoring_files function from the scorefile module to
     create a DuckDB file with two PGS scorefiles loaded for testing.
@@ -46,9 +47,10 @@ def db_with_scores(tmp_path,allele_match_table,score_variant_table) -> str:
         """,
         [str(allele_match_table)],
     )
-    
+
     conn.close()
     return str(db_path)
+
 
 @pytest.fixture
 def empty_db(tmp_path) -> str:
@@ -91,21 +93,22 @@ def zarr_group(tmp_path) -> zarr.Group:
     store_path = tmp_path / "weights.zarr"
     return zarr.open_group(store_path, mode="w")
 
+
 # ---
 def test_create_wide_weights_table(db_with_scores):
-    db_path=db_with_scores
+    db_path = db_with_scores
     create_wide_weights_table(db_path, sampleset="test", accessions="test")
 
-    conn=duckdb.connect(str(db_path))
+    conn = duckdb.connect(str(db_path))
 
     tables = conn.execute(
-            """
+        """
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'main';
             """
-        ).fetchall()
-    
+    ).fetchall()
+
     table_names = {table[0] for table in tables}
     assert "wide_score_variants" in table_names
 
@@ -142,11 +145,14 @@ def test_create_wide_weights_table(db_with_scores):
     assert test_effect_allele_idx == 1
     assert test_value == pytest.approx(-0.008818077)
 
-def test_get_variant_metadata(db_with_scores):
-    db_path=db_with_scores
 
-    # create the zarr_group 
-    group_path = create_wide_weights_table(db_path, sampleset="test", accessions="test")[0]
+def test_get_variant_metadata(db_with_scores):
+    db_path = db_with_scores
+
+    # create the zarr_group
+    group_path = create_wide_weights_table(
+        db_path, sampleset="test", accessions="test"
+    )[0]
 
     df = get_variant_metadata(db_path=db_with_scores, group_path=group_path)
 
@@ -163,11 +169,14 @@ def test_get_variant_metadata(db_with_scores):
         "is_dominant",
     ]
 
-def test_get_weight_matrix(db_with_scores):
-    db_path=db_with_scores
 
-    # create the zarr_group 
-    group_path = create_wide_weights_table(db_path, sampleset="test", accessions="test")[0]
+def test_get_weight_matrix(db_with_scores):
+    db_path = db_with_scores
+
+    # create the zarr_group
+    group_path = create_wide_weights_table(
+        db_path, sampleset="test", accessions="test"
+    )[0]
 
     cols, mat = get_weight_matrix(db_path=db_with_scores, group_path=group_path)
 
@@ -175,15 +184,18 @@ def test_get_weight_matrix(db_with_scores):
     assert cols == ["test"]
 
     # Shape: matrix
-    assert mat.shape == (1, 1) # (n_variants, n_accessions)
+    assert mat.shape == (1, 1)  # (n_variants, n_accessions)
     expected = np.array([[-0.008818077]])
     np.testing.assert_allclose(mat, expected)
 
-def test_store_results_in_zarr(db_with_scores,zarr_group):
-    db_path=db_with_scores
 
-    # create the zarr_group 
-    group_path = create_wide_weights_table(db_path, sampleset="test", accessions="test")[0]
+def test_store_results_in_zarr(db_with_scores, zarr_group):
+    db_path = db_with_scores
+
+    # create the zarr_group
+    group_path = create_wide_weights_table(
+        db_path, sampleset="test", accessions="test"
+    )[0]
 
     store_results_in_zarr(
         db_path=db_with_scores, group_path=group_path, pgs_group=zarr_group
@@ -199,8 +211,7 @@ def test_store_results_in_zarr(db_with_scores,zarr_group):
 
     assert zarr_group.attrs["accessions"] == ["test"]
 
-# @pytest.mark.filterwarnings("ignore::DeprecationWarning")
-# DeprecationWarning: `partition_by(..., as_dict=True)` will change to always return tuples as dictionary keys. Pass `by` as a list to silence this warning, e.g. `partition_by(['zarr_group'], as_dict=True)`.
+
 def test_store_group_weight_arrays_success(db_with_scores, zarr_group):
     result = store_group_weight_arrays(
         db_path=db_with_scores,
@@ -209,14 +220,17 @@ def test_store_group_weight_arrays_success(db_with_scores, zarr_group):
         accessions=["test"],
     )
 
-    assert set(result.keys()) == {"test/test.vcf.gz"}
+    assert set(result.keys()) == {
+        "test/test.vcf.gz",
+    }
 
     df = result["test/test.vcf.gz"]
 
     assert isinstance(df, pl.DataFrame)
-    assert df.shape == (1, 5) # (n_variants, n_columns)
+    assert df.shape == (1, 5)  # (n_variants, n_columns)
     assert df["weight_mat_row_nr"].to_list() == [0]
     assert df["target_row_nr"].to_list() == [0]
+
 
 def test_store_group_weight_arrays_raises_on_empty(empty_db, zarr_group):
     """

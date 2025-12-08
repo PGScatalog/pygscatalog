@@ -2,17 +2,18 @@ import pathlib
 import pytest
 
 from pgscatalog.calc.lib.cache._genomefilehandlers import (
-    get_file_handler, 
-    GenomeFileHandler, 
-    VCFHandler, 
-    BgenFileHandler
-    )
+    get_file_handler,
+    GenomeFileHandler,
+    VCFHandler,
+    BgenFileHandler,
+)
 
 from pgscatalog.calc.lib.cache.genomefiletypes import GenomeFileType
 from pgscatalog.calc.lib.cache.targetvariants import TargetVariants
+
+
 # Test 1 – VCF path ends with .vcf.gz → returns VCFHandler
 def test_get_file_handler_vcf(vcf_path, tmp_path):
-
     handler = get_file_handler(
         path=vcf_path,
         cache_dir=tmp_path,
@@ -26,11 +27,8 @@ def test_get_file_handler_vcf(vcf_path, tmp_path):
     assert len(handler.chroms) > 0
     assert len(handler.samples) > 0
 
-def test_vcf_handler_query_variants(
-    vcf_path, 
-    tmp_path, 
-    test_positions):
 
+def test_vcf_handler_query_variants(vcf_path, tmp_path, test_positions):
     handler = get_file_handler(
         path=vcf_path,
         cache_dir=tmp_path,
@@ -47,10 +45,11 @@ def test_vcf_handler_query_variants(
     assert variants.genotypes is not None
     assert len(variants.genotypes) > 0
 
+
 # Test 2.1: bgen + sample_file + index → BgenFileHandler
 def test_get_file_handler_bgen_with_sample_file(
-    phased_bgen_path, bgen_sample, tmp_path):
-
+    phased_bgen_path, bgen_sample, tmp_path
+):
     handler = get_file_handler(
         path=phased_bgen_path,
         cache_dir=tmp_path,
@@ -65,12 +64,10 @@ def test_get_file_handler_bgen_with_sample_file(
     assert len(handler.chroms) > 0
     assert len(handler.samples) > 0
 
-def test_bgen_handler_query_variants(
-    phased_bgen_path, 
-    bgen_sample, 
-    tmp_path, 
-    test_positions):
 
+def test_bgen_handler_query_variants(
+    phased_bgen_path, bgen_sample, tmp_path, test_positions
+):
     handler = get_file_handler(
         path=phased_bgen_path,
         cache_dir=tmp_path,
@@ -93,16 +90,17 @@ def test_bgen_handler_query_variants(
     assert len(variants.variant_metadata.chr_name) == len(test_positions)
     assert len(variants.variant_metadata.chr_pos) == len(test_positions)
 
+
 # Test 2.2: bgen is provided. sample_file does not exist, it should raise a FileNot
 def test_get_file_handler_bgen_without_sample_file(unphased_bgen_path, tmp_path):
-
     with pytest.raises(ValueError, match="BGEN files require a sample file"):
         get_file_handler(
             path=unphased_bgen_path,
             cache_dir=tmp_path,
             sampleset="TEST",
-            sample_file=None, 
+            sample_file=None,
         )
+
 
 # Test 3 – path does not exist → FileNotFoundError
 def test_get_file_handler_file_not_found(tmp_path):
@@ -115,7 +113,7 @@ def test_get_file_handler_file_not_found(tmp_path):
             cache_dir=tmp_path,
             sampleset="TEST",
         )
-    
+
     missing_bgen = tmp_path / "i_do_not_exist.bgen"
     missing_bgen_sample_file = tmp_path / "i_do_not_exist.sample"
 
@@ -126,7 +124,8 @@ def test_get_file_handler_file_not_found(tmp_path):
             sample_file=missing_bgen_sample_file,
             sampleset="TEST",
         )
-    
+
+
 # Test 4 – unsupported extension
 def test_get_file_handler_unsupported_extension(tmp_path):
     fake_input = tmp_path / "weird.txt"
@@ -138,6 +137,7 @@ def test_get_file_handler_unsupported_extension(tmp_path):
             cache_dir=tmp_path,
             sampleset="TEST",
         )
+
 
 def test_bgen_copy_index_to_cache_creates_and_reuses_cached_index(
     phased_bgen_path,

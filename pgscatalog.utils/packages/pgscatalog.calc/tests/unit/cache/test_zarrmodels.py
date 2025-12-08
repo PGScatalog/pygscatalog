@@ -12,10 +12,11 @@ def test_variant_metadata_invalid_ref_allele_raises():
         ZarrVariantMetadata(
             chr_name=["1"],
             chr_pos=[1],
-            ref=["N"],            # invalid allele
-            alts=["A"], 
+            ref=["N"],  # invalid allele
+            alts=["A"],
             variant_id=["v1"],
         )
+
 
 # Test 2: different lengths of input lists
 def test_variant_metadata_even_length_error():
@@ -28,6 +29,7 @@ def test_variant_metadata_even_length_error():
             variant_id=["var1", "var2", "var3"],
         )
 
+
 # Test 3: returned type check for ZarrVariantMetadata
 def simple_test_data():
     return ZarrVariantMetadata(
@@ -38,10 +40,12 @@ def simple_test_data():
         variant_id=["var1", "var2", "var3"],
     )
 
+
 def test_zarr_variant_metadata_type():
     zarr_variant_metadata = simple_test_data()
     assert isinstance(zarr_variant_metadata, ZarrVariantMetadata)
     assert zarr_variant_metadata.__len__() == 3
+
 
 # Test 4: merge two ZarrVariantMetadata instances
 def test_zarr_variant_metadata_merge():
@@ -58,11 +62,12 @@ def test_zarr_variant_metadata_merge():
     assert merged.chr_name == ["1", "1", "22", "X"]
     assert merged.chr_pos == [1, 2, 3, 4]
     assert merged.ref == ["A", "T", "G", "G"]
-    assert merged.alts == [['C'], ['TG'], ['T'], ['A']]
+    assert merged.alts == [["C"], ["TG"], ["T"], ["A"]]
     assert merged.variant_id == ["var1", "var2", "var3", "var4"]
 
     # originals should not be mutated
     assert zarr_variant_metadata_2.chr_name == ["X"]
+
 
 # Test 5: ZarrVariantMetadata into df
 def test_variant_metadata_to_df():
@@ -72,6 +77,7 @@ def test_variant_metadata_to_df():
     assert isinstance(df, pl.DataFrame)
     assert df.shape == (3, 5)
     assert df.columns == ["chr_name", "chr_pos", "ref", "alts", "variant_id"]
+
 
 # Test 6: ZarrVariantMetadata into numpy arrays
 def test_variant_metadata_to_numpy():
@@ -93,6 +99,7 @@ def test_variant_metadata_to_numpy():
             assert numpy_data[k].dtype == np.int64
         else:
             assert numpy_data[k].dtype == NUMPY_STRING_DTYPE
+
 
 # Test 7: Test ZarrSampleMetadata length
 def test_sample_metadata_len():

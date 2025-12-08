@@ -15,6 +15,7 @@ from pgscatalog.calc.lib.score._matchvariants import (
     _setup_enums,
 )
 
+
 @pytest.mark.parametrize(
     "input, result",
     [
@@ -34,21 +35,22 @@ from pgscatalog.calc.lib.score._matchvariants import (
         "very long sequence",
     ],
 )
-
 def test_complement_macro(input, result):
     with duckdb.connect(":memory:") as conn:
         add_complement_macro(conn)
         assert conn.sql(f"SELECT complement('{input}')").fetchone() == (result,)
+
 
 @pytest.fixture
 def db_path(tmp_path):
     """Path to a temporary DuckDB file used by tests."""
     return tmp_path / "test_matchlog.duckdb"
 
+
 # Test if the add_match_log create the table score_log_table
 # Test if the add_match_log insert the correct data into score_log_table
 # Test if the add_match_log create the table summary_log_table
-def _make_test_conn(tmp_path,pgs000001) -> duckdb.DuckDBPyConnection:
+def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
     db_path = tmp_path / "test.duckdb"
 
     # score_variant_table loading via load_scoring_files functions from Scorefiles
@@ -81,14 +83,17 @@ def _make_test_conn(tmp_path,pgs000001) -> duckdb.DuckDBPyConnection:
         (geno_index, chr_name, chr_pos, ref, alts, filename, sampleset)
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """,
-        [10, "11", 69516650 , "T", ["C"], "file.bgen", "test"],
+        [10, "11", 69516650, "T", ["C"], "file.bgen", "test"],
     )
 
     return conn
 
-def test_add_match_log_with_one_mapped_variants(db_path, sampleset_name, pgs000001, tmp_path):
+
+def test_add_match_log_with_one_mapped_variants(
+    db_path, sampleset_name, pgs000001, tmp_path
+):
     """add_match_log should create score_log_table and summary_log_table."""
-    conn=_make_test_conn(tmp_path,pgs000001)
+    conn = _make_test_conn(tmp_path, pgs000001)
 
     # update_match_table from matchvariants to create allele_match_table
     update_match_table(
@@ -101,13 +106,13 @@ def test_add_match_log_with_one_mapped_variants(db_path, sampleset_name, pgs0000
     add_match_log(conn, sampleset=sampleset_name, min_overlap=0.75)
 
     tables = conn.execute(
-            """
+        """
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'main';
             """
-        ).fetchall()
-    
+    ).fetchall()
+
     table_names = {table[0] for table in tables}
     assert "score_log_table" in table_names
     assert "summary_log_table" in table_names
@@ -164,7 +169,7 @@ def test_add_match_log_with_one_mapped_variants(db_path, sampleset_name, pgs0000
     # REFALT branch uses effect_allele directly
     assert records_matched_effect_allele == "T"
     # Check summary_log_table: single matched row, 100% match_rate, OK
-    
+
     summary = conn.execute(
         """
         SELECT
@@ -201,11 +206,12 @@ def test_add_match_log_with_one_mapped_variants(db_path, sampleset_name, pgs0000
     assert sum_is_ambiguous is False
     assert sum_is_multiallelic is False
     assert sum_count == 1
-    assert sum_fraction == Decimal('0.01')
-    assert sum_match_rate == Decimal('0.01')
+    assert sum_fraction == Decimal("0.01")
+    assert sum_match_rate == Decimal("0.01")
     assert sum_is_ok is False
 
     conn.close()
+
 
 # Test with more variants
 def _make_conn_from_json(
@@ -245,7 +251,7 @@ def _make_conn_from_json(
     # targetvariants table is needed, but left empty at here, so only the pre-defined data is used.
 
     conn.execute(
-       """
+        """
        CREATE TABLE targetvariants (
            geno_index UINTEGER,
            chr_name TEXT,
@@ -259,6 +265,7 @@ def _make_conn_from_json(
     )
 
     return conn
+
 
 def test_add_match_log_with_ndjson(
     db_path,
@@ -305,12 +312,12 @@ def test_add_match_log_with_ndjson(
         test_1000G_sum_is_ok,
     ) = summary_1000G
 
-    print(summary_test,summary_1000G)
+    print(summary_test, summary_1000G)
 
     assert test_accession == "test"
     assert test_1000G_accession == "PGS001229_hmPOS_GRCh38"
-    assert test_match_rate == Decimal('1.0')
-    assert test_1000G_match_rate == Decimal('0.93')
+    assert test_match_rate == Decimal("1.0")
+    assert test_1000G_match_rate == Decimal("0.93")
     assert test_sum_is_ok is True
     assert test_1000G_sum_is_ok is False
     conn.close()
@@ -322,5 +329,3 @@ def test_add_match_log_with_ndjson(
     # Test the get_ok_accessions function returns ValueError for 1000G sampleset
     with pytest.raises(ValueError, match="No scores passed matching threshold"):
         get_ok_accessions(db_path, "1000G")
-    
-    

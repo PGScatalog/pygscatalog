@@ -9,6 +9,7 @@ from pgscatalog.calc.lib.cache.targetvariants import (
 )
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
+
 @pytest.fixture
 def valid_args(tmp_path) -> dict:
     """Common valid constructor args for TargetVariants."""
@@ -42,6 +43,7 @@ def valid_args(tmp_path) -> dict:
         "target_path": target_path,
     }
 
+
 @pytest.fixture
 def variant(valid_args) -> TargetVariants:
     """A valid TargetVariants instance for most tests."""
@@ -57,7 +59,7 @@ def test_variant_basic_construction(variant: TargetVariants):
 
     # test samples property
     assert test_variant.samples == ["sample1", "sample2", "sample3"]
-    
+
     # test variant IDs property
     ids = test_variant.variant_ids
     assert len(ids) == len(test_variant)
@@ -71,6 +73,7 @@ def test_variant_basic_construction(variant: TargetVariants):
     assert sample_metadata.ref[0] == "A"
     assert sample_metadata.alts[0] == ["G"]
 
+
 # Test 2: Test that bad constructions raise errors
 # error 1: mismatched_lengths among inputs
 def test_variant_bad_construction(valid_args: dict):
@@ -80,6 +83,7 @@ def test_variant_bad_construction(valid_args: dict):
 
     with pytest.raises(ValueError, match="different lengths"):
         TargetVariants(**mismatched_args)
+
 
 # error 2: invalid values in genotypes
 def test_variant_invalid_genotypes_construction(valid_args: dict):
@@ -94,11 +98,13 @@ def test_variant_invalid_genotypes_construction(valid_args: dict):
     with pytest.raises(ValueError, match="Genotypes contain invalid values"):
         TargetVariants(**invalid_gts_args)
 
+
 # Test 3: test_write_zarr_writes_expected_structure
 def _make_memory_group() -> zarr.Group:
     """Create an in-memory zarr root group for testing."""
     root = zarr.group()
     return root
+
 
 # Zarr 1. build the zarr
 def test_write_zarr(variant: TargetVariants):
@@ -114,12 +120,15 @@ def test_write_zarr(variant: TargetVariants):
 
     # 2) samples attribute
     assert "samples" in root.attrs
-    assert root.attrs["samples"] == ZarrSampleMetadata.model_validate(variant.samples).root
+    assert (
+        root.attrs["samples"] == ZarrSampleMetadata.model_validate(variant.samples).root
+    )
 
     # 3) meta subgroup with 1D arrays
     meta_root = zarr.open_group(store=root.store, path="meta")
     for key in ("chr_name", "chr_pos", "ref", "alts", "variant_id"):
         assert key in meta_root
+
 
 # Zarr 2. append when arrays exist
 def test_write_zarr_appends_when_arrays_exist(variant: TargetVariants):
@@ -144,9 +153,9 @@ def test_write_zarr_appends_when_arrays_exist(variant: TargetVariants):
     ]
     assert variant_id_values == variant.variant_ids * 2
 
+
 # Test 4: Test add_missing_positions_to_lists function
 def test_add_missing_positions_to_lists(variant: TargetVariants):
-
     chroms = ["1"]
     positions = [46366609]
     ref_alleles = ["A"]

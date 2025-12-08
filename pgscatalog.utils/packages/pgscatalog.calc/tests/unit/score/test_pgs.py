@@ -7,14 +7,14 @@ import pytest
 import zarr
 
 from pgscatalog.calc.lib.score._pgs import (
-    calculate_scores, 
+    calculate_scores,
     insert_scores,
-    create_score_table, 
+    create_score_table,
     write_scores,
     calculate_score_statistics,
     calculate_effect_allele_dosage,
     calculate_nonmissing_allele_count,
-    )
+)
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def tiny_dosage_matrix():
             [2.0, 2.0, 2.0],  # v3
         ],
         dtype=np.float64,
-        )
+    )
 
 
 @pytest.fixture
@@ -51,13 +51,13 @@ def tiny_is_missing_matrix():
     """
     return np.array(
         [
-            [False, False, True],   # v0
-            [False, True,  False],  # v1
+            [False, False, True],  # v0
+            [False, True, False],  # v1
             [True, False, False],  # v2
-            [True,  False, False],  # v3
+            [True, False, False],  # v3
         ],
         dtype=bool,
-        )
+    )
 
 
 @pytest.fixture
@@ -76,14 +76,6 @@ def tiny_is_missing_zarr(tiny_is_missing_matrix):
 def tiny_sample_ids() -> list[str]:
     return ["sample1", "sample2", "sample3"]
 
-@pytest.fixture
-def tiny_effect_weights_zarr():
-    """
-    Simple effect weights for 4 variants (variants, 1) : all 1.0.
-    """
-    weights = np.ones((4, 1), dtype=np.float64)
-    store = zarr.storage.MemoryStore()
-    return zarr.create_array(store=store, data=weights)
 
 @pytest.fixture
 def tiny_effect_weights_zarr():
@@ -93,19 +85,32 @@ def tiny_effect_weights_zarr():
     weights = np.ones((4, 1), dtype=np.float64)
     store = zarr.storage.MemoryStore()
     return zarr.create_array(store=store, data=weights)
+
+
+@pytest.fixture
+def tiny_effect_weights_zarr():
+    """
+    Simple effect weights for 4 variants (variants, 1) : all 1.0.
+    """
+    weights = np.ones((4, 1), dtype=np.float64)
+    store = zarr.storage.MemoryStore()
+    return zarr.create_array(store=store, data=weights)
+
 
 @pytest.fixture
 def zero_dosage():
-    return np.zeros(shape=(4, 3)) # 4 variants, 3 samples
+    return np.zeros(shape=(4, 3))  # 4 variants, 3 samples
 
 
 @pytest.fixture
 def one_dosage():
-    return np.ones(shape=(4, 3)) # 4 variants, 3 samples
+    return np.ones(shape=(4, 3))  # 4 variants, 3 samples
+
 
 @pytest.fixture
 def constant_weights():
     return np.array([1, 1, 1, 1])[:, np.newaxis]
+
 
 @pytest.fixture
 def random_score_table_rows():
@@ -129,7 +134,9 @@ def random_score_table_rows():
 
     return pl.DataFrame(d)
 
-#----------- Test the function -------------------
+
+# ----------- Test the function -------------------
+
 
 def test_calculate_score_zero(zero_dosage, constant_weights, tmp_path):
     dosage_store = zarr.storage.MemoryStore()
@@ -157,8 +164,8 @@ def test_calculate_score(one_dosage, constant_weights, tmp_path):
     ]
     assert np.array_equal(score, expected_score)
 
-def test_calculate_score_shape_mismatch(one_dosage):
 
+def test_calculate_score_shape_mismatch(one_dosage):
     dosage_store = zarr.storage.MemoryStore()
     dosage_zarr = zarr.create_array(store=dosage_store, data=one_dosage)
 
@@ -169,6 +176,7 @@ def test_calculate_score_shape_mismatch(one_dosage):
 
     with pytest.raises(ValueError, match="dosage and weights must have same shape"):
         _ = calculate_scores(dosage_zarr, weights_zarr).compute()
+
 
 def test_calculate_scores_tiny(tiny_dosage_zarr, tiny_effect_weights_zarr):
     """
@@ -186,6 +194,7 @@ def test_calculate_scores_tiny(tiny_dosage_zarr, tiny_effect_weights_zarr):
     assert scores.shape == expected.shape
     assert scores.dtype == np.float64
     assert np.array_equal(scores, expected)
+
 
 def test_create_score_table(tmp_path):
     db_path = tmp_path / "test.db"
@@ -207,6 +216,7 @@ def test_create_score_table(tmp_path):
         ("score_avg", "DOUBLE"),
     ]
 
+
 def test_tiny_calculate_effect_allele_dosage(tiny_dosage_zarr):
     """
     PGS000001
@@ -223,15 +233,16 @@ def test_tiny_calculate_effect_allele_dosage(tiny_dosage_zarr):
 
     # returns a per-sample sum of dosages for all variants in this accession
     expected = np.array([3.0, 2.0, 3.0], dtype=np.float64)
-    
+
     result = calculate_effect_allele_dosage(
         dosage_array=tiny_dosage_zarr,
         accession_idx=accession_idx,
-        )
+    )
 
     assert result.shape == expected.shape
     assert result.dtype == np.float64
     assert np.array_equal(result, expected)
+
 
 def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missing_zarr):
     """
@@ -239,7 +250,7 @@ def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missin
     v0: [0, 1, np.na]
     v1: [1, np.na, 1]
     v2: [np.na, 1, 0]
-    
+
     per_smaple_allele count:
     [2,2,2]
 
@@ -255,10 +266,11 @@ def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missin
         is_missing_array=tiny_is_missing_zarr,
         dosage_array=tiny_dosage_zarr,
         accession_idx=accession_idx,
-        )
+    )
 
     assert result.shape == expected.shape
     assert np.array_equal(result, expected)
+
 
 def test_calculate_score_statistics_tiny(
     tmp_path,
@@ -389,6 +401,7 @@ def test_calculate_score_statistics_tiny(
         else:
             assert result_sorted[col].to_list() == expected_sorted[col].to_list()
 
+
 def test_insert_scores_tiny(tmp_path, random_score_table_rows):
     db_path = tmp_path / "tiny_scores.db"
     create_score_table(db_path)
@@ -420,6 +433,7 @@ def test_insert_scores_tiny(tmp_path, random_score_table_rows):
         else:
             assert result_sorted[col].to_list() == expected[col].to_list()
 
+
 def test_write_scores(tmp_path, tmp_path_factory, random_score_table_rows):
     db_path = tmp_path / "test.db"
     out_path = tmp_path_factory.mktemp("out")
@@ -443,7 +457,7 @@ def test_write_scores(tmp_path, tmp_path_factory, random_score_table_rows):
     write_scores(db_path=db_path, out_dir=out_path, max_memory_gb="1GB", threads=1)
 
     # test hive partitioning
-    out_csv = out_path / "sampleset=test" / "accession=PGStest" / "data_0.csv.gz"
+    out_csv = out_path / "scores.txt.gz"
     assert out_csv.exists()
 
     # test output structure
