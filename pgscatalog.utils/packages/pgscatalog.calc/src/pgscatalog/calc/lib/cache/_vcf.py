@@ -48,6 +48,7 @@ def vcf_get_sample_list(target_path: Pathish) -> list[str]:
 def vcf_buffer_variants(
     position_batch: Iterable[tuple[str, int]],
     target_path: Pathish,
+    index_path: Pathish,
     cache_dir: Pathish,
     sampleset: str,
 ) -> TargetVariants:
@@ -81,6 +82,7 @@ def vcf_buffer_variants(
                 regions=regions,
                 region_file=region_file,
                 target_path=target_path,
+                index_path=index_path,
                 variant_buffer=variant_buffer,
             )
             # read the temporary file and make a TargetVariants class
@@ -167,6 +169,7 @@ def parse_target_variants(
 def run_bcftools_view(
     regions: list[tuple[str, int, int]],
     target_path: Pathish,
+    index_path: Pathish,
     variant_buffer: IO[bytes],
     region_file: IO[str],
 ) -> None:
@@ -181,10 +184,17 @@ def run_bcftools_view(
     #   snp / mnp / indel)
     # --exclude-uncalled: only include sites with at least one non-missing genotype
     # --write-index: suppress annoying htslib warnings when working with the file
+
+    # handle odd index cases https://github.com/samtools/bcftools/issues/984
+    # e.g. symlinked to different directories
+    target_str = str(pathlib.Path(target_path).resolve())
+    index_str = str(pathlib.Path(index_path).resolve())
+    target_path_with_index = f"{target_str}##idx##{index_str}"
+
     pysam.bcftools.view(
         "-R",
         str(region_file.name),
-        str(pathlib.Path(target_path).resolve()),
+        target_path_with_index,
         "-o",
         str(variant_buffer.name),
         "--output-type",

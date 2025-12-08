@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-import zarr.codecs
 from numpy.dtypes import StringDType
 
 # ./. (no call) needs to be represented in np.uint8 (np.nan requires float)
@@ -12,12 +11,7 @@ MISSING_GENOTYPE_TUPLE = (
     MISSING_GENOTYPE_SENTINEL_VALUE,
 )
 
-ZARR_PLOIDY: int = 2  # diploid
-
-ZARR_VARIANT_CHUNK_SIZE: int = 5_000
-
-# numerical arrays will compress quite well with lower compression levels
-ZARR_COMPRESSOR = zarr.codecs.ZstdCodec(level=5)
+ZARR_PLOIDY: Literal[2] = 2  # diploid
 
 # variable-width string
 # https://numpy.org/devdocs/user/basics.strings.html#variable-width-strings

@@ -15,6 +15,7 @@ from rich.progress import (
 )
 
 from pgscatalog.calc import ScorePipeline
+from pgscatalog.calc.lib.config import config
 
 from .load import unzip_zarr
 
@@ -32,6 +33,11 @@ logging.basicConfig(
 
 
 def score_cli(args: argparse.Namespace) -> None:
+    # update zarr chunk size
+    logger.info(f"Default value {config.ZARR_VARIANT_CHUNK_SIZE=}")
+    config.ZARR_VARIANT_CHUNK_SIZE = args.batch_size
+    logger.info(f"After update {config.ZARR_VARIANT_CHUNK_SIZE=}")
+
     # check the output directory is empty
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -79,7 +85,11 @@ def score_cli(args: argparse.Namespace) -> None:
         progress.update(tasks["Load scoring files"], advance=1)
 
         progress.start_task(tasks["Match variants"])
-        pipeline.match_variants(min_overlap=args.min_overlap)
+        pipeline.match_variants(
+            min_overlap=args.min_overlap,
+            match_multiallelic=args.keep_multiallelic,
+            match_ambiguous=args.keep_ambiguous,
+        )
         progress.update(tasks["Match variants"], advance=1)
 
         progress.start_task(tasks["Export logs"])
@@ -94,7 +104,7 @@ def score_cli(args: argparse.Namespace) -> None:
         progress.update(tasks["Calculate scores"], advance=1)
 
         progress.start_task(tasks["Export scores"])
-        pipeline.export_scores(out_path=args.out_dir / "scores")
+        pipeline.export_scores(out_path=args.out_dir)
         progress.update(tasks["Export scores"], advance=1)
 
         progress.print("Finished calculating :tada: Goodbye!")

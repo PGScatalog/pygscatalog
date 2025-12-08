@@ -10,10 +10,9 @@ import zarr
 import zarr.storage
 from dask import array as da
 
+from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import (
     MISSING_GENOTYPE_SENTINEL_VALUE,
-    ZARR_COMPRESSOR,
-    ZARR_VARIANT_CHUNK_SIZE,
 )
 
 from ._impute import calculate_mean_dosage
@@ -98,8 +97,8 @@ def make_dosage_arrays(
         dtype=np.float64,
         fill_value=np.nan,
         overwrite=True,
-        chunks=(ZARR_VARIANT_CHUNK_SIZE, n_samples),
-        compressors=ZARR_COMPRESSOR,
+        chunks=(config.ZARR_VARIANT_CHUNK_SIZE, n_samples),
+        compressors=config.ZARR_COMPRESSOR,
     )
 
     # an array to track which variants are missing
@@ -109,8 +108,8 @@ def make_dosage_arrays(
         dtype=np.bool_,
         fill_value=np.nan,
         overwrite=True,
-        chunks=(ZARR_VARIANT_CHUNK_SIZE, n_samples),
-        compressors=ZARR_COMPRESSOR,
+        chunks=(config.ZARR_VARIANT_CHUNK_SIZE, n_samples),
+        compressors=config.ZARR_COMPRESSOR,
     )
 
     # calculate dosage for each genotype group (sampleset/filename) and store
@@ -174,7 +173,7 @@ def write_dosage_regions(
 
         # extract score variants from cache
         sliced_gts: da.Array = da.from_zarr(
-            target_zarr, chunks=(ZARR_VARIANT_CHUNK_SIZE, None, None)
+            target_zarr, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None, None)
         )[target_idx]
 
         # replace missing calls with np.nan
@@ -409,11 +408,11 @@ def adjust_dosage_for_effect(
 
     # expand 1D masks to 2D
     recessive_mask_2d = da.from_array(
-        recessive_mask, chunks=(ZARR_VARIANT_CHUNK_SIZE,)
+        recessive_mask, chunks=(config.ZARR_VARIANT_CHUNK_SIZE,)
     )[:, np.newaxis]
-    dominant_mask_2d = da.from_array(dominant_mask, chunks=(ZARR_VARIANT_CHUNK_SIZE,))[
-        :, np.newaxis
-    ]
+    dominant_mask_2d = da.from_array(
+        dominant_mask, chunks=(config.ZARR_VARIANT_CHUNK_SIZE,)
+    )[:, np.newaxis]
 
     # apply dominant adjustment (cap at 1)
     dominant_adjusted = da.where(

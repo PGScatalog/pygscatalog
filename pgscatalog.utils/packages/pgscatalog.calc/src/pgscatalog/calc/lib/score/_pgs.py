@@ -9,7 +9,7 @@ import polars as pl
 from dask import array as da
 from numpy import typing as npt
 
-from pgscatalog.calc.lib.constants import ZARR_VARIANT_CHUNK_SIZE
+from pgscatalog.calc.lib.config import config
 
 if TYPE_CHECKING:
     import zarr
@@ -32,6 +32,7 @@ def create_score_table(db_path: Pathish) -> None:
     """
     logger.info("Creating or replacing score table")
     with duckdb.connect(str(db_path)) as conn:
+        # allele_count * 2 will break when X / Y / MT added
         conn.sql("""
         CREATE OR REPLACE TABLE score_table (
             sampleset TEXT NOT NULL,
@@ -41,7 +42,7 @@ def create_score_table(db_path: Pathish) -> None:
             allele_count UINTEGER NOT NULL,
             score DOUBLE NOT NULL,
             dosage_sum DOUBLE NOT NULL,
-            score_avg GENERATED ALWAYS AS (dosage_sum / allele_count) VIRTUAL,
+            score_avg GENERATED ALWAYS AS (score / (allele_count * 2)) VIRTUAL,
             PRIMARY KEY (accession, sampleset, sample_id)
         );
         """)
@@ -66,7 +67,7 @@ def insert_scores(db_path: Pathish, _score_df: pl.DataFrame) -> None:
 def write_scores(
     db_path: Pathish, out_dir: Pathish, max_memory_gb: str, threads: int, scale: int = 6
 ) -> None:
-    """Write the score table to a directory in hive-partitioned format
+    """Write the score table to a compressed TSV file
 
     Scores are written out with a fixed width to preserve privacy (rounding limits
     identifiability). All calculations are done using internal cache data which is
@@ -77,7 +78,7 @@ def write_scores(
     db_path : Pathish
         Path to the score database
     out_dir : Pathish
-        Path to the output directory. Files in the directory will be overwritten.
+        Path to the output directory.
     max_memory_gb : str
         Maximum RAM that duckdb can use before intermediate results spilling to disk
     threads : int
@@ -87,36 +88,45 @@ def write_scores(
     """
     logger.info(f"Copying score table to {out_dir}")
     logger.info(f"Score columns will have {scale} digits after the decimal point")
+    out_file = str((out_dir / "scores.txt.gz").resolve())
     with duckdb.connect(
         str(db_path),
         config={"max_memory": max_memory_gb, "threads": str(threads)},
     ) as conn:
-        conn.sql(f"""
-        COPY (
-            SELECT
+        score_rel = (
+            conn.table("score_table")
+            .project(
+                f"""
                 sampleset,
                 accession,
                 sample_id,
                 n_matched,
                 allele_count,
-                -- export fixed-width decimals
                 CAST(dosage_sum AS DECIMAL(18, {scale})) AS dosage_sum,
                 CAST(score AS DECIMAL(18, {scale})) AS score,
-                CAST(score_avg AS DECIMAL(18, {scale})) AS score_avg,
-            FROM score_table
-            ORDER BY sampleset, accession, sample_id
+                CAST(score_avg AS DECIMAL(18, {scale})) AS score_avg
+                """
+            )
+            .select(
+                "sampleset",
+                "accession",
+                "sample_id",
+                "n_matched",
+                "allele_count",
+                "dosage_sum",
+                "score",
+                "score_avg",
+            )
+            .order("sampleset, accession, sample_id")
         )
-        TO '{str(out_dir)}'
-        (
-            FORMAT CSV,
-            HEADER,
-            DELIMITER ',',
-            COMPRESSION GZIP,
-            PARTITION_BY (sampleset, accession),
-            WRITE_PARTITION_COLUMNS true,
-            OVERWRITE true
-        );
-        """)
+        logger.info(f"Writing scores to {out_file}")
+        score_rel.write_csv(
+            out_file,
+            header=True,
+            sep=",",
+            compression="gzip",
+        )
+
     logger.info("Finished copying score table")
 
 
@@ -138,8 +148,10 @@ def calculate_scores(dosage_array: zarr.Array, effect_weights: zarr.Array) -> da
     np.ndarray
         1D NumPy array of scores for each sample
     """
-    dosage = da.from_zarr(dosage_array, chunks=(ZARR_VARIANT_CHUNK_SIZE, None))
-    weights = da.from_zarr(effect_weights, chunks=(ZARR_VARIANT_CHUNK_SIZE, None))
+    dosage = da.from_zarr(dosage_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None))
+    weights = da.from_zarr(
+        effect_weights, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
+    )
     if not dosage.shape[0] == weights.shape[0]:
         raise ValueError("dosage and weights must have same shape in axis 0")
 
@@ -202,6 +214,7 @@ def calculate_score_statistics(
     of zero (which would be very weird), these would get filtered out before calculating
     these statistics.
     """
+    logger.info(f"{config.ZARR_VARIANT_CHUNK_SIZE=} {config.ZARR_COMPRESSOR=}")
     logger.info("Calculating dosage statistics")
 
     score_stats: ScoreStats = {
@@ -267,7 +280,7 @@ def calculate_effect_allele_dosage(
     dosage_array: zarr.Array, accession_idx: npt.NDArray[np.int64]
 ) -> npt.NDArray[np.float64]:
     dosage_dask: da.Array = da.from_zarr(
-        dosage_array, chunks=(ZARR_VARIANT_CHUNK_SIZE, None)
+        dosage_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
     )
     # returns a per-sample sum of dosages for all variants in this accession
     per_sample_dosage: npt.NDArray[np.float64] = (
@@ -282,10 +295,10 @@ def calculate_nonmissing_allele_count(
     accession_idx: npt.NDArray[np.int64],
 ) -> npt.NDArray[np.int64]:
     dosage_dask: da.Array = da.from_zarr(
-        dosage_array, chunks=(ZARR_VARIANT_CHUNK_SIZE, None)
+        dosage_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
     )
     missing_dask: da.Array = da.from_zarr(
-        is_missing_array, chunks=(ZARR_VARIANT_CHUNK_SIZE, None)
+        is_missing_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
     )
 
     # missing variants will have been imputed, so replace these positions with np.nan
