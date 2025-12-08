@@ -1,4 +1,5 @@
 import pathlib
+import shutil
 
 import nox
 
@@ -30,6 +31,8 @@ def tests(session):
     else:
         package_path = "."
         config_file = "pyproject.toml"
+
+    install_system_binaries(package=package, session=session)
 
     session.run_install(
         "uv",
@@ -106,6 +109,8 @@ def coverage(session):
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
+    install_system_binaries(package=package, session=session)
+
     # make sure environment is clean
     session.run("coverage", "erase")
 
@@ -176,3 +181,24 @@ def dev(session: nox.Session) -> None:
     """
     session.run("uv", "venv")
     session.run("uv", "sync", "--all-groups")
+
+
+def install_system_binaries(package, session) -> None:
+    """ Install bgenix and 7z binaries using conda from bioconda / conda-forge """
+    if package in {"pgscatalog.utils", "pgscatalog.calc"}:
+        if shutil.which("bgenix") is None or shutil.which("7z") is None:
+            session.log("Installing system binaries via conda...")
+            session.run(
+                "conda",
+                "install",
+                "-y",
+                "-c",
+                "bioconda",
+                "-c",
+                "conda-forge",
+                "bgen-cpp",
+                "p7zip",
+                external=True,
+            )
+        else:
+            session.log("System binaries found, skipping conda install")
