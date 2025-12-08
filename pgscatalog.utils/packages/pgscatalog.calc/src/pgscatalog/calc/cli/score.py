@@ -85,7 +85,11 @@ def score_cli(args: argparse.Namespace) -> None:
         progress.update(tasks["Load scoring files"], advance=1)
 
         progress.start_task(tasks["Match variants"])
-        pipeline.match_variants(min_overlap=args.min_overlap)
+        pipeline.match_variants(
+            min_overlap=args.min_overlap,
+            match_multiallelic=args.keep_multiallelic,
+            match_ambiguous=args.keep_ambiguous,
+        )
         progress.update(tasks["Match variants"], advance=1)
 
         progress.start_task(tasks["Export logs"])

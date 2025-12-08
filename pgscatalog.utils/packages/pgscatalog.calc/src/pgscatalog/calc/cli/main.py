@@ -88,6 +88,27 @@ def parser_score_args(parser: argparse.ArgumentParser) -> None:
         default=0.75,
     )
     parser.add_argument(
+        "--keep_multiallelic",
+        dest="keep_multiallelic",
+        action="store_false",
+        help="Flag to allow matching to multiallelic variants (default: false).",
+        required=False,
+        default=False,
+    )
+    parser.add_argument(
+        "--keep_ambiguous",
+        dest="keep_ambiguous",
+        action="store_false",
+        help="""
+            Flag to force the program to keep variants with
+            ambiguous alleles, (e.g. A/T and G/C SNPs), which are normally
+            excluded (default: false). In this case the program proceeds
+            assuming that the genotype data is on the same strand as the
+            GWAS whose summary statistics were used to construct the score.
+        """,
+        required=False,
+    )
+    parser.add_argument(
         "--threads",
         type=check_positive,
         help="Number of threads to use",
