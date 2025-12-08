@@ -53,6 +53,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v3
       with:
         auto-activate: true
+        channels: conda-forge,bioconda,nodefaults
         activate-environment: ""
 
     - run: nox -s "${{ matrix.session }}" -- ${{ inputs.package }}
@@ -78,6 +79,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-activate: true
+          channels: conda-forge,bioconda,nodefaults
           activate-environment: ""
 
       - name: Make coverage report
