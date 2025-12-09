@@ -1,17 +1,18 @@
 # `pgscatalog.calc`
 
-[![Run pytest on pgscatalog.calc](https://github.com/PGScatalog/pygscatalog/actions/workflows/calc-pytest.yml/badge.svg)](https://github.com/PGScatalog/pygscatalog/actions/workflows/calc-pytest.yml)
+[![Run CI on pgscatalog.calc](https://github.com/PGScatalog/pygscatalog/actions/workflows/calc-ci.yml/badge.svg)](https://github.com/PGScatalog/pygscatalog/actions/workflows/calc-ci.yml)
 [![Documentation Status](https://readthedocs.org/projects/pygscatalog/badge/?version=latest)](https://pygscatalog.readthedocs.io/en/latest/autoapi/pgscatalog/calc/index.html)
+
+> [!IMPORTANT]  
+> * In `1.0.0-alpha.1` programs to calculate polygenic scores were added to this package
+> * The `pgsc_calc load` and `pgsc_calc score` programs are **pre-release software** that support basic PGS calculation only (chromosomes 1-22, indexed VCF and BGEN files, no ancestry adjustment)
+> * The simplest way to calculate polygenic scores with this software is to use v3 of the [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc)
+> * Documentation for this package and more PGS calculation features will be added to future releases
 
 This Python package contains:
 
 * CLI applications to aggregate and adjust calculated polygenic scores (PGS) in the context of genetic ancestry similarity
 * library classes and functions for working with calculated PGS and PCA data
-
-> [!NOTE]  
-> * This package doesn't contain functionality to calculate a PGS from target genomes and scoring files
-> * If you want software that does that, check out the [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc)
-> * This package is focused on PGS aggregation and normalisation, and is used internally by the PGS Catalog Calculator
 
 
 | Application                  | Description                                              | Link                                                                                |
