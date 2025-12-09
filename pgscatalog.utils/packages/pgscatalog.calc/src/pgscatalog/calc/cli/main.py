@@ -3,12 +3,13 @@ from __future__ import annotations
 import argparse
 import pathlib
 
+from pgscatalog.core.cli.download_cli import add_download_args, download_cli
+from pgscatalog.core.cli.format_cli import add_format_args, format_cli
+
 from pgscatalog.calc import GenomeFileType
 from pgscatalog.calc.cli._utils import check_positive, zero_one_float
 from pgscatalog.calc.cli.load import load_cli
 from pgscatalog.calc.cli.score import score_cli
-from pgscatalog.core.cli.download_cli import add_download_args, download_cli
-from pgscatalog.core.cli.format_cli import add_format_args, format_cli
 
 
 def main() -> None:
