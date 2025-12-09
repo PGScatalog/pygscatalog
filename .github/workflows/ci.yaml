@@ -57,6 +57,7 @@ jobs:
         activate-environment: ""
 
     - run: nox -s "${{ matrix.session }}" -- ${{ inputs.package }}
+      shell: bash -el {0}
       working-directory: "pgscatalog.utils"
 
   coverage:
@@ -83,6 +84,7 @@ jobs:
           activate-environment: ""
 
       - name: Make coverage report
+        shell: bash -el {0}
         run:  nox -s coverage -- ${{ inputs.package }}
         working-directory: "pgscatalog.utils"
 
