@@ -1,16 +1,19 @@
 import duckdb
-import polars as pl
 import pytest
 
 from pgscatalog.calc.lib.score._matchvariants import (
     MatchPriority,
     MatchResult,
+    _setup_enums,
     classify_match,
     get_variant_match_priority,
     is_biallelic_variant_ambiguous,
     match_variant,
     update_match_table,
 )
+from pgscatalog.calc.lib.scorefile import load_scoring_files
+
+# Test functions of: update_match_table,_setup_enums, match_variant, get_variant_match_priority, is_biallelic_variant_ambiguous, classify_match(complement ,complement_table)
 
 
 @pytest.mark.parametrize(
@@ -433,59 +436,108 @@ def test_match_variant_udf(match_dict: dict, result: dict) -> None:
     assert match_variant(**match_dict) == result
 
 
-def test_update_match_table(tmp_path) -> None:
-    """ Test that the match table contains the expected match types """
-    db_path = str(tmp_path / "test.duckdb")
-    with duckdb.connect(db_path) as conn:
-        _score_variants = pl.DataFrame(
-            [
-                # handling null cases (other_allele) is very important
-                {
-                    "chr_name": "1",
-                    "chr_position": 55030366,
-                    "effect_allele": "T",
-                    "other_allele": None,
-                    "row_nr": 2,
-                    "accession": "PGS000010_hmPOS_GRCh38",
-                },
-                {
-                    "chr_name": "1",
-                    "chr_position": 109275908,
-                    "effect_allele": "T",
-                    "other_allele": "C",
-                    "row_nr": 0,
-                    "accession": "PGS000010_hmPOS_GRCh38",
-                },
-            ]
+def test_setup_enums() -> None:
+    conn = duckdb.connect(":memory:")
+    _setup_enums(conn)
+
+    conn = duckdb.connect(":memory:")
+    _setup_enums(conn)
+
+    # Check that match_summary_enum exists and has expected values
+    (summary_values,) = conn.execute(
+        "SELECT enum_range(NULL::match_summary_enum)"
+    ).fetchone()
+    assert summary_values == ["matched", "unmatched", "excluded"]
+
+    # Check that match_type_enum has the same labels as MatchPriority
+    (type_values,) = conn.execute("SELECT enum_range(NULL::match_type_enum)").fetchone()
+    assert type_values == [e.name for e in MatchPriority]
+
+
+def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
+    db_path = tmp_path / "test.duckdb"
+
+    # score_variant_table loading via load_scoring_files functions from Scorefiles
+    load_scoring_files(
+        db_path=db_path,
+        scorefile_paths=[pgs000001],
+        threads=1,
+        max_memory_gb="4GB",
+    )
+
+    conn = duckdb.connect(db_path)
+
+    # minimal targetvariants table matching your SQL in update_match_table
+    conn.execute("""
+        CREATE TABLE targetvariants (
+            geno_index UINTEGER,
+            chr_name TEXT,
+            chr_pos UINTEGER,
+            ref TEXT,
+            alts TEXT[],
+            filename TEXT,
+            sampleset TEXT
+        );
+    """)
+
+    # One matching target row in the same sampleset
+    conn.execute(
+        """
+        INSERT INTO targetvariants
+        (geno_index, chr_name, chr_pos, ref, alts, filename, sampleset)
+        VALUES (?, ?, ?, ?, ?, ?, ?);
+        """,
+        [10, "11", 69516650, "T", ["C"], "file.bgen", "test"],
+    )
+
+    return conn
+
+
+def test_update_match_table(tmp_path, pgs000001) -> None:
+    conn = _make_test_conn(tmp_path, pgs000001)
+
+    # This calls _setup_enums and registers match_variant UDF internally
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=False,
+        sampleset="test",
+    )
+
+    # Unpack the struct match_result columns to simple scalars
+    rows = conn.execute(
+        """
+        SELECT
+            sampleset,
+            accession,
+            row_nr,
+            match_result.effect_allele_idx AS effect_allele_idx,
+            match_result.match_priority    AS match_priority,
+            match_result.match_type        AS match_type,
+            match_result.match_summary     AS match_summary,
+            match_result.is_ambiguous      AS is_ambiguous,
+            match_result.is_matched        AS is_matched,
+            match_result.is_multiallelic   AS is_multiallelic,
+            target_row_nr,
+            filename
+        FROM allele_match_table;
+        """
+    ).fetchall()
+
+    # We expect exactly one row with a REFALT match
+    assert rows == [
+        (
+            "test",  # sampleset
+            "PGS000001",  # accession
+            0,  # row_nr
+            0,  # effect_allele_idx
+            7,  # match_priority (REFALT)
+            "REFALT",  # match_type
+            "matched",  # match_summary
+            False,  # is_ambiguous
+            True,  # is_matched
+            False,  # is_multiallelic
+            10,  # target_row_nr (geno_index)
+            "file.bgen",  # filename
         )
-        conn.sql("CREATE TABLE score_variant_table AS SELECT * FROM _score_variants")
-        _target_variants = pl.DataFrame(
-            [
-                {
-                    "chr_name": "1",
-                    "chr_pos": 55030366,
-                    "ref": "T",
-                    "alts": ["C"],
-                    "filename": "test.bgen",
-                    "sampleset": "test",
-                    "geno_index": 0,
-                },
-                {
-                    "chr_name": "1",
-                    "chr_pos": 109275908,
-                    "ref": "C",
-                    "alts": ["T"],
-                    "filename": "test.bgen",
-                    "sampleset": "test",
-                    "geno_index": 1,
-                },
-            ]
-        )
-        conn.sql("CREATE TABLE targetvariants AS SELECT * FROM _target_variants")
-        update_match_table(
-            conn=conn, match_ambiguous=False, match_multiallelic=False, sampleset="test"
-        )
-        match_results = conn.sql(
-            "SELECT match_result.match_type FROM allele_match_table"
-        ).fetchall()
-        assert match_results == [('ALTREF',), ('REF_NO_OA',)]
+    ]

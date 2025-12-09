@@ -1,15 +1,10 @@
-import pathlib
-
-import dask.array as da
 import numpy as np
 import pytest
 import zarr
 
 from pgscatalog.calc.lib.score._dosage import (
     adjust_dosage_for_effect,
-    calculate_effect_allele_dosage,
 )
-from pgscatalog.calc.lib.constants import ZARR_PLOIDY
 
 N_SAMPLES = 5
 
@@ -67,26 +62,6 @@ def test_bad_effect_types(dosage, tmp_path):
             dominant_mask=is_dominant,
         )
     assert "A variant cannot be both" in str(e.value)
-
-
-@pytest.fixture
-def allele_match_table():
-    return (
-        pathlib.Path(__file__).parent.parent
-        / "data"
-        / "duckdb"
-        / "allele_match_table.json"
-    )
-
-
-@pytest.fixture
-def score_variant_table():
-    return (
-        pathlib.Path(__file__).parent.parent
-        / "data"
-        / "duckdb"
-        / "score_variant_table.json"
-    )
 
 
 @pytest.fixture

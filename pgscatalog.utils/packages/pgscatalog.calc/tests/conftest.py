@@ -2,6 +2,7 @@ import csv
 import gzip
 import pathlib
 import random
+import shutil
 
 import dask.array as da
 import numpy as np
@@ -9,10 +10,10 @@ import pysam
 import pysam.bcftools
 import pytest
 import zarr
-from pgscatalog.calc.lib.score._dosage import calculate_effect_allele_dosage
 
 from pgscatalog.calc import Scorefiles, TargetGenome
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
+from pgscatalog.calc.lib.score._dosage import calculate_effect_allele_dosage
 
 
 @pytest.fixture
@@ -23,9 +24,23 @@ def test_positions() -> list[tuple[str, int]]:
 
 @pytest.fixture
 def unphased_bgen_path() -> pathlib.Path:
-    return (
+    return pathlib.Path(
         pathlib.Path(__file__).parent / "data" / "bgen" / "unphased" / "tiny1000G.bgen"
     )
+
+
+@pytest.fixture
+def unphased_bgen_index_path(tmp_path) -> pathlib.Path:
+    index_path = (
+        pathlib.Path(__file__).parent
+        / "data"
+        / "bgen"
+        / "unphased"
+        / "tiny1000G.bgen.bgi"
+    )
+    index_dir = tmp_path / "unphased_bgen_index"
+    index_dir.mkdir()
+    return pathlib.Path(shutil.copy(index_path, index_dir))
 
 
 @pytest.fixture
@@ -34,10 +49,36 @@ def phased_bgen_path() -> pathlib.Path:
 
 
 @pytest.fixture
+def phased_bgen_index_path(tmp_path) -> pathlib.Path:
+        index_path = (
+            pathlib.Path(__file__).parent
+            / "data"
+            / "bgen"
+            / "phased"
+            / "tiny1000G.bgen.bgi"
+        )
+        index_dir = tmp_path / "phased_bgen_index"
+        index_dir.mkdir()
+        return pathlib.Path(shutil.copy(index_path, index_dir))
+
+
+@pytest.fixture
 def bgen_sample() -> pathlib.Path:
     return (
         pathlib.Path(__file__).parent / "data" / "bgen" / "phased" / "tiny1000G.sample"
     )
+
+
+@pytest.fixture
+def score_variant_table() -> pathlib.Path:
+    return (
+        pathlib.Path(__file__).parent / "data" / "duckdb" / "score_variant_table.json"
+    )
+
+
+@pytest.fixture
+def allele_match_table() -> pathlib.Path:
+    return pathlib.Path(__file__).parent / "data" / "duckdb" / "allele_match_table.json"
 
 
 @pytest.fixture
@@ -52,6 +93,17 @@ def vcf_path() -> pathlib.Path:
     """Path to an indexed version of 1000 Genomes, containing ~1000 variants randomly
     sampled from PGS001229"""
     return pathlib.Path(__file__).parent / "data" / "vcf" / "tiny1000G.vcf.gz"
+
+
+@pytest.fixture
+def vcf_index_path(tmp_path) -> pathlib.Path:
+    index_path = (pathlib.Path(__file__).parent
+                  / "data"
+                  / "vcf"
+                  / "tiny1000G.vcf.gz.tbi")
+    index_dir = tmp_path / "vcf_index"
+    index_dir.mkdir()
+    return pathlib.Path(shutil.copy(index_path, index_dir))
 
 
 @pytest.fixture(scope="session")
@@ -179,17 +231,32 @@ def gt_array_with_missingness(
     tmp_path_factory, target_with_missingness, test_positions, sampleset_name
 ):
     cache_dir = tmp_path_factory.mktemp("cache")
-    TargetGenome(
+
+    target = TargetGenome(
         target_path=target_with_missingness,
+        target_index_path=str(target_with_missingness) + ".csi",
         cache_dir=cache_dir,
         sampleset=sampleset_name,
-    ).cache_variants(positions=test_positions)
+    )
+
+    target.cache_variants(positions=test_positions)
 
     # test parquet files are written
-    store = zarr.storage.LocalStore(cache_dir / "gts")
+    store = zarr.storage.LocalStore(cache_dir / "genotypes.zarr")
     group = zarr.open_group(
         store=store, path=f"{sampleset_name}/{target_with_missingness.name}"
     )
+    """
+    zarr stucture:
+    /test/missing.vcf.gz
+    ├── genotypes (3, 3202, 2) uint8 -> (n_variants, n_samples, ploidy)
+    └── meta
+        ├── alts (3,) StringDType()
+        ├── chr_name (3,) StringDType()
+        ├── chr_pos (3,) int64
+        ├── ref (3,) StringDType()
+        └── variant_id (3,) StringDType()
+    """
     array = group["genotypes"]
 
     return np.array(array[: len(test_positions), :, :])
@@ -212,7 +279,7 @@ def genotype_missing_masked(gt_array_with_missingness):
     return masked_array
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def missing_dosage_array(genotype_missing_masked, effect_allele_idx, tmp_path):
     missing_array = da.from_array(genotype_missing_masked)
     dosage = calculate_effect_allele_dosage(

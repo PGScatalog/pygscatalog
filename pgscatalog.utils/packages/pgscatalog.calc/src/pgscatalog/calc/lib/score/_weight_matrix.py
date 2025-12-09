@@ -189,9 +189,12 @@ def store_group_weight_arrays(
     if not metadata_dfs:
         raise ValueError(f"{pgs_group=} {group_paths=} returned empty dataframe")
     logger.info("Creating dataframe with variant/effect allele index metadata")
-    return pl.concat(metadata_dfs).partition_by(
-        "zarr_group", as_dict=True, include_key=False
+
+    pl_dict = pl.concat(metadata_dfs).partition_by(
+        ["zarr_group"], as_dict=True, include_key=False
     )
+    # simplify single element tuples to strings
+    return {k[0]: v for k, v in pl_dict.items()}
 
 
 def store_results_in_zarr(
