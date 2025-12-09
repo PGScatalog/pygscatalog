@@ -68,7 +68,7 @@ class VCFHandler(GenomeFileHandler):
         path: Pathish,
         cache_dir: Pathish,
         sampleset: str,
-        index_path: pathlib.Path | None,
+        index_path: Pathish | None,
     ):
         if not pathlib.Path(path).suffixes[-2:] == [".vcf", ".gz"]:
             raise ValueError(f"{self.target_path} is not a .vcf.gz file")
