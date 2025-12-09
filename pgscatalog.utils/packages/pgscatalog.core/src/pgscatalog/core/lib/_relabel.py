@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+
 import csv
 import functools
 import gzip

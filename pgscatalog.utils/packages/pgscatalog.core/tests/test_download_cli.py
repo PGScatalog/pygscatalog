@@ -1,8 +1,9 @@
 import os
+from unittest.mock import patch
+
 import pytest
 
 from pgscatalog.core.cli.download_cli import run
-from unittest.mock import patch
 
 trait = "EFO_0004214"
 pgs_id = "PGS000822"

@@ -1,6 +1,6 @@
 [project]
 name = "pgscatalog.core"
-version = "1.0.1"
+version = "1.0.2"
 description = "Core tools for working with polygenic scores (PGS) and the PGS Catalog"
 license = "Apache-2.0"
 authors = [
@@ -56,6 +56,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pgscatalog"]
+artifacts = ["pgscatalog/calc/py.typed"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -73,10 +74,20 @@ parallel = true
 sigterm = true
 
 [tool.mypy]
-files = ["src/**/*.py"]
-exclude = "tests/"
-warn_unused_configs = true
-ignore_missing_imports = true
-follow_imports = "silent"
-disallow_untyped_calls = false
-disallow_incomplete_defs = true
+mypy_path = "src"
+exclude = "tests|cli"
+namespace_packages = true
+explicit_package_bases = true
+# https://careers.wolt.com/en/blog/tech/professional-grade-mypy-configuration
+disallow_untyped_defs = true
+disallow_any_unimported = false
+no_implicit_optional = true
+check_untyped_defs = true
+warn_return_any = true
+show_error_codes = true
+warn_unused_ignores = true
+
+[tool.ruff]
+fix = true
+
+# TODO: extend rulesets like pgscatalog.calc

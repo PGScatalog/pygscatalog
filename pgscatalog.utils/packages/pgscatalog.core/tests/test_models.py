@@ -1,5 +1,7 @@
-import pytest
 import csv
+
+import pytest
+
 from pgscatalog.core.lib.models import CatalogScoreVariant
 
 
@@ -7,7 +9,7 @@ from pgscatalog.core.lib.models import CatalogScoreVariant
 def complex_variants(request):
     pgs000021 = request.path.parent / "data" / "complex_variants_PGS000021.txt"
     pgs004239 = request.path.parent / "data" / "complex_variants_PGS004239.txt"
-    with open(pgs000021, "rt") as f1, open(pgs004239, "rt") as f2:
+    with open(pgs000021) as f1, open(pgs004239) as f2:
         return list(csv.DictReader(f1, delimiter="\t")), list(
             csv.DictReader(f2, delimiter="\t")
         )

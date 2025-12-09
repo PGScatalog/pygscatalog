@@ -684,7 +684,7 @@ test = [
 
 [[package]]
 name = "pgscatalog-core"
-version = "1.0.1"
+version = "1.0.2"
 source = { editable = "packages/pgscatalog.core" }
 dependencies = [
     { name = "httpx" },

@@ -8,12 +8,15 @@ Best way to reuse:
 
 """
 
+from __future__ import annotations
+
 import enum
 import itertools
 import pathlib
 from datetime import date
 from functools import cached_property
-from typing import Annotated, Any, ClassVar
+from io import TextIOWrapper
+from typing import Annotated, Any, ClassVar, TYPE_CHECKING, Self, no_type_check
 
 from pydantic import (
     AliasChoices,
@@ -27,11 +30,15 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from typing_extensions import Self
 from xopen import xopen
 
 from pgscatalog.core.lib.effecttype import EffectType
 from pgscatalog.core.lib.genomebuild import GenomeBuild
+
+if TYPE_CHECKING:
+    from typing import Generator
+
+    from pydantic import SerializationInfo
 
 
 class Allele(BaseModel):
@@ -74,19 +81,19 @@ class Allele(BaseModel):
         return "/" in self.allele
 
     @model_serializer(mode="plain", return_type=str)
-    def serialize(self):
+    def serialize(self) -> str:
         """When dumping the model, flatten it to just return the allele as a string"""
         return self.allele
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.allele
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, Allele):
             return self.allele == other.allele
         return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.allele)
 
 
@@ -502,7 +509,8 @@ class CatalogScoreVariant(BaseModel):
             )
         return non_additive
 
-    @computed_field  # type: ignore
+    @no_type_check  # type: ignore
+    @computed_field
     @cached_property
     def effect_type(self) -> EffectType:
         match (self.is_recessive, self.is_dominant, self.is_non_additive):
@@ -584,7 +592,7 @@ class CatalogScoreVariant(BaseModel):
 
     # start validating the entire model now (i.e. after instantiation, all fields are set)
     @model_validator(mode="after")
-    def check_extra_fields(self) -> Self:
+    def check_extra_fields(self) -> CatalogScoreVariant:
         """Only allelefrequency_effect_{ancestry} is supported as an extra field
         {ancestry} is dynamic and set by submitters"""
         if self.model_extra is not None:
@@ -609,7 +617,7 @@ class CatalogScoreVariant(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def check_effect_weights(self) -> Self:
+    def check_effect_weights(self) -> CatalogScoreVariant:
         match (
             self.effect_weight,
             self.dosage_0_weight,
@@ -624,7 +632,7 @@ class CatalogScoreVariant(BaseModel):
                 return self
 
     @model_validator(mode="after")
-    def check_position(self) -> Self:
+    def check_position(self) -> CatalogScoreVariant:
         match (self.rsID, self.chr_name, self.chr_position):
             case str() | None, str(), int():
                 # mandatory coordinates with optional rsid
@@ -647,7 +655,7 @@ class CatalogScoreVariant(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def check_complex_variants(self) -> Self:
+    def check_complex_variants(self) -> CatalogScoreVariant:
         if self.variant_type is not None:
             if self.is_haplotype is None and self.is_diplotype is None:
                 raise ValueError(
@@ -753,7 +761,7 @@ class ScoreVariant(CatalogScoreVariant):
         "row_nr",
     )
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[tuple[str, Any], None, None]:
         for attr in self.output_fields:
             yield getattr(self, attr)
 
@@ -807,7 +815,7 @@ class ScoreHeader(BaseModel):
     _path: pathlib.Path | None
 
     @property
-    def is_harmonised(self):
+    def is_harmonised(self) -> bool:
         # custom scores can't be harmonised o_o
         return False
 
@@ -819,7 +827,9 @@ class ScoreHeader(BaseModel):
         return GenomeBuild.from_string(value)
 
     @field_serializer("genome_build")
-    def serialize_genomebuild(self, genome_build, _info):
+    def serialize_genomebuild(
+        self, genome_build: GenomeBuild, _info: SerializationInfo
+    ) -> str:
         return genome_build.value if genome_build is not None else "NR"
 
     @cached_property
@@ -837,10 +847,10 @@ class ScoreHeader(BaseModel):
         return n_variants
 
     @classmethod
-    def from_path(cls, path):
+    def from_path(cls, path: str | pathlib.Path) -> Self:
         header = {}
 
-        def generate_header(f):
+        def generate_header(f: TextIOWrapper) -> Generator[str, None, None]:
             for line in f:
                 if line.startswith("##"):
                     continue
@@ -858,7 +868,7 @@ class ScoreHeader(BaseModel):
                 key, value = item.split("=")
                 header[key[1:]] = value  # drop # character from key
 
-        scoreheader = cls(**header)
+        scoreheader = cls(**header)  # type: ignore[arg-type]
         scoreheader._path = pathlib.Path(path)
         return scoreheader
 
@@ -948,7 +958,9 @@ class CatalogScoreHeader(ScoreHeader):
         return GenomeBuild.from_string(value)
 
     @field_serializer("genome_build", "HmPOS_build")
-    def serialize_genomebuild(self, genome_build, _info):
+    def serialize_genomebuild(
+        self, genome_build: GenomeBuild | None, _info: SerializationInfo
+    ) -> str:
         return genome_build.value if genome_build is not None else "NR"
 
     @field_validator("format_version")
@@ -966,7 +978,7 @@ class CatalogScoreHeader(ScoreHeader):
         return value
 
     @property
-    def is_harmonised(self):
+    def is_harmonised(self) -> bool:
         if self.HmPOS_build is None and self.HmPOS_date is None:
             return False
         return True

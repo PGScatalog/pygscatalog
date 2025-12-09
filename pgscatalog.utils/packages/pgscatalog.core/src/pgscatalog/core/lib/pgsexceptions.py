@@ -44,7 +44,10 @@ The hierarchy:
 
 """
 
+from __future__ import annotations
+
 import sys
+import types
 from types import MappingProxyType
 
 
@@ -53,14 +56,14 @@ class BasePGSException(Exception):
     The purpose of this class is to simplify finding PGS exceptions and exiting python
     with a matching custom exit code."""
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
 class MatchError(BasePGSException):
     """The base class for errors that are raised during variant matching"""
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
@@ -89,7 +92,7 @@ class MatchValueError(MatchError):
 class CombineError(BasePGSException):
     """The base class for errors that are raised when combining scorefiles"""
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
@@ -112,7 +115,7 @@ class EffectTypeError(CombineError):
 class CatalogError(BasePGSException):
     """The base class for errors when querying or downloading from the PGS Catalog"""
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
@@ -135,7 +138,7 @@ class InvalidAccessionError(CatalogError):
 class SamplesheetError(BasePGSException):
     """The base class for errors related to samplesheet parsing"""
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
@@ -169,18 +172,25 @@ class ExceptionExitCodeMap:
 
     code_map = MappingProxyType(_mapping)
 
-    def __getitem__(self, exception_type):
+    def __getitem__(self, exception_type: type[BasePGSException]) -> int:
         # if an exception can't be found in the map, return an error code (> 0) but default
         # max possible value 255
         return self.code_map.get(exception_type, 255)
 
 
-def handle_uncaught_exception(exctype, value, trace):
+def handle_uncaught_exception(
+    exctype: type[BaseException],
+    value: BaseException,
+    trace: types.TracebackType | None,
+) -> None:
     """Intercept BasePGSExceptions and trigger sys.exit with a custom code"""
     code_map = ExceptionExitCodeMap()
+
     oldHook(exctype, value, trace)
+
     if isinstance(value, BasePGSException):
-        sys.exit(code_map[exctype])
+        # You probably want value.__class__ here, not exctype, but both are valid
+        sys.exit(code_map[value.__class__])
 
 
 sys.excepthook, oldHook = handle_uncaught_exception, sys.excepthook

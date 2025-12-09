@@ -9,8 +9,8 @@ from unittest.mock import patch
 import pydantic
 import pytest
 
-from pgscatalog.core.cli.format_cli import run
 from pgscatalog.core import ScoringFile
+from pgscatalog.core.cli.format_cli import run
 
 
 @pytest.fixture(scope="package")
@@ -123,7 +123,7 @@ def test_fail_harmonised(tmp_path, fail_harmonised):
 
     # https://github.com/PGScatalog/pygscatalog/issues/55
     assert (tmp_path / "normalised_bad_harmonised.txt").exists()
-    with open(tmp_path / "normalised_bad_harmonised.txt", mode="rt") as f:
+    with open(tmp_path / "normalised_bad_harmonised.txt") as f:
         x = list(csv.reader(f, delimiter="\t"))
         assert len(x) == 4  # 3 variants + header
 
@@ -252,7 +252,7 @@ def test_combine_custom(tmp_path, custom_scorefiles):
     with patch("sys.argv", flargs):
         run()
 
-    with open(tmp_path / "normalised_custom.txt", mode="rt") as f:
+    with open(tmp_path / "normalised_custom.txt") as f:
         csv_reader = csv.DictReader(f, delimiter="\t")
         assert list(csv_reader) == [
             {
@@ -268,7 +268,7 @@ def test_combine_custom(tmp_path, custom_scorefiles):
             }
         ]
 
-    with open(tmp_path / "normalised_custom_no_oa.txt", mode="rt") as f:
+    with open(tmp_path / "normalised_custom_no_oa.txt") as f:
         csv_reader = csv.DictReader(f, delimiter="\t")
         assert list(csv_reader) == [
             {

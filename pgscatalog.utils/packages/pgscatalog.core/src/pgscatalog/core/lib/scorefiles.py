@@ -2,6 +2,8 @@
 in the PGS Catalog that contains a list of genetic variants and their effect weights.
 Scoring files are used to calculate PGS for new target genomes."""
 
+# mypy: ignore-errors
+
 import csv
 import itertools
 import logging
