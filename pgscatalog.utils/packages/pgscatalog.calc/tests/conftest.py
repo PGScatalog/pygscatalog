@@ -32,15 +32,18 @@ def unphased_bgen_path(tmp_path) -> pathlib.Path:
     return pathlib.Path(shutil.copy(original_index, d))
 
 
-@pytest.fixture()
+@pytest.fixture
 def unphased_bgen_index_path(tmp_path) -> pathlib.Path:
-    return (
+    index_path = (
         pathlib.Path(__file__).parent
         / "data"
         / "bgen"
         / "unphased"
         / "tiny1000G.bgen.bgi"
     )
+    index_dir = tmp_path / "unphased_bgen_index"
+    index_dir.mkdir()
+    return pathlib.Path(shutil.copy(index_path, index_dir))
 
 
 @pytest.fixture
@@ -48,15 +51,18 @@ def phased_bgen_path() -> pathlib.Path:
     return pathlib.Path(__file__).parent / "data" / "bgen" / "phased" / "tiny1000G.bgen"
 
 
-@pytest.fixture()
+@pytest.fixture
 def phased_bgen_index_path(tmp_path) -> pathlib.Path:
-    return (
-        pathlib.Path(__file__).parent
-        / "data"
-        / "bgen"
-        / "phased"
-        / "tiny1000G.bgen.bgi"
-    )
+        index_path = (
+            pathlib.Path(__file__).parent
+            / "data"
+            / "bgen"
+            / "phased"
+            / "tiny1000G.bgen.bgi"
+        )
+        index_dir = tmp_path / "phased_bgen_index"
+        index_dir.mkdir()
+        return pathlib.Path(shutil.copy(index_path, index_dir))
 
 
 @pytest.fixture
@@ -92,9 +98,15 @@ def vcf_path() -> pathlib.Path:
     return pathlib.Path(__file__).parent / "data" / "vcf" / "tiny1000G.vcf.gz"
 
 
-@pytest.fixture()
+@pytest.fixture
 def vcf_index_path(tmp_path) -> pathlib.Path:
-    return pathlib.Path(__file__).parent / "data" / "vcf" / "tiny1000G.vcf.gz.tbi"
+    index_path = (pathlib.Path(__file__).parent
+                  / "data"
+                  / "vcf"
+                  / "tiny1000G.vcf.gz.tbi")
+    index_dir = tmp_path / "vcf_index"
+    index_dir.mkdir()
+    return pathlib.Path(shutil.copy(index_path, index_dir))
 
 
 @pytest.fixture(scope="session")
