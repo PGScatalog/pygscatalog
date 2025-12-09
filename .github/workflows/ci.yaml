@@ -87,11 +87,3 @@ jobs:
         shell: bash -el {0}
         run:  nox -s coverage -- ${{ inputs.package }}
         working-directory: "pgscatalog.utils"
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-            use_oidc: true
-            fail_ci_if_error: true
-            slug: PGScatalog/pygscatalog
-            flags: ${{ inputs.package }}
