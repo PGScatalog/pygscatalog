@@ -17,6 +17,8 @@ This Python package contains:
 
 | Application                  | Description                                              | Link                                                                                |
 |------------------------------|----------------------------------------------------------|-------------------------------------------------------------------------------------|
+| `pgsc_calc load`             | Query an indexed VCF/BGEN and create a zarr zip archive  | `pgsc_calc load --help`                                                             |
+| `pgsc_calc score`            | Calculate polygenic scores from zarr zip archives        | `pgsc_calc score --help`                                                            |
 | `pgscatalog-aggregate`       | Aggregate calculated PGS split across multiple files     | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/aggregate.html) |
 | `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/ancestry.html)  |
 
