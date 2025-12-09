@@ -22,14 +22,11 @@ def test_positions() -> list[tuple[str, int]]:
     return [("8", 116938529), ("1", 44465567), ("10", 97611390)]
 
 
-@pytest.fixture(scope="function")
-def unphased_bgen_path(tmp_path) -> pathlib.Path:
-    original_index = (
+@pytest.fixture
+def unphased_bgen_path() -> pathlib.Path:
+    return pathlib.Path(
         pathlib.Path(__file__).parent / "data" / "bgen" / "unphased" / "tiny1000G.bgen"
     )
-    d = tmp_path / "bgen"
-    d.mkdir()
-    return pathlib.Path(shutil.copy(original_index, d))
 
 
 @pytest.fixture
@@ -282,7 +279,7 @@ def genotype_missing_masked(gt_array_with_missingness):
     return masked_array
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def missing_dosage_array(genotype_missing_masked, effect_allele_idx, tmp_path):
     missing_array = da.from_array(genotype_missing_masked)
     dosage = calculate_effect_allele_dosage(
