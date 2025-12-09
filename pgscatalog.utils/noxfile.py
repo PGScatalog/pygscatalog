@@ -142,7 +142,8 @@ def coverage(session):
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
-    session.run("coverage", "xml")
+    # create a coverage report and fail under 80%
+    session.run("coverage", "report", "--fail-under=80")
 
 
 @nox.session(default=False, python="3.12")
