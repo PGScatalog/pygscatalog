@@ -34,9 +34,9 @@ dependencies = [
 
 # https://peps.python.org/pep-0621/
 [project.scripts]
-pgscatalog-download = 'pgscatalog.core.cli.download_cli:run'
-pgscatalog-combine = 'pgscatalog.core.cli.format_cli:run' # deprecated
-pgscatalog-format = 'pgscatalog.core.cli.format_cli:run'
+pgscatalog-download = 'pgscatalog.core.cli.download_cli:main'
+pgscatalog-combine = 'pgscatalog.core.cli.format_cli:main' # deprecated
+pgscatalog-format = 'pgscatalog.core.cli.format_cli:main'
 pgscatalog-relabel = 'pgscatalog.core.cli.relabel_cli:run'
 
 # https://peps.python.org/pep-0735/

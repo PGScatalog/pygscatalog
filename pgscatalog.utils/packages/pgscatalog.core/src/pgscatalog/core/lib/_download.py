@@ -56,10 +56,13 @@ def ftp_fallback(retry_state: RetryCallState) -> None:
     Downloading over FTP is less reliable but a helpful fallback option.
     It should never be called directly, only as a callback function from tenacity.retry:
 
+    >>> class DummyOutcome():
+    ...     def result(self): return None
     >>> with tempfile.TemporaryDirectory() as d:
     ...     out_path = "PGS000001.txt.gz"
     ...     kwargs = {"url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000001/ScoringFiles/PGS000001.txt.gz", "directory": d, "out_path": out_path}
     ...     retry_state = tenacity.RetryCallState(retry_object=None, fn=None, args=None, kwargs=kwargs)
+    ...     retry_state.outcome = DummyOutcome()
     ...     ftp_fallback(retry_state)
     ...     (pathlib.Path(d) / pathlib.Path(out_path)).exists()
     True

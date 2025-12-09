@@ -10,7 +10,7 @@ import pydantic
 import pytest
 
 from pgscatalog.core import ScoringFile
-from pgscatalog.core.cli.format_cli import run
+from pgscatalog.core.cli.format_cli import main as run
 
 
 @pytest.fixture(scope="package")

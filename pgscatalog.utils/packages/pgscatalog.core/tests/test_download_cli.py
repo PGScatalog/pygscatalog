@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pgscatalog.core.cli.download_cli import run
+from pgscatalog.core.cli.download_cli import main as run
 
 trait = "EFO_0004214"
 pgs_id = "PGS000822"

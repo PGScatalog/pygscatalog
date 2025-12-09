@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, no_type_check
 import pyliftover  # type: ignore[import-untyped]
 
 from pgscatalog.core.lib.effecttype import EffectType
+from pgscatalog.core.lib.genomebuild import GenomeBuild
 from pgscatalog.core.lib.models import Allele
 from pgscatalog.core.lib.pgsexceptions import EffectTypeError, LiftoverError
 
@@ -20,7 +21,6 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Generator, Iterable
 
-    from pgscatalog.core.lib.genomebuild import GenomeBuild
     from pgscatalog.core.lib.models import ScoreVariant
     from pgscatalog.core.lib.scorefiles import ScoringFile
 
