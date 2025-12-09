@@ -3,6 +3,8 @@ standard way. Each step in the data processing pipeline is a generator that oper
 on a list of ScoreVariants and yields updated ScoreVariants. This makes it easy to
 plug in extra steps where needed, and lazily works on millions of objects."""
 
+from __future__ import annotations
+
 import logging
 import pathlib
 from typing import TYPE_CHECKING, no_type_check

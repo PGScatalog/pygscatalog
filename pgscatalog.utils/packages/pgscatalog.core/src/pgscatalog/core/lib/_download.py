@@ -2,6 +2,8 @@
 HTTPS download is preferred, with FTP fallback available.
 """
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from tenacity import RetryCallState
+
 
 def score_download_failed(retry_state: RetryCallState) -> None:
     """This function raises a ``ScoreChecksumError`` or ``ScoreDownloadError``
@@ -117,7 +120,9 @@ def ftp_fallback(retry_state: RetryCallState) -> None:
     retry_error_callback=ftp_fallback,
     wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
 )
-def https_download(*, url: str, out_path: pathlib.Path, directory: str, overwrite: bool = False) -> None:
+def https_download(
+    *, url: str, out_path: pathlib.Path, directory: str, overwrite: bool = False
+) -> None:
     """Download a file from the PGS Catalog over HTTPS, with automatic retries and
     waiting. md5 checksums are automatically validated.
     """

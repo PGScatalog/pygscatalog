@@ -3,6 +3,7 @@ in the PGS Catalog that contains a list of genetic variants and their effect wei
 Scoring files are used to calculate PGS for new target genomes."""
 
 # mypy: ignore-errors
+from __future__ import annotations
 
 import csv
 import itertools
