@@ -2,28 +2,39 @@
 HTTPS download is preferred, with FTP fallback available.
 """
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
 import pathlib
 import tempfile
 import urllib
+from typing import TYPE_CHECKING, no_type_check
 
-import tenacity
 import httpx
+import tenacity
 
-from pgscatalog.core.lib.pgsexceptions import ScoreDownloadError, ScoreChecksumError
 from pgscatalog.core.lib._config import Config
+from pgscatalog.core.lib.pgsexceptions import ScoreChecksumError, ScoreDownloadError
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from tenacity import RetryCallState
 
-def score_download_failed(retry_state):
+
+def score_download_failed(retry_state: RetryCallState) -> None:
     """This function raises a ``ScoreChecksumError`` or ``ScoreDownloadError``
     because every attempt has failed. This function should be used as a callback
     function from a tenacity.retry decorator"""
+    outcome = retry_state.outcome
+
+    if outcome is None:
+        raise ScoreDownloadError("Score download failed")
+
     try:
-        retry_state.outcome.result()
+        outcome.result()
     except ScoreChecksumError as e:
         raise ScoreChecksumError("All checksum retries failed") from e
     except Exception as download_exc:
@@ -38,21 +49,29 @@ def score_download_failed(retry_state):
     retry_error_callback=score_download_failed,
     wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
 )
-def ftp_fallback(retry_state):
+def ftp_fallback(retry_state: RetryCallState) -> None:
     """Try downloading from PGS Catalog using FTP like it's 1991 instead of HTTPS.
     This function should be used as a callback function from a tenacity.retry decorator.
 
     Downloading over FTP is less reliable but a helpful fallback option.
     It should never be called directly, only as a callback function from tenacity.retry:
 
+    >>> class DummyOutcome():
+    ...     def result(self): return None
     >>> with tempfile.TemporaryDirectory() as d:
     ...     out_path = "PGS000001.txt.gz"
     ...     kwargs = {"url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000001/ScoringFiles/PGS000001.txt.gz", "directory": d, "out_path": out_path}
     ...     retry_state = tenacity.RetryCallState(retry_object=None, fn=None, args=None, kwargs=kwargs)
+    ...     retry_state.outcome = DummyOutcome()
     ...     ftp_fallback(retry_state)
     ...     (pathlib.Path(d) / pathlib.Path(out_path)).exists()
     True
     """
+    outcome = retry_state.outcome
+
+    if outcome is None:
+        raise ScoreDownloadError("FTP fallback failed")
+
     url = retry_state.kwargs.get("url")
     directory = retry_state.kwargs.get("directory")
 
@@ -97,13 +116,16 @@ def ftp_fallback(retry_state):
             pass
 
 
+@no_type_check
 @tenacity.retry(
     stop=tenacity.stop_after_attempt(Config.MAX_RETRIES),
     retry=tenacity.retry_if_exception_type((ScoreDownloadError, ScoreChecksumError)),
     retry_error_callback=ftp_fallback,
     wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 2),
 )
-def https_download(*, url, out_path, directory, overwrite):
+def https_download(
+    *, url: str, out_path: pathlib.Path, directory: str, overwrite: bool = False
+) -> None:
     """Download a file from the PGS Catalog over HTTPS, with automatic retries and
     waiting. md5 checksums are automatically validated.
     """
@@ -147,7 +169,9 @@ def https_download(*, url, out_path, directory, overwrite):
             # if an exception was thrown, get rid of the temporary file
             tempf.close()
             os.remove(tempf.name)
-            logger.info(f"HTTPS download failed, deleting {tempf.name}")  # pragma: no cover
+            logger.info(
+                f"HTTPS download failed, deleting {tempf.name}"
+            )  # pragma: no cover
         except FileNotFoundError:
             # file has been renamed, that's OK
             pass

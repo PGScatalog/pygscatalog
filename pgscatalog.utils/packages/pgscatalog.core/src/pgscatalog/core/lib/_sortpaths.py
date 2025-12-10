@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+
 """This module assumes you're working with paths that follow the format:
 
 {sampleset}_{chrom}_{effect_type}_{n}

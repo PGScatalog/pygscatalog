@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from enum import Enum
 
 
@@ -24,9 +26,9 @@ class EffectType(Enum):
     ADDITIVE = "additive"
     NONADDITIVE = "nonadditive"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         # pasting __repr__ output should be sufficient to construct the class
         return f"{type(self).__name__}.{self.name}"

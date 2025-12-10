@@ -7,14 +7,22 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tqdm import tqdm
 
-from pgscatalog.core.lib import ScoringFiles, GenomeBuild, Config
+from pgscatalog.core.lib import Config, GenomeBuild, ScoringFiles
 
 logger = logging.getLogger(__name__)
 
 
-def run():
-    args = parse_args()
+def main():
+    parser = argparse.ArgumentParser(
+        description=_description_text,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    add_download_args(parser)
+    args = parse_download_args(parser)
+    download_cli(args)
 
+
+def download_cli(args):
     if args.verbose:
         logging.getLogger("pgscatalog.corelib").setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
@@ -65,36 +73,31 @@ def run():
     logger.info("All downloads finished")
 
 
-description_text = textwrap.dedent(
+_description_text = textwrap.dedent(
     """\
-Download a set of scoring files from the PGS Catalog using PGS Scoring
-IDs, traits, or publication accessions.
-
-The PGS Catalog API is queried to get a list of scoring file URLs.
-Scoring files are downloaded asynchronously via HTTPS to a specified
-directory. Downloaded files are automatically validated against an md5
-checksum.
-
-PGS Catalog scoring files are staged with the name:
-
-    {PGS_ID}.txt.gz
-
-If a valid build is specified harmonized files are downloaded as:
-
-    {PGS_ID}_hmPOS_{genome_build}.txt.gz
-
-These harmonised scoring files contain genomic coordinates, remapped
-from author-submitted information such as rsIDs.
-"""
+    Download a set of scoring files from the PGS Catalog using PGS Scoring
+    IDs, traits, or publication accessions.
+    
+    The PGS Catalog API is queried to get a list of scoring file URLs.
+    Scoring files are downloaded asynchronously via HTTPS to a specified
+    directory. Downloaded files are automatically validated against an md5
+    checksum.
+    
+    PGS Catalog scoring files are staged with the name:
+    
+        {PGS_ID}.txt.gz
+    
+    If a valid build is specified harmonized files are downloaded as:
+    
+        {PGS_ID}_hmPOS_{genome_build}.txt.gz
+    
+    These harmonised scoring files contain genomic coordinates, remapped
+    from author-submitted information such as rsIDs.
+    """
 )
 
 
-def parse_args(args=None):
-    parser = argparse.ArgumentParser(
-        description=description_text,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
+def add_download_args(parser) -> None:
     parser.add_argument(
         "-i",
         "--pgs",
@@ -165,7 +168,9 @@ def parse_args(args=None):
         help="<Optional> Extra logging information",
     )
 
-    args = parser.parse_args(args)
+
+def parse_download_args(parser) -> argparse.Namespace:
+    args = parser.parse_args()
 
     if args.pgs is None and args.efo is None and args.pgp is None:
         parser.error("Please provide at least one: --pgs, --efo, or --pgp")
@@ -174,4 +179,4 @@ def parse_args(args=None):
 
 
 if __name__ == "__main__":
-    run()
+    main()

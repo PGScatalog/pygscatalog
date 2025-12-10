@@ -8,31 +8,37 @@ Best way to reuse:
 
 """
 
+from __future__ import annotations
+
 import enum
 import itertools
 import pathlib
 from datetime import date
 from functools import cached_property
-from typing import ClassVar, Optional, Union, Any, Annotated
-
-from typing_extensions import Self
+from io import TextIOWrapper
+from typing import Annotated, Any, ClassVar, TYPE_CHECKING, Self, no_type_check
 
 from pydantic import (
     AliasChoices,
     BaseModel,
-    computed_field,
-    model_serializer,
-    Field,
-    field_validator,
-    model_validator,
     ConfigDict,
-    field_serializer,
+    Field,
     RootModel,
+    computed_field,
+    field_serializer,
+    field_validator,
+    model_serializer,
+    model_validator,
 )
 from xopen import xopen
 
-from pgscatalog.core.lib.genomebuild import GenomeBuild
 from pgscatalog.core.lib.effecttype import EffectType
+from pgscatalog.core.lib.genomebuild import GenomeBuild
+
+if TYPE_CHECKING:
+    from typing import Generator
+
+    from pydantic import SerializationInfo
 
 
 class Allele(BaseModel):
@@ -75,19 +81,19 @@ class Allele(BaseModel):
         return "/" in self.allele
 
     @model_serializer(mode="plain", return_type=str)
-    def serialize(self):
+    def serialize(self) -> str:
         """When dumping the model, flatten it to just return the allele as a string"""
         return self.allele
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.allele
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, Allele):
             return self.allele == other.allele
         return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.allele)
 
 
@@ -181,16 +187,18 @@ class CatalogScoreVariant(BaseModel):
 
     # variant description
     rsID: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
-            validation_alias=AliasChoices('rsID','rsid'), # Allow the use of 'rsid' in lower case
+            validation_alias=AliasChoices(
+                "rsID", "rsid"
+            ),  # Allow the use of 'rsid' in lower case
             title="dbSNP Accession ID (rsID)",
             description="The SNP’s rsID. This column also contains HLA alleles in the standard notation (e.g. HLA-DQA1*0102) that aren’t always provided with chromosomal positions.",
         ),
     ]
     chr_name: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Location - Chromosome ",
@@ -199,7 +207,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     chr_position: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             title="Location within the Chromosome",
@@ -208,7 +216,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     effect_allele: Annotated[
-        Optional[Allele],
+        Allele | None,
         Field(
             default=None,
             title="Effect Allele",
@@ -216,7 +224,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     other_allele: Annotated[
-        Optional[Allele],
+        Allele | None,
         Field(
             default=None,
             title="Other allele(s)",
@@ -224,7 +232,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     locus_name: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Locus Name",
@@ -232,7 +240,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     is_haplotype: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             default=False,
             title="FLAG: Haplotype",
@@ -240,7 +248,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     is_diplotype: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             default=False,
             title="FLAG: Diplotype",
@@ -248,7 +256,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     imputation_method: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Imputation Method",
@@ -256,7 +264,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     variant_description: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Variant Description",
@@ -264,7 +272,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     inclusion_criteria: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Score Inclusion Criteria",
@@ -278,7 +286,7 @@ class CatalogScoreVariant(BaseModel):
     # note: string coercion only happens if class is instantiated with numeric data
     # to avoid precision errors, always instantiate with strings, e.g. csv.reader which always return a list of strings
     effect_weight: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Variant Weight",
@@ -287,7 +295,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     is_interaction: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             default=False,
             title="FLAG: Interaction",
@@ -295,7 +303,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     is_dominant: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             default=False,
             title="FLAG: Dominant Inheritance Model",
@@ -303,7 +311,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     is_recessive: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             default=False,
             title="FLAG: Recessive Inheritance Model",
@@ -311,7 +319,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     dosage_0_weight: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Effect weight with 0 copy of the effect allele",
@@ -320,7 +328,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     dosage_1_weight: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Effect weight with 1 copy of the effect allele",
@@ -329,7 +337,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     dosage_2_weight: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Effect weight with 2 copies of the effect allele",
@@ -340,7 +348,7 @@ class CatalogScoreVariant(BaseModel):
 
     # other information
     OR: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             title="Odds Ratio",
@@ -348,7 +356,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     HR: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             title="Hazard Ratio",
@@ -356,7 +364,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     allelefrequency_effect: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             title="Effect Allele Frequency",
@@ -367,7 +375,7 @@ class CatalogScoreVariant(BaseModel):
 
     # harmonised files - additional columns
     hm_source: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Provider of the harmonized variant information",
@@ -375,7 +383,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     hm_rsID: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Harmonized rsID",
@@ -383,7 +391,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     hm_chr: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             title="Harmonized chromosome name",
@@ -391,7 +399,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     hm_pos: Annotated[
-        Optional[int],
+        int | None,
         Field(
             ge=0,
             default=None,
@@ -400,7 +408,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     hm_inferOtherAllele: Annotated[
-        Optional[Allele],
+        Allele | None,
         Field(
             default=None,
             title="Harmonized other alleles",
@@ -408,7 +416,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     hm_match_chr: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             default=None,
             title="FLAG: matching chromosome name",
@@ -416,7 +424,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     hm_match_pos: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             default=None,
             title="FLAG: matching chromosome position",
@@ -424,7 +432,7 @@ class CatalogScoreVariant(BaseModel):
         ),
     ]
     variant_type: Annotated[
-        Optional[VariantType],
+        VariantType | None,
         Field(
             default=None,
             title="Complex alleles only: how is the variant name formatted?",
@@ -501,7 +509,8 @@ class CatalogScoreVariant(BaseModel):
             )
         return non_additive
 
-    @computed_field  # type: ignore
+    @no_type_check  # type: ignore
+    @computed_field
     @cached_property
     def effect_type(self) -> EffectType:
         match (self.is_recessive, self.is_dominant, self.is_non_additive):
@@ -530,8 +539,7 @@ class CatalogScoreVariant(BaseModel):
     def alleles_must_parse(cls, value: Any) -> Allele:
         if isinstance(value, str):
             return Allele(allele=value)
-        else:
-            raise ValueError(f"Can't parse {value=}")
+        raise ValueError(f"Can't parse {value=}")
 
     @field_validator(
         "rsID",
@@ -551,14 +559,14 @@ class CatalogScoreVariant(BaseModel):
         mode="before",
     )
     @classmethod
-    def empty_string_to_none(cls, v: Any) -> Optional[Any]:
+    def empty_string_to_none(cls, v: Any) -> Any | None:
         if isinstance(v, str) and v.strip() == "":
             return None
         return v
 
     @field_validator("rsID", "hm_rsID", mode="after")
     @classmethod
-    def set_missing_rsid(cls, rsid: Optional[str]) -> Optional[str]:
+    def set_missing_rsid(cls, rsid: str | None) -> str | None:
         # rsID is a special case where . means missing
         if rsid == ".":
             rsid = None
@@ -573,7 +581,7 @@ class CatalogScoreVariant(BaseModel):
         mode="after",
     )
     @classmethod
-    def effect_weight_must_float(cls, weight: Optional[str]) -> Optional[str]:
+    def effect_weight_must_float(cls, weight: str | None) -> str | None:
         # reminder: weight fields default to None because check_effect_weights validates the model after instantiation
         # default values for fields are never validated
         # but any non-default value is validated, and must be coercible to float
@@ -584,7 +592,7 @@ class CatalogScoreVariant(BaseModel):
 
     # start validating the entire model now (i.e. after instantiation, all fields are set)
     @model_validator(mode="after")
-    def check_extra_fields(self) -> Self:
+    def check_extra_fields(self) -> CatalogScoreVariant:
         """Only allelefrequency_effect_{ancestry} is supported as an extra field
         {ancestry} is dynamic and set by submitters"""
         if self.model_extra is not None:
@@ -601,16 +609,15 @@ class CatalogScoreVariant(BaseModel):
                     raise ValueError(
                         f"Invalid extra fields detected: {bad_extra_fields}"
                     )
-                else:
-                    for field in extra:
-                        # make sure allele frequency is a float or raise a value error
-                        allelefrequency: float = float(getattr(self, field))
-                        setattr(self, field, allelefrequency)
+                for field in extra:
+                    # make sure allele frequency is a float or raise a value error
+                    allelefrequency: float = float(getattr(self, field))
+                    setattr(self, field, allelefrequency)
 
         return self
 
     @model_validator(mode="after")
-    def check_effect_weights(self) -> Self:
+    def check_effect_weights(self) -> CatalogScoreVariant:
         match (
             self.effect_weight,
             self.dosage_0_weight,
@@ -625,7 +632,7 @@ class CatalogScoreVariant(BaseModel):
                 return self
 
     @model_validator(mode="after")
-    def check_position(self) -> Self:
+    def check_position(self) -> CatalogScoreVariant:
         match (self.rsID, self.chr_name, self.chr_position):
             case str() | None, str(), int():
                 # mandatory coordinates with optional rsid
@@ -648,7 +655,7 @@ class CatalogScoreVariant(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def check_complex_variants(self) -> Self:
+    def check_complex_variants(self) -> CatalogScoreVariant:
         if self.variant_type is not None:
             if self.is_haplotype is None and self.is_diplotype is None:
                 raise ValueError(
@@ -733,7 +740,7 @@ class ScoreVariant(CatalogScoreVariant):
         str, Field(title="Accession", description="Accession of score variant")
     ]
     is_duplicated: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             default=False,
             title="Duplicated variant",
@@ -754,7 +761,7 @@ class ScoreVariant(CatalogScoreVariant):
         "row_nr",
     )
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[tuple[str, Any], None, None]:
         for attr in self.output_fields:
             yield getattr(self, attr)
 
@@ -793,51 +800,57 @@ class ScoreHeader(BaseModel):
     """
 
     # Fields storing the score identifier (the file should contains either pgs_id, omicspred_id or score_id)
-    pgs_id: Annotated[Optional[str], Field(title="PGS identifier",validation_alias=AliasChoices('pgs_id','omicspred_id','score_id'))]
-    pgs_name: Annotated[Optional[str], Field(description="PGS name", default=None)]
+    pgs_id: Annotated[
+        str | None,
+        Field(
+            title="PGS identifier",
+            validation_alias=AliasChoices("pgs_id", "omicspred_id", "score_id"),
+        ),
+    ]
+    pgs_name: Annotated[str | None, Field(description="PGS name", default=None)]
     trait_reported: Annotated[str, Field(description="Trait name")]
     # genome build is Optional because "NR" is represented internally as None
-    genome_build: Annotated[Optional[GenomeBuild], Field(description="Genome build")]
+    genome_build: Annotated[GenomeBuild | None, Field(description="Genome build")]
 
-    _path: Optional[pathlib.Path]
+    _path: pathlib.Path | None
 
     @property
-    def is_harmonised(self):
+    def is_harmonised(self) -> bool:
         # custom scores can't be harmonised o_o
         return False
 
     @field_validator("genome_build", mode="before")
     @classmethod
-    def parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
+    def parse_genome_build(cls, value: str) -> GenomeBuild | None:
         if value == "NR":
             return None
-        else:
-            return GenomeBuild.from_string(value)
+        return GenomeBuild.from_string(value)
 
     @field_serializer("genome_build")
-    def serialize_genomebuild(self, genome_build, _info):
+    def serialize_genomebuild(
+        self, genome_build: GenomeBuild, _info: SerializationInfo
+    ) -> str:
         return genome_build.value if genome_build is not None else "NR"
 
     @cached_property
     def row_count(self) -> int:
         """Calculate the number of variants in the scoring file by counting the number of rows"""
-        path: Optional[pathlib.Path] = getattr(self, "_path", None)
+        path: pathlib.Path | None = getattr(self, "_path", None)
         if path is None:
             raise TypeError("Can't calculate row count without path")
-        else:
-            with xopen(path, "rt") as fh:
-                # skip header line with - 1
-                n_variants = sum(1 for x in fh if not x.startswith("#")) - 1
-                if n_variants == 0:
-                    raise ValueError(f"No variants in {path}")
+        with xopen(path, "rt") as fh:
+            # skip header line with - 1
+            n_variants = sum(1 for x in fh if not x.startswith("#")) - 1
+            if n_variants == 0:
+                raise ValueError(f"No variants in {path}")
 
         return n_variants
 
     @classmethod
-    def from_path(cls, path):
+    def from_path(cls, path: str | pathlib.Path) -> Self:
         header = {}
 
-        def generate_header(f):
+        def generate_header(f: TextIOWrapper) -> Generator[str, None, None]:
             for line in f:
                 if line.startswith("##"):
                     continue
@@ -855,7 +868,7 @@ class ScoreHeader(BaseModel):
                 key, value = item.split("=")
                 header[key[1:]] = value  # drop # character from key
 
-        scoreheader = cls(**header)
+        scoreheader = cls(**header)  # type: ignore[arg-type]
         scoreheader._path = pathlib.Path(path)
         return scoreheader
 
@@ -885,21 +898,21 @@ class CatalogScoreHeader(ScoreHeader):
     ]
     # note: we'll make sure to serialise None values here and in genome_build as string "NR"
     weight_type: Annotated[
-        Optional[str], Field(description="Variant weight type", default=None)
+        str | None, Field(description="Variant weight type", default=None)
     ]
 
     ##SOURCE INFORMATION
     pgp_id: str
     citation: str
     ##HARMONIZATION DETAILS
-    HmPOS_build: Annotated[Optional[GenomeBuild], Field(default=None)]
-    HmPOS_date: Annotated[Optional[date], Field(default=None)]
-    HmPOS_match_pos: Annotated[Optional[str], Field(default=None)]
-    HmPOS_match_chr: Annotated[Optional[str], Field(default=None)]
+    HmPOS_build: Annotated[GenomeBuild | None, Field(default=None)]
+    HmPOS_date: Annotated[date | None, Field(default=None)]
+    HmPOS_match_pos: Annotated[str | None, Field(default=None)]
+    HmPOS_match_chr: Annotated[str | None, Field(default=None)]
 
     # note: only included when different from default
     license: Annotated[
-        Optional[str],
+        str | None,
         Field(
             "PGS obtained from the Catalog should be cited appropriately, and "
             "used in accordance with any licensing restrictions set by the authors. See "
@@ -939,14 +952,15 @@ class CatalogScoreHeader(ScoreHeader):
 
     @field_validator("genome_build", "HmPOS_build", mode="before")
     @classmethod
-    def parse_genome_build(cls, value: str) -> Optional[GenomeBuild]:
+    def parse_genome_build(cls, value: str) -> GenomeBuild | None:
         if value == "NR":
             return None
-        else:
-            return GenomeBuild.from_string(value)
+        return GenomeBuild.from_string(value)
 
     @field_serializer("genome_build", "HmPOS_build")
-    def serialize_genomebuild(self, genome_build, _info):
+    def serialize_genomebuild(
+        self, genome_build: GenomeBuild | None, _info: SerializationInfo
+    ) -> str:
         return genome_build.value if genome_build is not None else "NR"
 
     @field_validator("format_version")
@@ -958,17 +972,16 @@ class CatalogScoreHeader(ScoreHeader):
 
     @field_validator("weight_type", mode="after")
     @classmethod
-    def parse_weight_type(cls, value: Optional[str]) -> Optional[str]:
+    def parse_weight_type(cls, value: str | None) -> str | None:
         if value == "NR":
             value = None
         return value
 
     @property
-    def is_harmonised(self):
+    def is_harmonised(self) -> bool:
         if self.HmPOS_build is None and self.HmPOS_date is None:
             return False
-        else:
-            return True
+        return True
 
 
 class VariantLog(BaseModel):
@@ -981,7 +994,7 @@ class VariantLog(BaseModel):
     Instead, just create VariantLogs from a subset of ScoreVariant fields
     """
 
-    hm_source: Optional[str] = None
+    hm_source: str | None = None
     is_complex: bool
 
 
@@ -1020,10 +1033,10 @@ class ScoreLog(BaseModel):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    header: Union[ScoreHeader, CatalogScoreHeader] = Field(
+    header: ScoreHeader | CatalogScoreHeader = Field(
         description="Metadata from the scoring file header"
     )
-    variant_logs: Optional[list[VariantLog]] = Field(
+    variant_logs: list[VariantLog] | None = Field(
         description="A list of variants associated with the header. Some may be filtered out during normalisation.",
         exclude=True,
         repr=False,
@@ -1053,10 +1066,10 @@ class ScoreLog(BaseModel):
 
     @computed_field  # type: ignore
     @cached_property
-    def sources(self) -> Optional[list[str]]:
-        unique_sources: Optional[list[str]] = None
+    def sources(self) -> list[str] | None:
+        unique_sources: list[str] | None = None
         if self.variant_logs is not None:
-            sources: list[Optional[str]] = [x.hm_source for x in self.variant_logs]
+            sources: list[str | None] = [x.hm_source for x in self.variant_logs]
             filtered_sources = [x for x in sources if x is not None]
             if not filtered_sources:
                 unique_sources = None
@@ -1065,15 +1078,14 @@ class ScoreLog(BaseModel):
         return unique_sources
 
     @property
-    def n_actual_variants(self) -> Optional[int]:
+    def n_actual_variants(self) -> int | None:
         # this distinction is useful if variants have been filtered out
         if self.variant_logs is not None:
             return len(self.variant_logs)
-        else:
-            return None
+        return None
 
     @cached_property
-    def variant_count_difference(self) -> Optional[int]:
+    def variant_count_difference(self) -> int | None:
         # grab directly from header
         header_variants = getattr(self.header, "variants_number", None)
         if header_variants is None:
@@ -1081,7 +1093,7 @@ class ScoreLog(BaseModel):
             header_variants = self.header.row_count
 
         if self.n_actual_variants is None:
-            variant_difference: Optional[int] = None
+            variant_difference: int | None = None
         else:
             variant_difference = abs(header_variants - self.n_actual_variants)
 

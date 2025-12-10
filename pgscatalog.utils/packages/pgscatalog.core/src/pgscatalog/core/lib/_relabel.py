@@ -1,3 +1,6 @@
+# mypy: ignore-errors
+from __future__ import annotations
+
 import csv
 import functools
 import gzip

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 
 
@@ -15,14 +17,14 @@ class GenomeBuild(enum.Enum):
     NCBI36 = "NCBI36"  # ew
     NCBI35 = "NCBI35"  # huh
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{type(self).__name__}.{self.name}"
 
     @classmethod
-    def from_string(cls, build):
+    def from_string(cls, build: str) -> GenomeBuild | None:
         """
         :param build: genome build string
         :return: :class:`GenomeBuild`

@@ -1,19 +1,33 @@
-import logging
 import importlib.metadata
 
 from .lib import (
-    PolygenicScore,
-    AggregatedPGS,
-    AdjustResults,
+    VALID_CHROMOSOMES,
     AdjustArguments,
+    AdjustResults,
+    AggregatedPGS,
+    GenomeFileType,
+    Pathish,
+    PathishList,
+    # legacy stuff
+    PolygenicScore,
+    PopulationType,
+    PrincipalComponents,
+    Scorefiles,
+    ScorePipeline,
+    TargetGenome,
+    TargetVariants,
 )
-from .lib import PopulationType, PrincipalComponents
-
-log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"
-logging.basicConfig(format=log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
-logger = logging.getLogger(__name__)
 
 __all__ = [
+    "Scorefiles",
+    "TargetGenome",
+    "TargetVariants",
+    "ScorePipeline",
+    "GenomeFileType",
+    "Pathish",
+    "PathishList",
+    "VALID_CHROMOSOMES",
+    # legacy stuff
     "PolygenicScore",
     "PrincipalComponents",
     "PopulationType",

@@ -1,23 +1,23 @@
 """Public interface to the Polygenic Score Catalog core package"""
 
-import logging
 import importlib.metadata
+import logging
 
 from pgscatalog.core.lib import (
-    Config,
-    ScoreQueryResult,
-    CatalogQuery,
     CatalogCategory,
-    ScoringFiles,
-    ScoringFile,
+    CatalogQuery,
+    Config,
+    EffectType,
     GenomeBuild,
     RelabelArgs,
+    ScoreQueryResult,
+    ScoringFile,
+    ScoringFiles,
+    chrom_keyfunc,
+    effect_type_keyfunc,
+    models,
     relabel,
     relabel_write,
-    effect_type_keyfunc,
-    chrom_keyfunc,
-    EffectType,
-    models,
 )
 
 log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"

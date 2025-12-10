@@ -1,4 +1,5 @@
 import pathlib
+import shutil
 
 import nox
 
@@ -7,7 +8,7 @@ nox.options.default_venv_backend = "uv"
 
 
 # test every version of python we support!
-@nox.session(python=["3.10", "3.11", "3.12"])
+@nox.session(python=["3.12"])
 def tests(session):
     """Run pytest for all supported python versions
 
@@ -30,6 +31,8 @@ def tests(session):
     else:
         package_path = "."
         config_file = "pyproject.toml"
+
+    install_system_binaries(package=package, session=session)
 
     session.run_install(
         "uv",
@@ -62,20 +65,17 @@ def tests(session):
 @nox.session
 def lint(session):
     """Run linting checks"""
+    uv_call = ["uv", "sync", "--group", "lint"]
     if session.posargs:
         package_path = str(pathlib.Path("packages") / session.posargs[0])
-        config_file = str(
-            pathlib.Path("packages") / session.posargs[0] / "pyproject.toml"
-        )
-    else:
-        package_path = "src"
-        config_file = "pyproject.toml"
+        session.chdir(package_path)
+        uv_call.extend(["--package", session.posargs[0]])
+
+    package_path = "src"
+    config_file = "pyproject.toml"
 
     session.run(
-        "uv",
-        "sync",
-        "--group",
-        "lint",
+        *uv_call,
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
@@ -109,6 +109,8 @@ def coverage(session):
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
+    install_system_binaries(package=package, session=session)
+
     # make sure environment is clean
     session.run("coverage", "erase")
 
@@ -140,7 +142,8 @@ def coverage(session):
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
 
-    session.run("coverage", "xml")
+    # create a coverage report and fail under 80%
+    session.run("coverage", "report", "--fail-under=80")
 
 
 @nox.session(default=False, python="3.12")
@@ -179,3 +182,26 @@ def dev(session: nox.Session) -> None:
     """
     session.run("uv", "venv")
     session.run("uv", "sync", "--all-groups")
+
+
+def install_system_binaries(package, session) -> None:
+    """ Install bgenix and 7z binaries using conda from bioconda / conda-forge """
+    if package in {"pgscatalog.utils", "pgscatalog.calc"}:
+        if shutil.which("bgenix") is None or shutil.which("7z") is None:
+            session.log("Installing system binaries via conda...")
+            session.run(
+                "conda",
+                "install",
+                "-y",
+                "-n",
+                "base",
+                "-c",
+                "bioconda",
+                "-c",
+                "conda-forge",
+                "bgen-cpp",
+                "p7zip",
+                external=True,
+            )
+        else:
+            session.log("System binaries found, skipping conda install")

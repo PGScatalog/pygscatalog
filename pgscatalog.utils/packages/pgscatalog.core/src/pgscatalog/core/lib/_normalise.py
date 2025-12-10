@@ -3,22 +3,36 @@ standard way. Each step in the data processing pipeline is a generator that oper
 on a list of ScoreVariants and yields updated ScoreVariants. This makes it easy to
 plug in extra steps where needed, and lazily works on millions of objects."""
 
+from __future__ import annotations
+
 import logging
 import pathlib
+from typing import TYPE_CHECKING, no_type_check
 
-import pyliftover
+import pyliftover  # type: ignore[import-untyped]
 
+from pgscatalog.core.lib.effecttype import EffectType
 from pgscatalog.core.lib.genomebuild import GenomeBuild
 from pgscatalog.core.lib.models import Allele
-from pgscatalog.core.lib.pgsexceptions import LiftoverError, EffectTypeError
-from pgscatalog.core.lib.effecttype import EffectType
+from pgscatalog.core.lib.pgsexceptions import EffectTypeError, LiftoverError
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from typing import Generator, Iterable
 
+    from pgscatalog.core.lib.models import ScoreVariant
+    from pgscatalog.core.lib.scorefiles import ScoringFile
+
+
+@no_type_check
 def normalise(
-    scoring_file, drop_missing=False, liftover=False, chain_dir=None, target_build=None
-):
+    scoring_file: ScoringFile,
+    drop_missing: bool = False,
+    liftover: bool = False,
+    chain_dir: pathlib.Path | None = None,
+    target_build: GenomeBuild | None = None,
+) -> Generator[ScoreVariant, None, None]:
     """Order of steps is important:
 
     1. liftover non-harmonised data (quite rare), failed lifts get None'd
@@ -59,7 +73,9 @@ def normalise(
     return variants
 
 
-def check_effect_type(variants):
+def check_effect_type(
+    variants: Iterable[ScoreVariant],
+) -> Generator[ScoreVariant, None, None]:
     """Check for non-additive variants and complain if found"""
     for variant in variants:
         if variant.effect_type == EffectType.NONADDITIVE:
@@ -67,11 +83,13 @@ def check_effect_type(variants):
         yield variant
 
 
-def check_duplicates(variants):
+def check_duplicates(
+    variants: Iterable[ScoreVariant],
+) -> Generator[ScoreVariant, None, None]:
     """Check if a scoring file contains multiple variants with the same ID
     ID = chr:pos:effect_allele:other_allele
     """
-    seen_ids = {}
+    seen_ids: dict[str, bool] = {}
     current_accession = None
     n_duplicates = 0
     n_variants = 0
@@ -97,7 +115,7 @@ def check_duplicates(variants):
         )
 
 
-def drop_hla(variants):
+def drop_hla(variants: Iterable[ScoreVariant]) -> Generator[ScoreVariant, None, None]:
     """Drop HLA alleles from a list of ScoreVariants
 
     >>> from pgscatalog.core.lib.models import ScoreVariant
@@ -124,7 +142,9 @@ def drop_hla(variants):
     logger.warning(f"{n_dropped} HLA alleles detected and dropped")
 
 
-def assign_other_allele(variants):
+def assign_other_allele(
+    variants: Iterable[ScoreVariant],
+) -> Generator[ScoreVariant, None, None]:
     """Check if there's more than one possible other allele, remove if true
 
     >>> from pgscatalog.core.lib.models import ScoreVariant
@@ -147,7 +167,9 @@ def assign_other_allele(variants):
         logger.warning("Other allele for these variants is set to missing")
 
 
-def remap_harmonised(variants, harmonised, target_build):
+def remap_harmonised(
+    variants: Iterable[ScoreVariant], harmonised: bool, target_build: GenomeBuild | None
+) -> Generator[ScoreVariant, None, None]:
     """
     Overwrite key attributes with harmonised data, if available.
 
@@ -180,7 +202,9 @@ def remap_harmonised(variants, harmonised, target_build):
             yield variant
 
 
-def check_effect_allele(variants, drop_missing=False):
+def check_effect_allele(
+    variants: Iterable[ScoreVariant], drop_missing: bool = False
+) -> Generator[ScoreVariant, None, None]:
     """
     Odd effect allele:
 
@@ -194,7 +218,7 @@ def check_effect_allele(variants, drop_missing=False):
     """
     n_bad = 0
     for variant in variants:
-        if not variant.effect_allele.is_snp:
+        if variant.effect_allele is not None and not variant.effect_allele.is_snp:
             n_bad += 1
             if drop_missing:
                 continue
@@ -205,7 +229,9 @@ def check_effect_allele(variants, drop_missing=False):
         logger.warning(f"{n_bad} variants have invalid effect alleles (not ACTG)")
 
 
-def detect_complex(variants):
+def detect_complex(
+    variants: Iterable[ScoreVariant],
+) -> Generator[ScoreVariant, None, None]:
     """Some older scoring files in the PGS Catalog are complicated.
     They often require bespoke set up to support interaction terms, etc
     This function only exists to provide loud warnings to end users.
@@ -226,9 +252,16 @@ def detect_complex(variants):
         )
 
 
+@no_type_check
 def lift(
-    *, scoring_file, harmonised, current_build, target_build, chain_dir, min_lift=0.95
-):
+    *,
+    scoring_file: ScoringFile,
+    harmonised: bool,
+    current_build: GenomeBuild | None,
+    target_build: GenomeBuild,
+    chain_dir: pathlib.Path,
+    min_lift: float = 0.95,
+) -> Generator[ScoreVariant, None, None]:
     variants = scoring_file.variants
 
     skip_lo = True
@@ -270,7 +303,9 @@ def lift(
             logger.info("Liftover successful")
 
 
-def load_chain(*, current_build, target_build, chain_dir):
+def load_chain(
+    *, current_build: GenomeBuild, target_build: GenomeBuild, chain_dir: pathlib.Path
+) -> pyliftover.LiftOver:
     """Only supports loading GRCh37 and GRCh38 chain files
 
     >>> from pgscatalog.core.lib import Config

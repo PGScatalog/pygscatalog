@@ -1,22 +1,34 @@
-import logging
+from .cache.genomefiletypes import GenomeFileType
+from .cache.targetgenome import TargetGenome
+from .cache.targetvariants import TargetVariants
+from .constants import VALID_CHROMOSOMES
 
-from .polygenicscore import (
-    PolygenicScore,
-    AggregatedPGS,
-    AdjustResults,
+# legacy stuff
+from .legacy.polygenicscore import (
     AdjustArguments,
+    AdjustResults,
+    AggregatedPGS,
+    PolygenicScore,
 )
-from .principalcomponents import PopulationType, PrincipalComponents
-
-log_fmt = "%(name)s: %(asctime)s %(levelname)-8s %(message)s"
-logging.basicConfig(format=log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
-logger = logging.getLogger(__name__)
+from .legacy.principalcomponents import PopulationType, PrincipalComponents
+from .score.scorepipeline import ScorePipeline
+from .scorefile import Scorefiles
+from .types import Pathish, PathishList
 
 __all__ = [
+    "Scorefiles",
+    "TargetGenome",
+    "TargetVariants",
+    "ScorePipeline",
+    "GenomeFileType",
+    "Pathish",
+    "PathishList",
+    "VALID_CHROMOSOMES",
+    # legacy stuff exported
     "PolygenicScore",
-    "PrincipalComponents",
     "PopulationType",
     "AggregatedPGS",
-    "AdjustArguments",
     "AdjustResults",
+    "AdjustArguments",
+    "PrincipalComponents",
 ]

@@ -24,8 +24,8 @@ classifiers = [
 requires-python = ">=3.10"
 
 dependencies = [
-    "pgscatalog-calc",
     "pgscatalog-core",
+    "pgscatalog-calc",
     "pgscatalog-match",
 ]
 
@@ -41,11 +41,11 @@ test = [
 ]
 
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["src/pgscatalog"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -78,5 +78,3 @@ follow_imports = "silent"
 disallow_untyped_calls = false
 disallow_incomplete_defs = true
 
-[tool.setuptools.packages.find]
-where = ["src"]

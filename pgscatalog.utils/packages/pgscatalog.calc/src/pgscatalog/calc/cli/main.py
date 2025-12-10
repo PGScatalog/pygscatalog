@@ -1,0 +1,200 @@
+from __future__ import annotations
+
+import argparse
+import pathlib
+
+from pgscatalog.core.cli.download_cli import add_download_args, download_cli
+from pgscatalog.core.cli.format_cli import add_format_args, format_cli
+
+from pgscatalog.calc import GenomeFileType
+from pgscatalog.calc.cli._utils import check_positive, zero_one_float
+from pgscatalog.calc.cli.load import load_cli
+from pgscatalog.calc.cli.score import score_cli
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="pgsc_calc",
+        description="""
+    Polygenic Score (PGS) Catalog Calculator.
+
+    A set of programs to apply PGS scoring files to new target genomes.
+    """,
+    )
+    subparsers = parser.add_subparsers(required=True)
+
+    parser_load = subparsers.add_parser(
+        "load", help="Load genomes into a cache directory"
+    )
+    parser_load_args(parser_load)
+
+    parser_score = subparsers.add_parser("score", help="Calculate polygenic scores")
+    parser_score_args(parser_score)
+
+    parser_format = subparsers.add_parser(
+        "format", help="Format scoring files to a consistent structure "
+    )
+    parser_format_args(parser_format)
+
+    parser_download = subparsers.add_parser(
+        "download", help="Download PGS Catalog scoring files "
+    )
+    parser_download_args(parser_download)
+
+    args = parser.parse_args()
+
+    # dispatch args to correct function
+    args.func(args)
+
+
+def parser_download_args(parser: argparse.ArgumentParser) -> None:
+    add_download_args(parser)
+    parser.set_defaults(func=download_cli)
+
+
+def parser_format_args(parser: argparse.ArgumentParser) -> None:
+    add_format_args(parser)
+    parser.set_defaults(func=format_cli)
+
+
+def parser_score_args(parser: argparse.ArgumentParser) -> None:
+    """Arguments for the score program"""
+    parser.add_argument(
+        "--zarr_zip_file",
+        type=pathlib.Path,
+        nargs="+",
+        dest="zarr_zip_file",
+        required=True,
+        help="A list of zarr zip files created by pgsc_calc load.",
+    )
+    parser.add_argument(
+        "--score_paths",
+        type=pathlib.Path,
+        nargs="+",
+        help="PGS Catalog scoring file paths (processed with pgscatalog-format)",
+        required=True,
+    )
+    parser.add_argument(
+        "--out_dir",
+        type=pathlib.Path,
+        help="Directory path for output",
+        required=True,
+    )
+    parser.add_argument(
+        "--min_overlap",
+        type=zero_one_float,
+        dest="min_overlap",
+        help="Minimum variant overlap",
+        required=False,
+        default=0.75,
+    )
+    parser.add_argument(
+        "--keep_multiallelic",
+        dest="keep_multiallelic",
+        action="store_true",
+        help="Flag to allow matching to multiallelic variants (default: false).",
+        required=False,
+    )
+    parser.add_argument(
+        "--keep_ambiguous",
+        dest="keep_ambiguous",
+        action="store_true",
+        help="""
+            Flag to force the program to keep variants with
+            ambiguous alleles, (e.g. A/T and G/C SNPs), which are normally
+            excluded (default: false). In this case the program proceeds
+            assuming that the genotype data is on the same strand as the
+            GWAS whose summary statistics were used to construct the score.
+        """,
+    )
+    parser.add_argument(
+        "--threads",
+        type=check_positive,
+        help="Number of threads to use",
+        required=False,
+        default=1,
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=check_positive,
+        default=5_000,
+        help="Number of variants to buffer before writing to zarr",
+    )
+    parser.add_argument(
+        "--max_memory_gb",
+        # have to double %: argparse uses % to parse strings
+        help="Maximum RAM to use in GB (default: ~90%% of system RAM if not set)",
+        type=check_positive,
+        required=False,
+        default=16,
+    )
+    parser.set_defaults(func=score_cli)
+
+
+def parser_load_args(parser: argparse.ArgumentParser) -> None:
+    """Arguments for the load program"""
+    parser.add_argument(
+        "--cache_dir",
+        type=pathlib.Path,
+        default=pathlib.Path.cwd() / "pgscatalog-genome-cache",
+        dest="cache_dir",
+        help="A directory to store the cache.",
+    )
+    parser.add_argument(
+        "--zarr_zip_file",
+        type=pathlib.Path,
+        dest="zarr_zip_file",
+        required=False,
+        help="An existing zarr cache to update.",
+    )
+    parser.add_argument(
+        "--target_genomes",
+        type=str,
+        nargs="+",
+        help="Target genomes to load in the format PATH:CHROM",
+        required=True,
+    )
+    parser.add_argument(
+        "--sampleset",
+        type=str,
+        help="Human label for the target genomes (e.g. UKBiobank)",
+        required=True,
+    )
+    parser.add_argument(
+        "--format",
+        type=GenomeFileType,
+        choices=[x.value for x in GenomeFileType],
+        help="Target genome format",
+        required=True,
+    )
+    parser.add_argument(
+        "--score_paths",
+        type=pathlib.Path,
+        nargs="+",
+        help="PGS Catalog scoring file paths",
+        required=True,
+    )
+    parser.add_argument("--verbose", action="store_true", help="More logging!")
+    parser.add_argument(
+        "--threads",
+        type=check_positive,
+        default=1,
+        help="Number of dask threads to use (between 2 - 4 is good)",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=check_positive,
+        default=5_000,
+        help="Number of variants to buffer before writing to zarr",
+    )
+    parser.add_argument(
+        "--bgen_sample_file",
+        type=pathlib.Path,
+        help="Path to a BGEN sample file",
+        required=False,
+    )
+    parser.set_defaults(func=load_cli)
+
+
+if __name__ == "__main__":
+    main()
