@@ -11,6 +11,7 @@ from dask import array as da
 from numpy import typing as npt
 
 from pgscatalog.calc.lib.config import config
+from pgscatalog.calc.lib.constants import ZARR_PLOIDY
 
 if TYPE_CHECKING:
     import zarr
@@ -43,7 +44,7 @@ def create_score_table(db_path: Pathish) -> None:
             allele_count UINTEGER NOT NULL,
             score DOUBLE NOT NULL,
             dosage_sum DOUBLE NOT NULL,
-            score_avg GENERATED ALWAYS AS (score / (allele_count * 2)) VIRTUAL,
+            score_avg GENERATED ALWAYS AS (score / allele_count) VIRTUAL,
             PRIMARY KEY (accession, sampleset, sample_id)
         );
         """)
@@ -306,7 +307,8 @@ def calculate_nonmissing_allele_count(
     missing_variants = da.where(~missing_dask, dosage_dask, np.nan)
 
     # return a per-sample sum of non-missing allele count in this accession
+    # think about X / Y / MT here too
     per_sample_allele_count: npt.NDArray[np.int64] = da.sum(
         ~da.isnan(missing_variants[accession_idx,]), axis=0
-    ).compute()
+    ).compute() * ZARR_PLOIDY
     return per_sample_allele_count
