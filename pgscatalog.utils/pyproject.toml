@@ -1,6 +1,6 @@
 [project]
 name = "pgscatalog-utils"
-version = "2.0.2"
+version = "3.0.0-alpha.1"
 description = "Utilities for working with PGS Catalog API and scoring files"
 license = "Apache-2.0"
 authors = [
