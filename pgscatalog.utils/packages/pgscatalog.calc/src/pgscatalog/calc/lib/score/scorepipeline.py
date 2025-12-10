@@ -204,7 +204,7 @@ class ScorePipeline:
     ) -> None:
         logger.info("Matching scoring file variants in target genomes")
 
-        if 0 >= min_overlap > 1:
+        if not (0 < min_overlap <= 1):
             raise ValueError(
                 f"min_overlap must be positive and less than 1, got {min_overlap}"
             )
