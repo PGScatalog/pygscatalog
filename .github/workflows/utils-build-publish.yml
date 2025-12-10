@@ -41,7 +41,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./pgscatalog.utils
-          file: docker/utils.Dockerfile
+          file: ./pgscatalog.utils/docker/utils.Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
