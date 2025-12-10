@@ -101,7 +101,9 @@ def add_match_log(
                    match_summary,
                    is_ambiguous,
                    is_multiallelic,
-                   COUNT(match_summary) AS count
+                   COUNT(match_summary) AS count,
+                   -- count any match types which flipped the effect allele
+                   COUNT(*) FILTER (WHERE match_type LIKE '%flip') AS match_flipped
             FROM score_log_table
             GROUP BY sampleset,
                      accession,
@@ -140,6 +142,7 @@ def add_match_log(
             match_summary,
             is_ambiguous,
             is_multiallelic,
+            match_flipped,
             count,
             fraction,
             match_rate,
