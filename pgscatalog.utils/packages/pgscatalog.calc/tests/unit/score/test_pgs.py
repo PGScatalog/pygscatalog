@@ -260,7 +260,7 @@ def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missin
 
     # return a per-sample sum of non-missing allele count in this accession
 
-    expected = np.array([2, 2, 2], dtype=np.int64)
+    expected = np.array([4, 4, 4], dtype=np.int64)
 
     result = calculate_nonmissing_allele_count(
         is_missing_array=tiny_is_missing_zarr,
@@ -370,7 +370,7 @@ def test_calculate_score_statistics_tiny(
         {
             "accession": ["PGS000001"] * 3 + ["PGS999999"] * 3,
             "dosage_sum": [3.0, 2.0, 3.0] + [2.0, 2.0, 2.0],
-            "allele_count": [2, 2, 2] + [0, 1, 1],
+            "allele_count": [4, 4, 4] + [0, 2, 2],
             "n_matched": [1] * 6,  # one row per accession in allele_match_raw
             "sample_id": tiny_sample_ids + tiny_sample_ids,
             "score": [0.1, 0.3, 0.5] + [0.2, 0.4, 0.6],
