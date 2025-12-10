@@ -28,7 +28,14 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - uses: wntrblm/nox@2024.04.15
-        
+
+      - name: Install miniconda and activate base environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-activate: true
+          channels: conda-forge,bioconda,nodefaults
+          activate-environment: ""
+          
       - name: Test package before building
         run: nox -s tests -- ${{ inputs.package }}
         working-directory: pgscatalog.utils
