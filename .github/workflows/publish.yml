@@ -32,6 +32,7 @@ jobs:
       - name: Test package before building
         run: nox -s tests -- ${{ inputs.package }}
         working-directory: pgscatalog.utils
+        shell: bash -el {0}
 
       - name: Build package
         run: nox -s build -- ${{ inputs.package }}
