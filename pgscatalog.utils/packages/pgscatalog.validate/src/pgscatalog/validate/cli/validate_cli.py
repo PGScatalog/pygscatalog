@@ -21,19 +21,15 @@ def run() -> None:
     args = _parse_args()
     _check_args(args)
 
-    validator_type = args.type
-    files_dir = args.dir
-    log_dir = args.log_dir
+    validator_type: str = args.type
     filename: Path = args.filename
     dirname: Path = args.dir
     log_dir: Path = args.log_dir
     score_dir: Path = args.score_dir
+    check_filename: bool = args.check_filename
 
     # Check PGS Catalog file name nomenclature
-    check_filename = False
-    if args.check_filename:
-        check_filename = True
-    elif validator_type != 'raw':
+    if not check_filename and validator_type != 'raw':
         # Raw files can have any name
         print("WARNING: the parameter '--check_filename' is not present in the submitted command line, " +
               "therefore the validation of the scoring file name(s) won't be performed.")
