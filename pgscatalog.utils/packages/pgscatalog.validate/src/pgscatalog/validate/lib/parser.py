@@ -3,6 +3,7 @@ import csv
 import gzip
 from abc import abstractmethod
 from collections.abc import Iterable
+from os import PathLike
 from pathlib import Path
 from typing import List, TextIO, Generator
 
@@ -22,7 +23,7 @@ class ScoreFileParser(abc.ABC):
 
     file_path: Path
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str | PathLike[str]):
         self.file_path = Path(file_path)
         if not self.file_path.is_file():
             raise FileNotFoundError(f"Error: File not found: {self.file_path}")
@@ -41,9 +42,9 @@ class TSVFileParser(ScoreFileParser):
     # Abstracted open function, in case the file is gzipped
     open_fn = open
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str | PathLike[str]):
         super().__init__(file_path)
-        if file_path.endswith(".gz"):
+        if self.file_path.suffix == ".gz":
             self.open_fn = gzip.open
 
     def get_column_names(self) -> List[str]:
@@ -62,7 +63,7 @@ class SpreadsheetFileParser(ScoreFileParser):
 
     worksheet: Worksheet
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str | PathLike[str]):
         super().__init__(file_path)
         self.worksheet = load_workbook(self.file_path, read_only=True).worksheets[0]
 

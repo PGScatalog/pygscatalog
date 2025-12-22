@@ -1,9 +1,9 @@
 import argparse
-import glob
 import logging
 import os
 import re
 import textwrap
+from pathlib import Path
 from typing import TextIO
 
 from pgscatalog.validate.lib.models import ScoringFileValidationError
@@ -17,13 +17,17 @@ logging.basicConfig(level=logging.INFO, format='(%(levelname)s): %(message)s')
 
 
 def run() -> None:
-    global data_sum, score_dir
+    global data_sum
     args = _parse_args()
     _check_args(args)
 
     validator_type = args.type
     files_dir = args.dir
     log_dir = args.log_dir
+    filename: Path = args.filename
+    dirname: Path = args.dir
+    log_dir: Path = args.log_dir
+    score_dir: Path = args.score_dir
 
     # Check PGS Catalog file name nomenclature
     check_filename = False
@@ -43,13 +47,13 @@ def run() -> None:
 
     ## Run validator ##
     # One file
-    if args.filename:
-        _run_validator(args.filename, log_dir, score_dir, check_filename, header)
+    if filename:
+        _run_validator(filename, log_dir, score_dir, check_filename, header)
     # Content of the directory
-    elif files_dir:
+    elif dirname:
         count_files = 0
         # Browse directory: for each file run validator
-        for filepath in sorted(glob.glob(files_dir+"/*.*")):
+        for filepath in sorted(dirname.glob("*.*")):
             _run_validator(filepath, log_dir, score_dir, check_filename, header)
             count_files += 1
 
@@ -158,11 +162,11 @@ def _check_args(args: argparse.Namespace) -> None:
               " and the harmonized scoring file(s) won't be performed.")
 
 
-def _run_validator(filepath: str, log_dir: str, score_dir: str, check_filename: bool, header: bool) -> None:
+def _run_validator(filepath: Path, log_dir: Path, score_dir: Path, check_filename: bool, header: bool) -> None:
     """Run the file validator"""
     # TODO: add check_filename and score_dir support
-    file = os.path.basename(filepath)
-    filename = file.split('.')[0]
+    file = filepath.name
+    filename = filepath.stem
     print(f"# Filename: {file}")
     if log_dir:
         log_file = f'{log_dir}/{filename}_log.txt'
@@ -195,6 +199,20 @@ def _epilog_text() -> str:
    ''')
 
 
+def _valid_file(file: str) -> Path:
+    path = Path(file)
+    if not path.is_file():
+        raise argparse.ArgumentTypeError(f"{file} is not a valid file")
+    return path
+
+
+def _valid_dir(directory: str) -> Path:
+    path = Path(directory)
+    if not path.is_dir():
+        raise argparse.ArgumentTypeError(f"{directory} is not a directory")
+    return path
+
+
 def _parse_args(args=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=_description_text(), epilog=_epilog_text(),
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -202,16 +220,20 @@ def _parse_args(args=None) -> argparse.Namespace:
                         help=f"Type of validator: {' or '.join(val_types)}", metavar='VALIDATOR_TYPE',
                         default='raw')
     parser.add_argument("-f", "--filename",
+                        type=_valid_file,
                         help="""The path to the polygenic scoring file to be validated 
                         (no need to use the [--dir] option)""",
                         metavar='SCORING_FILE_NAME')
     parser.add_argument("-d", "--dir",
+                        type=_valid_dir,
                         help="""The name of the directory containing the files that need to processed 
                         (no need to use the [-f] option""")
     parser.add_argument("-D", "--score_dir",
+                        type=_valid_dir,
                         help="""<Optional> The name of the directory containing the formatted scoring files
                          to compare with harmonized scoring files (only if "--type hm_pos" is used)""")
     parser.add_argument("-l", "--log_dir",
+                        type=_valid_dir,
                         help='<Optional> The name of the log directory where the log file(s) will be stored',
                         required=False)
     parser.add_argument("-c", "--check_filename",

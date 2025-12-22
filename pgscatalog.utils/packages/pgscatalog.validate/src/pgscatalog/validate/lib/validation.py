@@ -1,3 +1,5 @@
+from os import PathLike
+from pathlib import Path
 from typing import Dict
 
 from pgscatalog.core.lib.models import VariantType, CatalogScoreHeader
@@ -25,19 +27,20 @@ class ScoringFileValidation:
     errors: list[ScoringFileValidationError]
     parser: ScoreFileParser
 
-    def __init__(self, file_name: str, header: bool = False, hm: bool = False):
+    def __init__(self, file_name: str | PathLike[str], header: bool = False, hm: bool = False):
 
-        if file_name.endswith('.xlsx'):
-            self.parser = SpreadsheetFileParser(file_name)
+        path = Path(file_name)
+        if path.suffix == '.xlsx':
+            self.parser = SpreadsheetFileParser(path)
         else:
-            self.parser = TSVFileParser(file_name)
+            self.parser = TSVFileParser(path)
 
         self.accession = self.parser.file_path.stem
         self.errors = []
 
         if header:
             try:
-                CatalogScoreHeader.from_path(file_name)
+                CatalogScoreHeader.from_path(path)
             except ValidationError as e:
                 self.errors.append(ScoringFileValidationError(0, e))
 
