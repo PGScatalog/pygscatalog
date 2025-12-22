@@ -51,17 +51,15 @@ class ScoringFileValidation:
                 return
 
             # Validate the variants
-            index = 0
-            for line in self.parser.get_variants():
+            for i, line in enumerate(self.parser.get_variants(), 1):
                 line = self.__remove_empty_values(line)
-                index += 1
                 try:
                     if 'variant_type' in line and line['variant_type'] in VariantType:
-                        ComplexVariant(**line, **{"accession": self.accession, "row_nr": index})
+                        ComplexVariant(**line, **{"accession": self.accession, "row_nr": i})
                     else:
-                        ValidationVariant(**line, **{"accession": self.accession, "row_nr": index})
+                        ValidationVariant(**line, **{"accession": self.accession, "row_nr": i})
                 except ValidationError as e:
-                    self.errors.append(ScoringFileValidationError(index, e))
+                    self.errors.append(ScoringFileValidationError(i, e))
 
         except FileNotFoundError:
             print(f"Error: File not found: {self.parser.file_path}")
