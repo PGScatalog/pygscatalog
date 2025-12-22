@@ -121,38 +121,9 @@ def _file_validation_state(filename: str, log_file: str) -> None:
 
 
 def _check_args(args: argparse.Namespace) -> None:
-    global score_dir
     ## Check parameters ##
-    # Type of validator
-    if args.type and args.type not in val_types:
-        print(f"Error: Validator type (option -t) '{args.t}' is not in the list of recognized types: {val_types}.")
-        exit(1)
-    # Logs dir
-    if args.log_dir and not os.path.isdir(args.log_dir):
-        print(f"Error: Log dir '{args.log_dir}' can't be found!")
-        exit(1)
-    # File and directory parameters (only one of the '-f' and '--dir' can be used)
-    if args.filename and args.dir:
-        print("Error: you can't use both options [-f] - single scoring file and [--dir] - directory of scoring files."
-              " Please use only 1 of these 2 options!")
-        exit(1)
-    elif not args.filename and not args.dir:
-        print("Error: you need to provide a scoring file [-f] or a directory of scoring files [--dir]!")
-        exit(1)
-    elif args.filename and not os.path.isfile(args.filename):
-        print(f"Error: Scoring file '{args.filename}' can't be found!")
-        exit(1)
-    elif args.dir and not os.path.isdir(args.dir):
-        print(f"Error: the scoring file directory '{args.dir}' can't be found!")
-        exit(1)
     # Scoring files directory (only to compare with the harmonized files)
-    score_dir = None
-    if args.score_dir:
-        score_dir = args.score_dir
-        if not os.path.isdir(score_dir):
-            print(f"Error: Scoring file directory '{score_dir}' can't be found!")
-            exit(1)
-    elif args.type not in ['formatted', 'raw']:
+    if args.type == 'hm_pos' and not args.score_dir:
         print("WARNING: the parameter '--score_dir' is not present in the submitted command line,"
               " therefore the comparison of the number of data rows between the formatted scoring file(s)"
               " and the harmonized scoring file(s) won't be performed.")
@@ -214,16 +185,17 @@ def _parse_args(args=None) -> argparse.Namespace:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-t", "--type",
                         help=f"Type of validator: {' or '.join(val_types)}", metavar='VALIDATOR_TYPE',
-                        default='raw')
-    parser.add_argument("-f", "--filename",
-                        type=_valid_file,
-                        help="""The path to the polygenic scoring file to be validated 
-                        (no need to use the [--dir] option)""",
-                        metavar='SCORING_FILE_NAME')
-    parser.add_argument("-d", "--dir",
-                        type=_valid_dir,
-                        help="""The name of the directory containing the files that need to processed 
-                        (no need to use the [-f] option""")
+                        choices=val_types, default='raw')
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("-f", "--filename",
+                             type=_valid_file,
+                             help="""The path to the polygenic scoring file to be validated 
+                             (no need to use the [--dir] option)""",
+                             metavar='SCORING_FILE_NAME')
+    input_group.add_argument("-d", "--dir",
+                             type=_valid_dir,
+                             help="""The name of the directory containing the files that need to processed 
+                             (no need to use the [-f] option""")
     parser.add_argument("-D", "--score_dir",
                         type=_valid_dir,
                         help="""<Optional> The name of the directory containing the formatted scoring files
