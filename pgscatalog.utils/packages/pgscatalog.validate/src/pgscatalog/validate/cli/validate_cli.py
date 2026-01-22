@@ -27,6 +27,7 @@ def run() -> None:
     log_dir: Path = args.log_dir
     score_dir: Path = args.score_dir
     check_filename: bool = args.check_filename
+    strict: bool = args.strict
 
     # Check PGS Catalog file name nomenclature
     if not check_filename and validator_type != 'raw':
@@ -44,13 +45,13 @@ def run() -> None:
     ## Run validator ##
     # One file
     if filename:
-        _run_validator(filename, log_dir, score_dir, check_filename, header)
+        _run_validator(filename, log_dir, score_dir, check_filename, header, strict)
     # Content of the directory
     elif dirname:
         count_files = 0
         # Browse directory: for each file run validator
         for filepath in sorted(dirname.glob("*.*")):
-            _run_validator(filepath, log_dir, score_dir, check_filename, header)
+            _run_validator(filepath, log_dir, score_dir, check_filename, header, strict)
             count_files += 1
 
         # Print summary  + results
@@ -120,6 +121,13 @@ def _file_validation_state(filename: str, log_file: str) -> None:
         data_sum['other'].append(filename)
 
 
+def _report_warnings(warnings: list[str]) -> None:
+    """Print the given warnings to stdout."""
+    print('- Warnings:')
+    for warning in warnings:
+        print(warning)
+
+
 def _check_args(args: argparse.Namespace) -> None:
     ## Check parameters ##
     # Scoring files directory (only to compare with the harmonized files)
@@ -129,7 +137,7 @@ def _check_args(args: argparse.Namespace) -> None:
               " and the harmonized scoring file(s) won't be performed.")
 
 
-def _run_validator(filepath: Path, log_dir: Path, score_dir: Path, check_filename: bool, header: bool) -> None:
+def _run_validator(filepath: Path, log_dir: Path, score_dir: Path, check_filename: bool, header: bool, strict: bool = False) -> None:
     """Run the file validator"""
     # TODO: add check_filename and score_dir support
     file = filepath.name
@@ -140,7 +148,7 @@ def _run_validator(filepath: Path, log_dir: Path, score_dir: Path, check_filenam
     else:
         log_file = None
 
-    validation = ScoringFileValidation(filepath, header=header)
+    validation = ScoringFileValidation(filepath, header=header, strict=strict)
 
     # Check log
     if log_file:
@@ -149,6 +157,8 @@ def _run_validator(filepath: Path, log_dir: Path, score_dir: Path, check_filenam
     else:
         # Report to stdout
         _report_errors_to_stdout(validation.errors)
+    if validation.warnings:
+        _report_warnings(validation.warnings)
 
 
 def _description_text() -> str:
@@ -207,6 +217,10 @@ def _parse_args(args=None) -> argparse.Namespace:
     parser.add_argument("-c", "--check_filename",
                         help="""<Optional> Check that the file name match the PGS Catalog nomenclature. 
                         Only if using with --type [formatted|hm_pos]""",
+                        required=False,
+                        action='store_true')
+    parser.add_argument("-s", "--strict",
+                        help="""<Optional> Treat warnings (such as leading/trailing spaces) as errors""",
                         required=False,
                         action='store_true')
     return parser.parse_args(args)

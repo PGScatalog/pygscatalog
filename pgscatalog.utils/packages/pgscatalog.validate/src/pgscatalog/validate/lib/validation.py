@@ -27,7 +27,7 @@ class ScoringFileValidation:
     errors: list[ScoringFileValidationError]
     parser: ScoreFileParser
 
-    def __init__(self, file_name: str | PathLike[str], header: bool = False, hm: bool = False):
+    def __init__(self, file_name: str | PathLike[str], header: bool = False, hm: bool = False, strict: bool = False):
 
         path = Path(file_name)
         if path.suffix == '.xlsx':
@@ -43,6 +43,9 @@ class ScoringFileValidation:
                 CatalogScoreHeader.from_path(path)
             except ValidationError as e:
                 self.errors.append(ScoringFileValidationError(0, e))
+
+        # Setting strict static variable
+        ValidationModel.strict = strict
 
         try:
             column_names = self.parser.get_column_names()
@@ -63,6 +66,8 @@ class ScoringFileValidation:
                         ValidationVariant(**line, **{"accession": self.accession, "row_nr": i})
                 except ValidationError as e:
                     self.errors.append(ScoringFileValidationError(i, e))
+
+            self.warnings = ValidationModel.warnings
 
         except FileNotFoundError:
             print(f"Error: File not found: {self.parser.file_path}")

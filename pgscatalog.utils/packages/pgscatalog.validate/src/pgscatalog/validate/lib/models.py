@@ -1,5 +1,5 @@
 import re
-from typing import ClassVar, Any, Optional
+from typing import ClassVar, Any, Optional, List
 
 from pydantic import (
     BaseModel,
@@ -95,7 +95,22 @@ class ColumnNames(BaseModel):
         return self
 
 
-class ValidationVariant(ScoreVariant):
+class ValidationModel(BaseModel):
+    """Class for models that need additional validation compared to the core model class"""
+    strict: ClassVar[bool] = False
+    warnings: ClassVar[List[str]] = []
+
+    @classmethod
+    def raise_warning(cls, text):
+        """ Raise a warning with the given message. Might be promoted to error if ValidationModel.strict
+        static variable is set to True"""
+        if cls.strict:
+            raise ValueError(text)
+        else:
+            cls.warnings.append(text)
+
+
+class ValidationVariant(ScoreVariant, ValidationModel):
     """Adds an extra layer of validation of scoring file variants"""
 
     ## Allowed chromosome names
@@ -133,7 +148,8 @@ class ValidationVariant(ScoreVariant):
         if cls.__value_contains_non_printable_characters(v):
             raise ValueError(errors.NON_PRINTABLE_CHAR.format(input=repr(v)))
         if cls.__value_contains_leading_or_trailing_spaces(v):
-            raise ValueError(errors.LEADING_OR_TRAILING_SPACE.format(input=repr(v)))
+            cls.raise_warning(errors.LEADING_OR_TRAILING_SPACE.format(input=repr(v)))
+            v = v.strip()  # If just warning, we don't want to propagate the wrong value to further validation routines
         return v
 
     @field_validator('chr_name', 'hm_chr', mode="after")
