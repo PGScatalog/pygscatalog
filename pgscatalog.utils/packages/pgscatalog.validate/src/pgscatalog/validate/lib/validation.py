@@ -25,6 +25,7 @@ class ScoringFileValidation:
     column_names: ColumnNames
     accession: str
     errors: list[ScoringFileValidationError]
+    warnings: list[str]
     parser: ScoreFileParser
 
     def __init__(self, file_name: str | PathLike[str], header: bool = False, hm: bool = False, strict: bool = False):
@@ -37,6 +38,7 @@ class ScoringFileValidation:
 
         self.accession = self.parser.file_path.stem
         self.errors = []
+        self.warnings = []
 
         if header:
             try:
@@ -44,8 +46,9 @@ class ScoringFileValidation:
             except ValidationError as e:
                 self.errors.append(ScoringFileValidationError(0, e))
 
-        # Setting strict static variable
+        # Setting static variables (meant to be changed in the future to something more elegant)
         ValidationModel.strict = strict
+        ValidationModel.warnings = []
 
         try:
             column_names = self.parser.get_column_names()

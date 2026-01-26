@@ -1,8 +1,8 @@
 import argparse
 import logging
-import os
-import re
+import sys
 import textwrap
+import warnings
 from pathlib import Path
 from typing import TextIO
 
@@ -17,7 +17,6 @@ logging.basicConfig(level=logging.INFO, format='(%(levelname)s): %(message)s')
 
 
 def run() -> None:
-    global data_sum
     args = _parse_args()
     _check_args(args)
 
@@ -49,33 +48,35 @@ def run() -> None:
     # Content of the directory
     elif dirname:
         count_files = 0
+        valid_files = []
+        invalid_files = []
+        other_files = []
         # Browse directory: for each file run validator
         for filepath in sorted(dirname.glob("*.*")):
-            _run_validator(filepath, log_dir, score_dir, check_filename, header, strict)
             count_files += 1
+            try:
+                summary = _run_validator(filepath, log_dir, score_dir, check_filename, header, strict)
+            except Exception as e:
+                warnings.warn(str(e))
+                other_files.append(filepath)
+                continue
+            if summary['errors_count'] > 0:
+                invalid_files.append(filepath)
+            else:
+                valid_files.append(filepath)
 
         # Print summary  + results
         print("\nSummary:")
-        if data_sum['valid']:
-            print(f"- Valid: {len(data_sum['valid'])}/{count_files}")
-        if data_sum['invalid']:
-            print(f"- Invalid: {len(data_sum['invalid'])}/{count_files}")
-        if data_sum['other']:
-            print(f"- Other issues: {len(data_sum['other'])}/{count_files}")
+        if valid_files:
+            print(f"- Valid: {len(valid_files)}/{count_files}")
+        if invalid_files:
+            print(f"- Invalid: {len(invalid_files)}/{count_files}")
+        if other_files:
+            print(f"- Other issues: {len(other_files)}/{count_files}")
 
-        if data_sum['invalid']:
-            print("Invalid files:")
-            print("\n".join(data_sum['invalid']))
-
-
-def _read_last_line(file: str) -> str:
-    """
-    Return the last line of the file
-    """
-    file_handle = open(file, "r")
-    lines = file_handle.readlines()
-    file_handle.close()
-    return lines[-1]
+        if invalid_files:
+            print("\nInvalid files:")
+            print("\n".join(map(str, invalid_files)))
 
 
 def _print_errors(validation_errors, file: TextIO = None):
@@ -103,29 +104,11 @@ def _report_errors_to_stdout(validation_errors: list[ScoringFileValidationError]
     _print_errors(validation_errors, None)
 
 
-def _file_validation_state(filename: str, log_file: str) -> None:
-    global data_sum
-    if os.path.exists(log_file):
-        log_result = _read_last_line(log_file)
-        if re.search("File is valid", log_result):
-            print("> valid\n")
-            data_sum['valid'].append(filename)
-        elif re.search("File is invalid", log_result):
-            print("#### invalid! ####\n")
-            data_sum['invalid'].append(filename)
-        else:
-            print("!! validation process had an issue. Please look at the logs.\n")
-            data_sum['other'].append(filename)
-    else:
-        print("!! validation process had an issue: the log file can't be found")
-        data_sum['other'].append(filename)
-
-
-def _report_warnings(warnings: list[str]) -> None:
-    """Print the given warnings to stdout."""
-    print('- Warnings:')
-    for warning in warnings:
-        print(warning)
+def _report_warnings(warning_messages: list[str], file=sys.stdout) -> None:
+    """Print the given warnings to stdout or the given file if provided."""
+    print('- Warnings:', file=file)
+    for warning in warning_messages:
+        print(warning, file=file)
 
 
 def _check_args(args: argparse.Namespace) -> None:
@@ -137,7 +120,8 @@ def _check_args(args: argparse.Namespace) -> None:
               " and the harmonized scoring file(s) won't be performed.")
 
 
-def _run_validator(filepath: Path, log_dir: Path, score_dir: Path, check_filename: bool, header: bool, strict: bool = False) -> None:
+def _run_validator(filepath: Path, log_dir: Path, score_dir: Path, check_filename: bool,
+                   header: bool, strict: bool = False) -> dict:
     """Run the file validator"""
     # TODO: add check_filename and score_dir support
     file = filepath.name
@@ -150,15 +134,22 @@ def _run_validator(filepath: Path, log_dir: Path, score_dir: Path, check_filenam
 
     validation = ScoringFileValidation(filepath, header=header, strict=strict)
 
+    summary = {'errors_count': len(validation.errors)}
+
     # Check log
     if log_file:
         _report_errors_to_log_file(validation.errors, log_file)
-        _file_validation_state(file, log_file)
+        summary['log_file'] = log_file
+        if validation.warnings:
+            with open(log_file, 'a') as f:
+                _report_warnings(validation.warnings, file=f)
     else:
         # Report to stdout
         _report_errors_to_stdout(validation.errors)
-    if validation.warnings:
-        _report_warnings(validation.warnings)
+        if validation.warnings:
+            _report_warnings(validation.warnings)
+
+    return summary
 
 
 def _description_text() -> str:
