@@ -106,9 +106,8 @@ def _report_errors_to_stdout(validation_errors: list[ScoringFileValidationError]
 
 def _report_warnings(warning_messages: list[str], file=sys.stdout) -> None:
     """Print the given warnings to stdout or the given file if provided."""
-    print('- Warnings:', file=file)
     for warning in warning_messages:
-        print(warning, file=file)
+        print(f"WARNING: {warning}", file=file)
 
 
 def _check_args(args: argparse.Namespace) -> None:
