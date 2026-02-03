@@ -19,3 +19,4 @@ EXCLUSION_GROUP_NOT_IN_VAR_DESC = "Exclusion group \"{input}\" is not found in v
 EXCLUSION_GROUPS_NOT_IN_EFFECT_ALLELE = "Exclusion group(s) \"{input}\" are declared in variant_description but cannot be found in effect_allele."
 DUPLICATE_EXCLUSION_GROUPS = "Exclusion group \"{input}\" is declared twice"
 LOCUS_NAME_NOT_APOE = "locus_name of APOE allele variant is not APOE"
+LOCUS_NAME_NOT_CYP = "locus_name of CYP allele variant does not follow CYP gene naming convention"

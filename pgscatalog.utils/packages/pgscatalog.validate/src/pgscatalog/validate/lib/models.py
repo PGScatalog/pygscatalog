@@ -210,10 +210,10 @@ class ComplexVariant(ValidationVariant):
     def _validate_apoe(self):
         if self.locus_name != 'APOE':
             raise ValueError(errors.LOCUS_NAME_NOT_APOE)
-        pass
 
     def _validate_cyp(self):
-        pass
+        if not self.locus_name.startswith('CYP'):
+            raise ValueError(errors.LOCUS_NAME_NOT_CYP)
 
     def _get_exclusion_groups(self) -> dict:
         exclusion_groups = {}
