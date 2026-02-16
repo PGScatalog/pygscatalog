@@ -52,8 +52,8 @@ First, download chain files from UCSC:
 * `hg19ToHg38.over.chain.gz`_
 * `hg38ToHg19.over.chain.gz`_
 
-.. _hg19ToHg38.over.chain.gz: https://hgdownload.soe.ucsc.edu/goldenPath/hg38/liftOver/
-.. _hg38ToHg19.over.chain.gz: https://hgdownload.soe.ucsc.edu/goldenPath/hg19/liftOver/
+.. _hg19ToHg38.over.chain.gz: https://hgdownload.soe.ucsc.edu/goldenPath/hg19/liftOver/
+.. _hg38ToHg19.over.chain.gz: https://hgdownload.soe.ucsc.edu/goldenPath/hg38/liftOver/
 
 And copy them into a directory (e.g. ``my_chain_dir/``).
 
