@@ -5,7 +5,7 @@ import pytest
 
 from pgscatalog.core.cli.download_cli import main as run
 
-trait = "EFO_0004214"
+trait = "MONDO_0005068"
 pgs_id = "PGS000822"
 pgp_id = "PGP000001"
 
