@@ -774,13 +774,13 @@ class ScoreHeader(BaseModel):
     it easier for people to use custom scoring files with the PGS Catalog Calculator.
 
     >>> ScoreHeader(**{"pgs_id": "PGS123456", "trait_reported": "testtrait", "genome_build": "GRCh38"})
-    ScoreHeader(pgs_id='PGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38)
+    ScoreHeader(pgs_id='PGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
 
     >>> ScoreHeader(**{"omicspred_id": "OPGS123456", "trait_reported": "testtrait", "genome_build": "GRCh38"})
-    ScoreHeader(pgs_id='OPGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38)
+    ScoreHeader(pgs_id='OPGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
 
     >>> ScoreHeader(**{"score_id": "SC1234B", "trait_reported": "testtrait", "genome_build": "GRCh37"})
-    ScoreHeader(pgs_id='SC1234B', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh37)
+    ScoreHeader(pgs_id='SC1234B', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh37, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
 
     >>> from ._config import Config
     >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
@@ -788,7 +788,7 @@ class ScoreHeader(BaseModel):
     77
 
     >>> from ._config import Config
-    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "OPGS002493.txt.gz"
+    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "OPGS017309_hmPOS_GRCh38.txt.gz"
     >>> test = ScoreHeader.from_path(testpath) # doctest
     """
 
