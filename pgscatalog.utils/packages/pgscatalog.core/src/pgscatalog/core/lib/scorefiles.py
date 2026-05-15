@@ -54,7 +54,7 @@ class ScoringFile:
     >>> sf
     ScoringFile('.../OPGS002493.txt.gz', target_build=None)
     >>> sf.header
-    ScoreHeader(pgs_id='OPGS002493', pgs_name='P80162', trait_reported='C-X-C motif chemokine 6', genome_build=GenomeBuild.GRCh37)
+    ScoreHeader(pgs_id='OPGS002493', pgs_name='P80162', trait_reported='C-X-C motif chemokine 6', genome_build=GenomeBuild.GRCh37, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
     >>> sf.is_harmonised
     False
     >>> for variant in sf.variants:
