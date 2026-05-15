@@ -1,0 +1,12 @@
+#omicspred_id=OPGS019828
+#pgs_name=OID31373
+#trait_type=proteomics
+#measurement_tissue=plasma
+#measurement_platform=Olink Explore
+#trait_reported=Epigen
+#genome_build=GRCh37
+#variants_number=1
+#citation=Xu*, Loesch*, Taylor* et al. Population-scale phenome-wide association analysis of the imputed plasma proteome. (in preparation)
+#license=CC BY
+rsid	chr_name	chr_position	effect_allele	other_allele	effect_weight
+rs17309228	7	25452779	T	C	-0.0553658304720546
