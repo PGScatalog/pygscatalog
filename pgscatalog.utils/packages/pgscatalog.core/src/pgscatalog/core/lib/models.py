@@ -812,12 +812,19 @@ class ScoreHeader(BaseModel):
     # genome build is Optional because "NR" is represented internally as None
     genome_build: Annotated[GenomeBuild | None, Field(description="Genome build")]
 
+    ##HARMONIZATION DETAILS
+    HmPOS_build: Annotated[GenomeBuild | None, Field(default=None)]
+    HmPOS_date: Annotated[date | None, Field(default=None)]
+    HmPOS_match_pos: Annotated[str | None, Field(default=None)]
+    HmPOS_match_chr: Annotated[str | None, Field(default=None)]
+
     _path: pathlib.Path | None
 
     @property
     def is_harmonised(self) -> bool:
-        # custom scores can't be harmonised o_o
-        return False
+        if self.HmPOS_build is None and self.HmPOS_date is None:
+            return False
+        return True
 
     @field_validator("genome_build", mode="before")
     @classmethod
@@ -826,9 +833,9 @@ class ScoreHeader(BaseModel):
             return None
         return GenomeBuild.from_string(value)
 
-    @field_serializer("genome_build")
+    @field_serializer("genome_build", "HmPOS_build")
     def serialize_genomebuild(
-        self, genome_build: GenomeBuild, _info: SerializationInfo
+        self, genome_build: GenomeBuild | None, _info: SerializationInfo
     ) -> str:
         return genome_build.value if genome_build is not None else "NR"
 
@@ -904,11 +911,6 @@ class CatalogScoreHeader(ScoreHeader):
     ##SOURCE INFORMATION
     pgp_id: str
     citation: str
-    ##HARMONIZATION DETAILS
-    HmPOS_build: Annotated[GenomeBuild | None, Field(default=None)]
-    HmPOS_date: Annotated[date | None, Field(default=None)]
-    HmPOS_match_pos: Annotated[str | None, Field(default=None)]
-    HmPOS_match_chr: Annotated[str | None, Field(default=None)]
 
     # note: only included when different from default
     license: Annotated[
@@ -957,12 +959,6 @@ class CatalogScoreHeader(ScoreHeader):
             return None
         return GenomeBuild.from_string(value)
 
-    @field_serializer("genome_build", "HmPOS_build")
-    def serialize_genomebuild(
-        self, genome_build: GenomeBuild | None, _info: SerializationInfo
-    ) -> str:
-        return genome_build.value if genome_build is not None else "NR"
-
     @field_validator("format_version")
     @classmethod
     def check_format_version(cls, version: ScoreFormatVersion) -> ScoreFormatVersion:
@@ -976,12 +972,6 @@ class CatalogScoreHeader(ScoreHeader):
         if value == "NR":
             value = None
         return value
-
-    @property
-    def is_harmonised(self) -> bool:
-        if self.HmPOS_build is None and self.HmPOS_date is None:
-            return False
-        return True
 
 
 class VariantLog(BaseModel):
