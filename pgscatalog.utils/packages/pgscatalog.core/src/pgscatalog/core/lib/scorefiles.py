@@ -40,7 +40,7 @@ class ScoringFile:
     >>> sf # doctest: +ELLIPSIS
     ScoringFile('.../custom.txt', target_build=None)
     >>> sf.header
-    ScoreHeader(pgs_id='test', pgs_name='test', trait_reported='test trait', genome_build=GenomeBuild.GRCh37)
+    ScoreHeader(pgs_id='test', pgs_name='test', trait_reported='test trait', genome_build=GenomeBuild.GRCh37, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
     >>> sf.is_harmonised
     False
 
