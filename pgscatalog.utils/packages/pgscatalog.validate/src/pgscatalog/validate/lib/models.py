@@ -1,4 +1,6 @@
 import re
+from dataclasses import dataclass
+from enum import Enum
 from typing import ClassVar, Any, Optional, List
 
 from pydantic import (
@@ -6,21 +8,52 @@ from pydantic import (
     model_validator,
     ValidationError, field_validator
 )
+from pydantic_core.core_schema import ValidationInfo
 from typing_extensions import Self
 
 from pgscatalog.core.lib.models import ScoreVariant
 import pgscatalog.validate.lib.errors as errors
 
 
+class ErrorLevel(Enum):
+    WARNING = 1
+    ERROR = 2
+
+
+@dataclass
+class ErrorData:
+    """
+    Class for representing a single error message. It contains the error message and the attribute that caused the error, if applicable.
+    For example, if the error is "Invalid chromosome name", the attr would be "chr_name".
+    """
+    msg: str
+    attr: str = None
+
+
 class ScoringFileValidationError(Exception):
-    """Wrapper class for pydantic validation errors that also includes the row number where the error occurred."""
+    """
+    Class for representing the validation errors found in the scoring file. It contains the row number,
+    the error level and a list of error messages.
+
+    Can be initialized with either a pydantic ValidationError (for errors found during model validation)
+    or a list of error messages (used for warnings as they don't use the pydantic ValidationError class).
+
+    """
 
     row: int
-    error: ValidationError
+    level: ErrorLevel
+    errors: list[ErrorData]
 
-    def __init__(self, row, error: ValidationError):
+    def __init__(self, row, error: ValidationError | list[object] | object, level: ErrorLevel = ErrorLevel.ERROR):
         self.row = row
-        self.error = error
+        self.level = level
+        if isinstance(error, ValidationError):
+            self.errors = [ErrorData(msg=e['msg'], attr=e['loc'][0] if e['loc'] else None) for e in error.errors()]
+        else:
+            if isinstance(error, list):
+                self.errors = [ErrorData(msg=str(e)) for e in error]
+            else:
+                self.errors = [ErrorData(msg=str(error)),]
 
 
 class ColumnNames(BaseModel):
@@ -101,13 +134,13 @@ class ValidationModel(BaseModel):
     warnings: ClassVar[List[str]] = []
 
     @classmethod
-    def raise_warning(cls, text):
+    def raise_warning(cls, text: str, context: dict):
         """ Raise a warning with the given message. Might be promoted to error if ValidationModel.strict
         static variable is set to True"""
         if cls.strict:
             raise ValueError(text)
         else:
-            cls.warnings.append(text)
+            context.setdefault("warnings", []).append(text)
 
 
 class ValidationVariant(ScoreVariant, ValidationModel):
@@ -141,14 +174,17 @@ class ValidationVariant(ScoreVariant, ValidationModel):
         check_fields=False,
     )
     @classmethod
-    def extra_field_validation(cls, v: Any) -> Optional[Any]:
+    def extra_field_validation(cls, v: Any, info: ValidationInfo) -> Optional[Any]:
         """
         Validate all fields for common mistakes such as non-printable characters or leading/trailing spaces.
         """
+
+        context = info.context if info.context is not None else {}
+
         if cls.__value_contains_non_printable_characters(v):
             raise ValueError(errors.NON_PRINTABLE_CHAR.format(input=repr(v)))
         if cls.__value_contains_leading_or_trailing_spaces(v):
-            cls.raise_warning(errors.LEADING_OR_TRAILING_SPACE.format(input=repr(v)))
+            cls.raise_warning(errors.LEADING_OR_TRAILING_SPACE.format(input=repr(v)), context)
             v = v.strip()  # If just warning, we don't want to propagate the wrong value to further validation routines
         return v
 
