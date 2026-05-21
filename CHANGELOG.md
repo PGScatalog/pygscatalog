@@ -1,3 +1,9 @@
+## 2026-05-21
+
+Patch release [pgscatalog-core-1.1.0](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-core-1.1.0)
+
+* Fix support for OmicsPred scoring files
+ 
 ## 2025-08-07
 
 Patch release [pgscatalog-utils-1.0.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.0.1)
