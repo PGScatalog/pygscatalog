@@ -42,7 +42,7 @@ class ScoringFile:
     >>> sf # doctest: +ELLIPSIS
     ScoringFile('.../custom.txt', target_build=None)
     >>> sf.header
-    ScoreHeader(pgs_id='test', pgs_name='test', trait_reported='test trait', genome_build=GenomeBuild.GRCh37)
+    ScoreHeader(pgs_id='test', pgs_name='test', trait_reported='test trait', genome_build=GenomeBuild.GRCh37, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
     >>> sf.is_harmonised
     False
 
@@ -54,7 +54,7 @@ class ScoringFile:
     >>> sf
     ScoringFile('.../OPGS002493.txt.gz', target_build=None)
     >>> sf.header
-    ScoreHeader(pgs_id='OPGS002493', pgs_name='P80162', trait_reported='C-X-C motif chemokine 6', genome_build=GenomeBuild.GRCh37)
+    ScoreHeader(pgs_id='OPGS002493', pgs_name='P80162', trait_reported='C-X-C motif chemokine 6', genome_build=GenomeBuild.GRCh37, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
     >>> sf.is_harmonised
     False
     >>> for variant in sf.variants:
@@ -68,7 +68,7 @@ class ScoringFile:
     >>> sf # doctest: +ELLIPSIS
     ScoringFile('.../PGS000001_hmPOS_GRCh38.txt.gz', target_build=None)
     >>> sf.header
-    CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=<ScoreFormatVersion.v2: '2.0'>, trait_mapped=['breast carcinoma'], trait_efo=['EFO_0000305'], variants_number=77, weight_type=None, pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build=GenomeBuild.GRCh38, HmPOS_date=datetime.date(2022, 7, 29), HmPOS_match_pos='{"True": null, "False": null}', HmPOS_match_chr='{"True": null, "False": null}')
+    CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, HmPOS_build=GenomeBuild.GRCh38, HmPOS_date=datetime.date(2022, 7, 29), HmPOS_match_pos='{"True": null, "False": null}', HmPOS_match_chr='{"True": null, "False": null}', format_version=<ScoreFormatVersion.v2: '2.0'>, trait_mapped=['breast carcinoma'], trait_efo=['EFO_0000305'], variants_number=77, weight_type=None, pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036')
 
     Looking at the header above, the original submission lacked a genome build but has been harmonised:
 

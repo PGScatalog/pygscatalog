@@ -20,6 +20,20 @@ def custom_scorefiles(request):
     return custom1, custom2
 
 
+@pytest.fixture(scope="package")
+def omicspred_scorefiles(request):
+    omicspred1 = request.path.parent / "data" / "OPGS017309.txt"
+    omicspred2 = request.path.parent / "data" / "OPGS019828.txt"
+    return omicspred1, omicspred2
+
+
+@pytest.fixture(scope="package")
+def harmonised_omicspred_scorefiles(request):
+    hm_omicspred1 = request.path.parent / "data" / "OPGS017309_hmPOS_GRCh38.txt.gz"
+    hm_omicspred2 = request.path.parent / "data" / "OPGS019828_hmPOS_GRCh38.txt.gz"
+    return hm_omicspred1, hm_omicspred2
+
+
 @pytest.fixture(scope="package", params=("GRCh37", "GRCh38"))
 def harmonised_scorefiles(request):
     pgs000001 = request.path.parent / "data" / f"PGS000001_hmPOS_{request.param}.txt.gz"
@@ -62,6 +76,11 @@ def expected_fields():
 @pytest.fixture(scope="package")
 def n_variants():
     return collections.Counter({"PGS000001": 77, "PGS000002": 77})
+
+
+@pytest.fixture(scope="package")
+def n_variants_omicspred():
+    return collections.Counter({"OPGS017309": 697, "OPGS019828": 1})
 
 
 @pytest.fixture(scope="package")
@@ -213,6 +232,38 @@ def test_combine_score_harmonised(
     assert (tmp_path / "log_combined.json").exists(), "Missing log output"
 
 
+def test_combine_omicspred_score_harmonised(
+    tmp_path, harmonised_omicspred_scorefiles, expected_fields, n_variants_omicspred
+
+):
+    """Test combining OmicsPred harmonised data: OPGS017309 and OPGS019828.
+    The genome build always matches across both files, so combining should work."""
+    paths = [str(x) for x in harmonised_omicspred_scorefiles]
+    build = "GRCh38"
+
+    op_log = "log_combined_omicspred.json"
+
+    args = [("pgscatalog-format", "-s"), paths, ("-o", str(tmp_path), "-t", build, "-l", op_log)]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run()
+
+    results = []
+    for path in [pathlib.Path(x).name for x in paths]:
+        with gzip.open(tmp_path / ("normalised_" + path), mode="rt") as f:
+            csv_reader = csv.DictReader(f, delimiter="\t")
+            results.extend(list(csv_reader))
+    print(results)
+
+    # split to remove harmonisation suffix hmPOS_GRCh3X
+    opgs = collections.Counter([x["accession"].split("_")[0] for x in results])
+    assert opgs == n_variants_omicspred
+    assert all([expected_fields == tuple(variant.keys()) for variant in results])
+
+    assert (tmp_path / op_log).exists(), "Missing log output"
+
+
 def test_combine_fail(tmp_path, harmonised_scorefiles):
     """Test combining files with the same build but the wrong target build.
     Local files are in GRCh38, but we say we want GRCh37 (and vice versa)"""
@@ -280,6 +331,51 @@ def test_combine_custom(tmp_path, custom_scorefiles):
                 "effect_type": "additive",
                 "is_duplicated": "False",
                 "accession": "test2",
+                "row_nr": "0",
+            }
+        ]
+
+
+def test_combine_omicspred(tmp_path, omicspred_scorefiles):
+    """Test combining Omicspred scoring files"""
+    target_build = "GRCh37"
+
+    args = [
+        ("pgscatalog-format", "-s"),
+        (str(x) for x in omicspred_scorefiles),
+        ("-o", str(tmp_path), "-t", target_build),
+    ]
+    flargs = list(itertools.chain(*args))
+
+    with patch("sys.argv", flargs):
+        run()
+
+    with open(tmp_path / "normalised_OPGS017309.txt") as f:
+        csv_reader = csv.DictReader(f, delimiter="\t")
+        assert list(csv_reader)[0] == {
+            "chr_name": "6",
+            "chr_position": "159767493",
+            "effect_allele": "C",
+            "other_allele": "T",
+            "effect_weight": "-0.0181768630858936",
+            "effect_type": "additive",
+            "is_duplicated": "False",
+            "accession": "OPGS017309",
+            "row_nr": "0",
+        }
+
+    with open(tmp_path / "normalised_OPGS019828.txt") as f:
+        csv_reader = csv.DictReader(f, delimiter="\t")
+        assert list(csv_reader) == [
+            {
+                "chr_name": "7",
+                "chr_position": "25452779",
+                "effect_allele": "T",
+                "other_allele": "C",
+                "effect_weight": "-0.0553658304720546",
+                "effect_type": "additive",
+                "is_duplicated": "False",
+                "accession": "OPGS019828",
                 "row_nr": "0",
             }
         ]

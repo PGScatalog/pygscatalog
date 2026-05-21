@@ -781,13 +781,13 @@ class ScoreHeader(BaseModel):
     it easier for people to use custom scoring files with the PGS Catalog Calculator.
 
     >>> ScoreHeader(**{"pgs_id": "PGS123456", "trait_reported": "testtrait", "genome_build": "GRCh38"})
-    ScoreHeader(pgs_id='PGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38)
+    ScoreHeader(pgs_id='PGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
 
     >>> ScoreHeader(**{"omicspred_id": "OPGS123456", "trait_reported": "testtrait", "genome_build": "GRCh38"})
-    ScoreHeader(pgs_id='OPGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38)
+    ScoreHeader(pgs_id='OPGS123456', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh38, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
 
     >>> ScoreHeader(**{"score_id": "SC1234B", "trait_reported": "testtrait", "genome_build": "GRCh37"})
-    ScoreHeader(pgs_id='SC1234B', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh37)
+    ScoreHeader(pgs_id='SC1234B', pgs_name=None, trait_reported='testtrait', genome_build=GenomeBuild.GRCh37, HmPOS_build=None, HmPOS_date=None, HmPOS_match_pos=None, HmPOS_match_chr=None)
 
     >>> from ._config import Config
     >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
@@ -795,7 +795,7 @@ class ScoreHeader(BaseModel):
     77
 
     >>> from ._config import Config
-    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "OPGS002493.txt.gz"
+    >>> testpath = Config.ROOT_DIR / "tests" / "data" / "OPGS017309_hmPOS_GRCh38.txt.gz"
     >>> test = ScoreHeader.from_path(testpath) # doctest
     """
 
@@ -812,12 +812,17 @@ class ScoreHeader(BaseModel):
     # genome build is Optional because "NR" is represented internally as None
     genome_build: Annotated[GenomeBuild | None, Field(description="Genome build")]
 
+    ##HARMONIZATION DETAILS
+    HmPOS_build: Annotated[GenomeBuild | None, Field(default=None)]
+    HmPOS_date: Annotated[date | None, Field(default=None)]
+    HmPOS_match_pos: Annotated[str | None, Field(default=None)]
+    HmPOS_match_chr: Annotated[str | None, Field(default=None)]
+
     _path: pathlib.Path | None
 
     @property
     def is_harmonised(self) -> bool:
-        # custom scores can't be harmonised o_o
-        return False
+        return self.HmPOS_build is not None and self.HmPOS_date is not None
 
     @field_validator("genome_build", mode="before")
     @classmethod
@@ -826,9 +831,9 @@ class ScoreHeader(BaseModel):
             return None
         return GenomeBuild.from_string(value)
 
-    @field_serializer("genome_build")
+    @field_serializer("genome_build", "HmPOS_build")
     def serialize_genomebuild(
-        self, genome_build: GenomeBuild, _info: SerializationInfo
+        self, genome_build: GenomeBuild | None, _info: SerializationInfo
     ) -> str:
         return genome_build.value if genome_build is not None else "NR"
 
@@ -882,7 +887,7 @@ class CatalogScoreHeader(ScoreHeader):
     >>> testpath = Config.ROOT_DIR / "tests" / "data" / "PGS000001_hmPOS_GRCh38.txt.gz"
     >>> test = CatalogScoreHeader.from_path(testpath) # doctest: +ELLIPSIS
     >>> test # doctest: +ELLIPSIS
-    CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, format_version=<ScoreFormatVersion.v2: '2.0'>, trait_mapped=['breast carcinoma'], trait_efo=['EFO_0000305'], variants_number=77, weight_type=None, pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036', HmPOS_build=GenomeBuild.GRCh38, HmPOS_date=datetime.date(2022, 7, 29), HmPOS_match_pos='{"True": null, "False": null}', HmPOS_match_chr='{"True": null, "False": null}')
+    CatalogScoreHeader(pgs_id='PGS000001', pgs_name='PRS77_BC', trait_reported='Breast cancer', genome_build=None, HmPOS_build=GenomeBuild.GRCh38, HmPOS_date=datetime.date(2022, 7, 29), HmPOS_match_pos='{"True": null, "False": null}', HmPOS_match_chr='{"True": null, "False": null}', format_version=<ScoreFormatVersion.v2: '2.0'>, trait_mapped=['breast carcinoma'], trait_efo=['EFO_0000305'], variants_number=77, weight_type=None, pgp_id='PGP000001', citation='Mavaddat N et al. J Natl Cancer Inst (2015). doi:10.1093/jnci/djv036')
     >>> test.variants_number == test.row_count
     True
     """
@@ -904,11 +909,6 @@ class CatalogScoreHeader(ScoreHeader):
     ##SOURCE INFORMATION
     pgp_id: str
     citation: str
-    ##HARMONIZATION DETAILS
-    HmPOS_build: Annotated[GenomeBuild | None, Field(default=None)]
-    HmPOS_date: Annotated[date | None, Field(default=None)]
-    HmPOS_match_pos: Annotated[str | None, Field(default=None)]
-    HmPOS_match_chr: Annotated[str | None, Field(default=None)]
 
     # note: only included when different from default
     license: Annotated[
@@ -957,12 +957,6 @@ class CatalogScoreHeader(ScoreHeader):
             return None
         return GenomeBuild.from_string(value)
 
-    @field_serializer("genome_build", "HmPOS_build")
-    def serialize_genomebuild(
-        self, genome_build: GenomeBuild | None, _info: SerializationInfo
-    ) -> str:
-        return genome_build.value if genome_build is not None else "NR"
-
     @field_validator("format_version")
     @classmethod
     def check_format_version(cls, version: ScoreFormatVersion) -> ScoreFormatVersion:
@@ -976,12 +970,6 @@ class CatalogScoreHeader(ScoreHeader):
         if value == "NR":
             value = None
         return value
-
-    @property
-    def is_harmonised(self) -> bool:
-        if self.HmPOS_build is None and self.HmPOS_date is None:
-            return False
-        return True
 
 
 class VariantLog(BaseModel):
