@@ -822,9 +822,7 @@ class ScoreHeader(BaseModel):
 
     @property
     def is_harmonised(self) -> bool:
-        if self.HmPOS_build is None and self.HmPOS_date is None:
-            return False
-        return True
+        return self.HmPOS_build is not None and self.HmPOS_date is not None
 
     @field_validator("genome_build", mode="before")
     @classmethod
