@@ -10,6 +10,9 @@ on:
         - pgscatalog.match
         - pgscatalog.calc
         - pgscatalog.utils
+      version:
+        type: string
+        required: true
 
 jobs:
   publish:
@@ -28,6 +31,32 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - uses: wntrblm/nox@2024.04.15
+
+      - name: Check requested version
+        run: |
+          uv run --package "$PACKAGE" python - <<'PY'
+          import importlib
+          import os
+          import sys
+
+          package = os.environ["PACKAGE"]
+          expected = os.environ["EXPECTED_VERSION"]
+          actual = importlib.import_module(package).__version__
+
+          if actual != expected:
+              print(
+                  f"Version mismatch for {package}: workflow input version is "
+                  f"{expected!r}, but {package}.__version__ is {actual!r}",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+
+          print(f"Version check passed for {package}: {actual}")
+          PY
+        env:
+          PACKAGE: ${{ inputs.package }}
+          EXPECTED_VERSION: ${{ inputs.version }}
+        working-directory: pgscatalog.utils
         
       - name: Test package before building
         run: nox -s tests -- ${{ inputs.package }}
@@ -57,4 +86,3 @@ jobs:
                 ref: 'refs/tags/${{ env.TAG_NAME }}',
                 sha: context.sha
               })
-
