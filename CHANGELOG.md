@@ -1,3 +1,13 @@
+## 2026-05-27
+
+Patch release [pgscatalog-core-1.1.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-core-1.1.1)
+
+Patch release [pgscatalog-utils-2.0.4](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-2.0.4)
+
+* Release repaired `pgscatalog.core` package after the broken 1.1.0 release
+* Bump `pgscatalog.core` dependency to avoid the broken `pgscatalog.core` 1.1.0 release
+* Add a PyPI publish workflow check that confirms the requested release version matches the package version
+
 ## 2025-08-07
 
 Patch release [pgscatalog-utils-1.0.1](https://github.com/PGScatalog/pygscatalog/releases/tag/pgscatalog-utils-1.0.1)
