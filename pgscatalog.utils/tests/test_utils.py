@@ -14,6 +14,7 @@ import pytest
         "pgscatalog-intersect",
         "pgscatalog-aggregate",
         "pgscatalog-ancestry-adjust",
+        "pgscatalog-validate",
     ],
 )
 def test_clis(cli_name):

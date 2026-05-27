@@ -1,0 +1,7 @@
+chr_name	chr_position	effect_allele	other_allele	effect_weight
+chr1	1143203	T	C	6.42523e-06
+1	4524245	A	T	.
+2	424201	A	C	2.31077e-06
+2	-1	A	G	5.58099e-06
+6_GL000250v2_foo	1	A	G	5.58099e-06
+chr6_GL000250v2_alt	1	A	G	5.58099e-06
