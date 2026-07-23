@@ -2,9 +2,7 @@ import polars as pl
 import numpy as np
 from scipy.sparse import csr_array
 from dask import array as da
-from functools import partial
-import multiprocessing as mp
-from tqdm import tqdm
+
 
 # Generate per-chromsome LD matricies (with MAF information) on QC'd SNPs from reference panel
 
@@ -87,8 +85,8 @@ selected_var_maf = matched_var_maf.filter(var_mask)
 # 2. Assemble dosage array for the REFERENCE dataset and TARGET
 
 # Generate dummy PCA data
-def DummyDosgaes_TwoPop(n_variants=10000, fraction_mafdiff=0.05,
-                        n_ref_samples=(3000,2000), n_target_samples=(0,1000), maf_range=(0.01, 0.5), missing_rate=0.01,
+def DummyDosgaes_TwoPop(n_variants=10000, fraction_mafdiff=0.1,
+                        n_ref_samples=(2000,1000), n_target_samples=(0,100), maf_range=(0.01, 0.5), missing_rate=0.01,
                         seed=42):
     """Simulate genotype dosages for a reference panel and a target population, with missingness"""
     # Random MAF for each variant
@@ -252,20 +250,7 @@ def oadp(U, s, V, b, dim_ref=4, dim_stu=None, dim_online=None):
 
 
 
-def adp(XTX, X, w, pcs_ref, dim_stu=None):
-    dim_ref = pcs_ref.shape[1]
-    if dim_stu is None:
-        dim_stu = dim_ref * 2
-    w = w.reshape((-1,1))
-    XTw = X.T @ w
-    wTw = w.T @ w
-    XTX_aug = np.vstack((np.hstack((XTX, XTw)), np.hstack((XTw.T, wTw))))
-    s_aug, V_aug = svd_eigcov(XTX_aug)
-    s_aug = s_aug[:dim_stu]
-    V_aug = V_aug[:, :dim_stu]
-    pcs_aug = V_aug * s_aug
-    pcs_stu = ref_aug_procrustes(pcs_ref, pcs_aug)
-    return pcs_stu[:dim_ref]
+
 
 def source_fraposa_pca(genotypes_ref: np.array, genotypes_target= None, dim_ref=10, method='oadp', dim_stu=None, dim_online=None):
     # Setup the number of PCs we want to compute for difference methods
@@ -310,19 +295,16 @@ def source_fraposa_pca(genotypes_ref: np.array, genotypes_target= None, dim_ref=
             w, _, _ = standardize(w, X_mean, X_std)
             if method == 'oadp':
                 pcs_stu[i, :] = oadp(U, s, V, w, dim_ref, dim_stu, dim_online)
-            if method == 'sp' or method == 'ap':
+            if method == 'sp':
                 pcs_stu[i, :] = w.T @ U[:, :dim_ref]
-            if method == 'adp':
-                pcs_stu[i, :] = adp(XTX, X, w, pcs_ref, dim_stu=dim_stu)
-
         del W
         return pcs_ref, pcs_stu
     else:
         return pcs_ref
 
 #pca_fraposa = source_fraposa_pca(genotypes_ref=dd_ref[1])
-pca_fraposa, pca_fraposa_target = source_fraposa_pca(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='sp')
-oadp_fraposa, oadp_fraposa_target = source_fraposa_pca(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp')
+pca_fraposa_ref, pca_fraposa_target = source_fraposa_pca(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='sp')
+_, oadp_fraposa_target = source_fraposa_pca(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp')
 #np.savetxt('test_pca.txt', r_pca)
 
 
@@ -382,7 +364,7 @@ def fraposa_dask(
     dim_ref=10,
     method="oadp",
     dim_stu=None,
-    dim_online=None, n_jobs=4, chunk_size=200,
+    dim_online=None
 ):
     """Implementation of fraposa_pgsc that supports Dask arrays for large-scale genotype data."""
     # FRAPOSA: Fast and Robust Ancestry Prediction by Online singular value decomposition and Shrinkage Adjustment
@@ -390,13 +372,13 @@ def fraposa_dask(
     # fraposa_pgsc modifications (QC, translation to dask): Samuel Lambert
 
     # Setup dimension requirements
-    assert method in ["oadp", "adp", "sp"]
+    assert method in ["oadp", "sp"]
 
-    if method in ["oadp", "adp"]:
+    if method == "oadp":
         if dim_stu is None:
             dim_stu = dim_ref * 2
         assert dim_ref <= dim_stu
-    if method == "oadp":
+
         if dim_online is None:
             dim_online = dim_stu * 2
         assert dim_stu <= dim_online
@@ -407,37 +389,49 @@ def fraposa_dask(
     # 1. Standardize Reference
     X, X_mean, X_std = standardize_dask(genotypes_ref)
 
-    # 2. Compute Eigendecomposition
+    # 2. Run methods
     if method == "oadp":
-        s, V, _ = eig_ref_dask(X)
+        X = X.compute()  # materialise the genotypes
+        s, V = eig_ref(X)[:2]
         V = V[:, :dim_online]
         U = X @ (V / s[:dim_online])
+
+        print('PCA of REFERENCE samples...')
+        pcs_ref = V[:, :dim_ref] * s[:dim_ref]
+        if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
+            W = da.asarray(genotypes_target, dtype=float)
+            W_std, _, _ = standardize_dask(W, mean=X_mean, std=X_std)
+            W_std = W_std.compute()
+            p_stu, n_stu = W_std.shape
+            pcs_stu = np.zeros((n_stu, dim_ref))
+
+            for i in range(n_stu):
+                w = W_std[:, i].astype(np.float64).reshape((-1, 1))
+                pcs_stu[i, :] = oadp(U, s, V, w, dim_ref, dim_stu, dim_online)
+            return pcs_ref, pcs_stu
+        else:
+            return pcs_ref
     elif method == "sp":
-        s, V, _ = eig_ref_dask(X)
+        s, V, _ = eig_ref_dask(X) # This implementation uses a different solver, not compatiple with OADP!
         V = V[:, :dim_ref]
         U = X @ (V / s[:dim_ref])
-    elif method == "adp":
-        s, V, XTX = eig_ref_dask(X)
-        V = V[:, :dim_ref]
 
-    # 3. Reference PCs
-    pcs_ref = V[:, :dim_ref] * s[:dim_ref]
-    print('PCA of REFERENCE samples...')
-    pcs_ref = pcs_ref.compute()
+        pcs_ref = V[:, :dim_ref] * s[:dim_ref]
+        print('PCA of REFERENCE samples...')
+        pcs_ref = pcs_ref.compute()
 
-    # 4. Project TARGET samples into the PCA space
-    if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
-        print('Processing TARGET samples...')
-        # ToDo ensure alignment of variants between reference and target
-        W = da.asarray(genotypes_target, dtype=float)
-        W_std, _, _ = standardize_dask(W, mean=X_mean, std=X_std)
+        if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
+            print('Processing TARGET samples...')
+            # ToDo ensure alignment of variants between reference and target
+            W = da.asarray(genotypes_target, dtype=float)
+            W_std, _, _ = standardize_dask(W, mean=X_mean, std=X_std)
 
-        if method == 'sp':
-            pcs_stu = W_std.T @ U[:, :dim_ref]
-            pcs_stu = pcs_stu.compute()
-        return pcs_ref, pcs_stu
-    else:
-        return pcs_ref
+            if method == 'sp':
+                pcs_stu = W_std.T @ U[:, :dim_ref]
+                pcs_stu = pcs_stu.compute()
+            return pcs_ref, pcs_stu
+        else:
+            return pcs_ref
 
-# pca_dask = fraposa_pca(genotypes_ref=dd_ref[1]).compute()
 pca_dask_ref, pca_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='sp')
+oadp_dask_ref, oadp_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp')
