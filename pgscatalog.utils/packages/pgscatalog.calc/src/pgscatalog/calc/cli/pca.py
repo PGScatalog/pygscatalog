@@ -151,6 +151,120 @@ def eig_ref(X):
     print('Eigendecomposition on reference covariance matrix...')
     s, V = svd_eigcov(XTX)
     return s, V, XTX
+
+def svd_online(U1, d1, V1, b, l=None):
+    n, k = V1.shape
+    if l is None:
+        l = k
+    assert U1.shape[1] == k
+    assert len(d1) == k
+    assert(l <= k)
+    p = U1.shape[0]
+    b = b.reshape((p,1)) # Make sure the new sample is a column vec
+    b_tilde = b - U1 @ (U1.T @ b)
+    b_tilde = b_tilde / np.sqrt(sum(np.square(b_tilde)))
+    R = np.concatenate((np.diag(d1), U1.transpose() @ b), axis = 1)
+    R_tail = np.concatenate((np.zeros((1,k)), b_tilde.transpose() @ b), axis = 1)
+    R = np.concatenate((R, R_tail), axis = 0)
+    d2, R_Vt = np.linalg.svd(R, full_matrices=False)[1:]
+    V_new = np.zeros((k+1, n+1))
+    V_new[:k, :n] = V1.transpose()
+    V_new[k, n] = 1
+    V2 = (R_Vt @ V_new).transpose()[:,:l]
+    return d2, V2
+
+def procrustes(Y_mat, X_mat, return_transformed=False):
+    ''' Find the best transformation from X to Y '''
+    X = np.array(X_mat, dtype=np.double, copy=True)
+    Y = np.array(Y_mat, dtype=np.double, copy=True)
+    n_X = X.shape[0]
+    X_mean = np.mean(X, 0)
+    Y_mean = np.mean(Y, 0)
+    X -= X_mean
+    Y -= Y_mean
+    C = Y.T @ X
+    U, s, VT = np.linalg.svd(C, full_matrices=False)
+    trXX = np.sum(X**2)
+    trS = np.sum(s)
+    R = VT.T @ U.T
+    rho = trS / trXX
+    c = Y_mean - rho * X_mean @ R
+    if return_transformed:
+        X_new = X_mat @ R * rho + c
+        return R, rho, c, X_new
+    else:
+        return R, rho, c
+
+def ref_aug_procrustes(pcs_ref, pcs_aug):
+    n_ref, p_ref = pcs_ref.shape
+    n_aug, p_aug = pcs_aug.shape
+    assert n_aug == n_ref + 1
+    assert p_aug >= p_ref
+    pcs_aug_head = pcs_aug[:-1, :]
+    pcs_aug_tail = pcs_aug[-1, :].reshape((1,-1))
+    R, rho, c = procrustes_diffdim(pcs_ref, pcs_aug_head)
+    pcs_aug_tail_trsfed = pcs_aug_tail @ R * rho + c
+    return pcs_aug_tail_trsfed.flatten()
+
+def procrustes_diffdim(Y_mat, X_mat, n_iter_max=10000, epsilon_min=1e-6, return_transformed=False):
+    X = np.array(X_mat, dtype=np.double, copy=True)
+    Y = np.array(Y_mat, dtype=np.double, copy=True)
+    n_X, p_X = X.shape
+    n_Y, p_Y = Y.shape
+    assert n_X == n_Y
+    assert p_X >= p_Y
+    if p_X == p_Y:
+        return procrustes(Y, X, return_transformed)
+    else:
+        Z = np.zeros((n_X, p_X - p_Y))
+        for i in range(n_iter_max):
+            W = np.hstack((Y, Z))
+            R, rho, c = procrustes(W, X)
+            X_new = X @ R * rho + c
+            Z_new = X_new[:, p_Y:]
+            Z_new_mean = np.mean(Z_new, 0)
+            Z_new_centered = Z_new - Z_new_mean
+            Z_diff = Z_new - Z
+            epsilon = np.sum(Z_diff**2) / np.sum(Z_new_centered**2)
+            if(epsilon < epsilon_min):
+                break
+            else:
+                Z = Z_new
+        if return_transformed:
+            return R, rho, c, X_new
+        else:
+            return R, rho, c
+
+def oadp(U, s, V, b, dim_ref=4, dim_stu=None, dim_online=None):
+    if dim_stu is None:
+        dim_stu = dim_ref * 2
+    if dim_online is None:
+        dim_online = dim_stu * 2
+    pcs_ref = V[:, :dim_ref] * s[:dim_ref]
+    s_aug, V_aug = svd_online(U[:,:dim_online], s[:dim_online], V[:,:dim_online], b)
+    s_aug, V_aug = s_aug[:dim_stu], V_aug[:, :dim_stu]
+    pcs_aug = V_aug * s_aug
+    pcs_stu = ref_aug_procrustes(pcs_ref, pcs_aug)
+    return pcs_stu[:dim_ref]
+
+
+
+
+def adp(XTX, X, w, pcs_ref, dim_stu=None):
+    dim_ref = pcs_ref.shape[1]
+    if dim_stu is None:
+        dim_stu = dim_ref * 2
+    w = w.reshape((-1,1))
+    XTw = X.T @ w
+    wTw = w.T @ w
+    XTX_aug = np.vstack((np.hstack((XTX, XTw)), np.hstack((XTw.T, wTw))))
+    s_aug, V_aug = svd_eigcov(XTX_aug)
+    s_aug = s_aug[:dim_stu]
+    V_aug = V_aug[:, :dim_stu]
+    pcs_aug = V_aug * s_aug
+    pcs_stu = ref_aug_procrustes(pcs_ref, pcs_aug)
+    return pcs_stu[:dim_ref]
+
 def source_fraposa_pca(genotypes_ref: np.array, genotypes_target= None, dim_ref=10, method='oadp', dim_stu=None, dim_online=None):
     # Setup the number of PCs we want to compute for difference methods
     dim_stu = dim_ref * 2
@@ -179,10 +293,33 @@ def source_fraposa_pca(genotypes_ref: np.array, genotypes_target= None, dim_ref=
         V = V[:, :dim_ref]
     pcs_ref = V[:, :dim_ref] * s[:dim_ref]
 
-    return pcs_ref
+    # Process target samples
+    if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
+        print('Processing target samples...')
+        # ToDo ensure alignment of variants between reference and target
+        W = genotypes_target.astype(np.float64)
+        p_ref = len(X_mean)
+        p_stu, n_stu = W.shape
+        pcs_stu = np.zeros((n_stu, dim_ref))
 
-pca_fraposa = source_fraposa_pca(genotypes_ref=dd_ref[1])
-np.savetxt('test_pca.txt', r_pca)
+        for i in range(n_stu):
+            w = W[:, i].astype(np.float64).reshape((-1, 1))
+            w, _, _ = standardize(w, X_mean, X_std)
+            if method == 'oadp':
+                pcs_stu[i, :] = oadp(U, s, V, w, dim_ref, dim_stu, dim_online)
+            if method == 'sp' or method == 'ap':
+                pcs_stu[i, :] = w.T @ U[:, :dim_ref]
+            if method == 'adp':
+                pcs_stu[i, :] = adp(XTX, X, w, pcs_ref, dim_stu=dim_stu)
+
+        del W
+        return pcs_ref, pcs_stu
+    else:
+        return pcs_ref
+
+#pca_fraposa = source_fraposa_pca(genotypes_ref=dd_ref[1])
+pca_fraposa, pca_fraposa_target = source_fraposa_pca(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp')
+#np.savetxt('test_pca.txt', r_pca)
 
 
 def standardize_dask(X, mean=None, std=None):
@@ -239,7 +376,35 @@ def eig_ref_dask(X):
     return s, V, XTX
 
 
-def source_fraposa_pca_dask(
+def _oadp_chunk_kernel(
+    W_chunk, U, s, V, dim_ref=4, dim_stu=None, dim_online=None
+):
+    """Applies original fraposa oadp() function to each column in a Dask chunk.
+
+    Parameters:
+    -----------
+    W_chunk : np.ndarray
+        A 2D NumPy array of shape (p_variants, n_chunk_samples).
+    """
+    n_samples = W_chunk.shape[1]
+    pcs_chunk = np.zeros((n_samples, dim_ref))
+    W_chunk = W_chunk.compute()
+    # Run your exact reference function on each column of this chunk
+    for i in range(n_samples):
+        b = W_chunk[:, i]
+        pcs_chunk[i, :] = oadp(
+            U=U,
+            s=s,
+            V=V,
+            b=b,
+            dim_ref=dim_ref,
+            dim_stu=dim_stu,
+            dim_online=dim_online,
+        )
+
+    return pcs_chunk
+
+def fraposa_pca(
     genotypes_ref,
     genotypes_target=None,
     dim_ref=10,
@@ -247,6 +412,11 @@ def source_fraposa_pca_dask(
     dim_stu=None,
     dim_online=None,
 ):
+    """Implementation of fraposa_pgsc that supports Dask arrays for large-scale genotype data."""
+    # FRAPOSA: Fast and Robust Ancestry Prediction by Online singular value decomposition and Shrinkage Adjustment
+    # Original Author: David (Daiwei) Zhang
+    # fraposa_pgsc modifications (QC, translation to dask): Samuel Lambert
+
     # Setup dimension requirements
     dim_stu = dim_ref * 2
     assert method in ["oadp", "adp", "sp"]
@@ -279,9 +449,22 @@ def source_fraposa_pca_dask(
         s, V, XTX = eig_ref_dask(X)
         V = V[:, :dim_ref]
 
-    # Reference PCs
+    # 3. Reference PCs
     pcs_ref = V[:, :dim_ref] * s[:dim_ref]
+    pcs_ref = pcs_ref.compute()
+    # 4. Project TARGET samples into the PCA space
+    if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
+        print('Processing target samples...')
+        # ToDo ensure alignment of variants between reference and target
+        W = da.asarray(genotypes_target, dtype=float)
+        W_std, _, _ = standardize_dask(W, mean=X_mean, std=X_std)
 
-    return pcs_ref
+        if method == 'sp':
+            pcs_stu = W_std.T @ U[:, :dim_ref]
+            pcs_stu = pcs_stu.compute()
+        return pcs_ref, pcs_stu
+    else:
+        return pcs_ref
 
-pca_dask = source_fraposa_pca_dask(genotypes_ref=dd_ref[1]).compute()
+# pca_dask = fraposa_pca(genotypes_ref=dd_ref[1]).compute()
+pca_dask_ref, pca_dask_target = fraposa_pca(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='sp')
