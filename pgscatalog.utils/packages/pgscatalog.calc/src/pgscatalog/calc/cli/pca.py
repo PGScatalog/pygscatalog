@@ -254,12 +254,13 @@ def oadp(U, s, V, b, dim_ref=4, dim_stu=None, dim_online=None):
 
 def source_fraposa_pca(genotypes_ref: np.array, genotypes_target= None, dim_ref=10, method='oadp', dim_stu=None, dim_online=None):
     # Setup the number of PCs we want to compute for difference methods
-    assert method in ['oadp', 'adp', 'sp']
-    if method in ['oadp', 'adp']:
+    # Setup dimension requirements
+    assert method in ["oadp", "sp"]
+    if method == "oadp":
         if dim_stu is None:
             dim_stu = dim_ref * 2
         assert dim_ref <= dim_stu
-    if method in ['oadp']:
+
         if dim_online is None:
             dim_online = dim_stu * 2
         assert dim_stu <= dim_online
@@ -357,6 +358,9 @@ def eig_ref_dask(X):
     return s, V, XTX
 
 
+def axismap_oadp(col, U, s, V, dim_ref, dim_stu, dim_online):
+    w = col[:, np.newaxis]
+    return oadp(U, s, V, w, dim_ref, dim_stu, dim_online).flatten()
 
 def fraposa_dask(
     genotypes_ref,
@@ -372,7 +376,7 @@ def fraposa_dask(
     # fraposa_pgsc modifications (QC, translation to dask): Samuel Lambert
 
     # Setup dimension requirements
-    assert method in ["oadp", "sp"]
+    assert method in ["oadp",'oadp2', "sp"]
 
     if method == "oadp":
         if dim_stu is None:
@@ -390,6 +394,26 @@ def fraposa_dask(
     X, X_mean, X_std = standardize_dask(genotypes_ref)
 
     # 2. Run methods
+    if method == "oadp2":
+        X = X.compute()  # materialise the genotypes
+        s, V = eig_ref(X)[:2]
+        V = V[:, :dim_online]
+        U = X @ (V / s[:dim_online])
+
+        print('PCA of REFERENCE samples...')
+        pcs_ref = V[:, :dim_ref] * s[:dim_ref]
+        if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
+            W = da.asarray(genotypes_target, dtype=float)
+            W_std, _, _ = standardize_dask(W, mean=X_mean, std=X_std)
+            # ToDo: it would be more efficient to compute W_std in chunks and apply oadp in a loop, rather than
+            #  computing the entire W_std at once. or it could be better to use a Dask map_blocks or similar approach
+            #  to apply oadp in parallel across chunks of W_std?
+            # W_std_chunked = W_std.rechunk({0: -1, 1: 5})
+            W_std = W_std.compute()
+            pcs_stu = np.apply_along_axis(axismap_oadp, axis=0, arr=W_std, U=U, s=s, V=V, dim_ref=dim_ref, dim_stu=dim_stu, dim_online=dim_online)
+            return pcs_ref, pcs_stu.T
+        else:
+            return pcs_ref
     if method == "oadp":
         X = X.compute()  # materialise the genotypes
         s, V = eig_ref(X)[:2]
@@ -401,10 +425,12 @@ def fraposa_dask(
         if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
             W = da.asarray(genotypes_target, dtype=float)
             W_std, _, _ = standardize_dask(W, mean=X_mean, std=X_std)
+            # ToDo: it would be more efficient to compute W_std in chunks and apply oadp in a loop, rather than
+            #  computing the entire W_std at once. or it could be better to use a Dask map_blocks or similar approach
+            #  to apply oadp in parallel across chunks of W_std?
             W_std = W_std.compute()
             p_stu, n_stu = W_std.shape
             pcs_stu = np.zeros((n_stu, dim_ref))
-
             for i in range(n_stu):
                 w = W_std[:, i].astype(np.float64).reshape((-1, 1))
                 pcs_stu[i, :] = oadp(U, s, V, w, dim_ref, dim_stu, dim_online)
@@ -432,6 +458,9 @@ def fraposa_dask(
             return pcs_ref, pcs_stu
         else:
             return pcs_ref
+
+_, oadp2_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp2')
+
 
 pca_dask_ref, pca_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='sp')
 oadp_dask_ref, oadp_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp')
