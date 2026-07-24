@@ -85,8 +85,8 @@ selected_var_maf = matched_var_maf.filter(var_mask)
 # 2. Assemble dosage array for the REFERENCE dataset and TARGET
 
 # Generate dummy PCA data
-def DummyDosgaes_TwoPop(n_variants=10000, fraction_mafdiff=0.1,
-                        n_ref_samples=(2000,1000), n_target_samples=(0,100), maf_range=(0.01, 0.5), missing_rate=0.01,
+def DummyDosgaes_TwoPop(n_variants=10000, fraction_mafdiff=0.025,
+                        n_ref_samples=(2000,1000), n_target_samples=(3000,1000), maf_range=(0.01, 0.5), missing_rate=0.01,
                         seed=42):
     """Simulate genotype dosages for a reference panel and a target population, with missingness"""
     # Random MAF for each variant
@@ -376,7 +376,7 @@ def fraposa_dask(
     # fraposa_pgsc modifications (QC, translation to dask): Samuel Lambert
 
     # Setup dimension requirements
-    assert method in ["oadp",'oadp2', "sp"]
+    assert method in ["oadp", "sp"]
 
     if method == "oadp":
         if dim_stu is None:
@@ -394,26 +394,6 @@ def fraposa_dask(
     X, X_mean, X_std = standardize_dask(genotypes_ref)
 
     # 2. Run methods
-    if method == "oadp2":
-        X = X.compute()  # materialise the genotypes
-        s, V = eig_ref(X)[:2]
-        V = V[:, :dim_online]
-        U = X @ (V / s[:dim_online])
-
-        print('PCA of REFERENCE samples...')
-        pcs_ref = V[:, :dim_ref] * s[:dim_ref]
-        if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
-            W = da.asarray(genotypes_target, dtype=float)
-            W_std, _, _ = standardize_dask(W, mean=X_mean, std=X_std)
-            # ToDo: it would be more efficient to compute W_std in chunks and apply oadp in a loop, rather than
-            #  computing the entire W_std at once. or it could be better to use a Dask map_blocks or similar approach
-            #  to apply oadp in parallel across chunks of W_std?
-            # W_std_chunked = W_std.rechunk({0: -1, 1: 5})
-            W_std = W_std.compute()
-            pcs_stu = np.apply_along_axis(axismap_oadp, axis=0, arr=W_std, U=U, s=s, V=V, dim_ref=dim_ref, dim_stu=dim_stu, dim_online=dim_online)
-            return pcs_ref, pcs_stu.T
-        else:
-            return pcs_ref
     if method == "oadp":
         X = X.compute()  # materialise the genotypes
         s, V = eig_ref(X)[:2]
@@ -425,16 +405,10 @@ def fraposa_dask(
         if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
             W = da.asarray(genotypes_target, dtype=float)
             W_std, _, _ = standardize_dask(W, mean=X_mean, std=X_std)
-            # ToDo: it would be more efficient to compute W_std in chunks and apply oadp in a loop, rather than
-            #  computing the entire W_std at once. or it could be better to use a Dask map_blocks or similar approach
-            #  to apply oadp in parallel across chunks of W_std?
+            # Have tried W_std_chunked = W_std.rechunk({0: -1, 1: 5}) + map_blocks but it causes problems
             W_std = W_std.compute()
-            p_stu, n_stu = W_std.shape
-            pcs_stu = np.zeros((n_stu, dim_ref))
-            for i in range(n_stu):
-                w = W_std[:, i].astype(np.float64).reshape((-1, 1))
-                pcs_stu[i, :] = oadp(U, s, V, w, dim_ref, dim_stu, dim_online)
-            return pcs_ref, pcs_stu
+            pcs_stu = np.apply_along_axis(axismap_oadp, axis=0, arr=W_std, U=U, s=s, V=V, dim_ref=dim_ref, dim_stu=dim_stu, dim_online=dim_online)
+            return pcs_ref, pcs_stu.T
         else:
             return pcs_ref
     elif method == "sp":
@@ -459,8 +433,7 @@ def fraposa_dask(
         else:
             return pcs_ref
 
-_, oadp2_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp2')
-
 
 pca_dask_ref, pca_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='sp')
 oadp_dask_ref, oadp_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp')
+_, oadp2_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp2')
