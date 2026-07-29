@@ -206,6 +206,55 @@ def test_unsplit_input_uses_all_sentinel(targets, scorefile, tmp_path, monkeypat
     )
 
 
+def test_two_whole_genome_batches(targets, scorefile, tmp_path, monkeypatch):
+    """Two whole-genome VCFs holding disjoint samples are sample batches, not an
+    ambiguous samplesheet: they load together and land side by side under ALL
+    (docs/tickets/0002)"""
+    _, unsplit, _ = targets
+
+    with pysam.VariantFile(str(unsplit)) as vcf:
+        samples = list(vcf.header.samples)
+
+    batches = []
+    for i, half in enumerate((samples[::2], samples[1::2]), start=1):
+        path = tmp_path / f"batch{i}.vcf.gz"
+        pysam.bcftools.view(
+            "-s",
+            ",".join(half),
+            "-Oz",
+            "-o",
+            str(path),
+            str(unsplit),
+            catch_stdout=False,
+        )
+        pysam.bcftools.index(str(path))
+        batches.append(path)
+
+    # one LOAD, both inputs: the old unsplit-chromosome rule rejected this
+    _run(
+        [
+            "pgsc_calc",
+            "load",
+            "--target_genomes",
+            *[str(p) for p in batches],
+            "--sampleset",
+            SAMPLESET,
+            "--format",
+            "vcf",
+            "--cache_dir",
+            str(tmp_path / "cache"),
+            "--score_paths",
+            str(scorefile),
+        ],
+        monkeypatch,
+    )
+
+    names = zipfile.ZipFile(tmp_path / "cache" / "genotypes.zarr.zip").namelist()
+    for path in batches:
+        prefix = f"genotypes.zarr/{SAMPLESET}/ALL/{path.name}/genotypes/"
+        assert any(n.startswith(prefix) for n in names), names[:5]
+
+
 def test_partial_extract_of_one_leaf(targets, scorefile, tmp_path, monkeypatch):
     """Extracting a single leaf brings every ancestor zarr.json with it, whatever
     the depth of the hierarchy"""
