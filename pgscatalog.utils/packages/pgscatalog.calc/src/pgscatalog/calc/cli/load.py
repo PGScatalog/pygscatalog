@@ -255,13 +255,11 @@ def unzip_zarr(
     if group_path is not None:
         logger.info(f"Only extracting {group_path=} from zip")
         cmd.append(f"-ir!{group_path}/*")
-        # also unzip the zarr.json file for the root and sampleset groups
+        # also unzip the zarr.json file of every ancestor group
         # otherwise the zarr hierarchy won't parse properly for downstream processes
-        root_zarr_json = group_path.split("/")[0] + "/zarr.json"
-        sampleset_zarr_json = "/".join(group_path.split("/")[0:2]) + "/zarr.json"
-
-        for x in (root_zarr_json, sampleset_zarr_json):
-            cmd.append(x)
+        parts = group_path.split("/")
+        for i in range(1, len(parts)):
+            cmd.append("/".join(parts[:i]) + "/zarr.json")
 
     logger.info(f"Running subprocess {cmd=}")
     result = subprocess.run(cmd, check=True, capture_output=True, text=True)

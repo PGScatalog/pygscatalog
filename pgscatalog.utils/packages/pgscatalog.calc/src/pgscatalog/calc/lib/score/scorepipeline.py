@@ -96,7 +96,7 @@ class ScorePipeline:
             "ref",
             "alts",
             "variant_id",
-            "filename",
+            "zarr_group",
             "sampleset",
         ]
 
@@ -122,8 +122,9 @@ class ScorePipeline:
         This function traverses the hierarchy, builds a dataframe, and inserts it
         """
         store = zarr.storage.LocalStore(root=self.genotypes_root_path)
+        root: zarr.Group = zarr.open_group(store=store, mode="r")
         # load the sampleset group ready for traversing
-        group: zarr.Group = zarr.open_group(store=store, path=self.sampleset, mode="r")
+        group: zarr.Group = cast("zarr.Group", root[self.sampleset])
 
         conn.sql("""
         CREATE TABLE IF NOT EXISTS targetvariants (
@@ -133,15 +134,15 @@ class ScorePipeline:
             ref TEXT,
             alts TEXT[],
             variant_id TEXT,
-            filename TEXT,
+            zarr_group TEXT,
             sampleset TEXT
         );
         """)
 
         # when traversing the group, iterate over each meta group lazily to save memory
         # because these 1D arrays can get big, especially when loaded into a polars DF
-        for filename, variants in get_variants_from_zarr(group):
-            logger.info(f"Inserting variants from zarr {filename=}")
+        for zarr_group, variants in get_variants_from_zarr(group):
+            logger.info(f"Inserting variants from zarr {zarr_group=}")
             _df = (
                 (
                     pl.DataFrame(variants)
@@ -151,7 +152,7 @@ class ScorePipeline:
                 # re-split the alts field
                 .with_columns(
                     [
-                        pl.lit(filename).alias("filename"),
+                        pl.lit(zarr_group).alias("zarr_group"),
                         pl.lit(self.sampleset).alias("sampleset"),
                         pl.col("alts").str.split("/"),
                     ]
@@ -164,7 +165,7 @@ class ScorePipeline:
             )
 
             # check the number of variants in metadata matches the genotype array shape
-            sub_group = cast("zarr.Group", group[filename])
+            sub_group = cast("zarr.Group", root[zarr_group])
             n_geno_variants: int = cast("zarr.Array", sub_group["genotypes"]).shape[0]
 
             if n_geno_variants == (n_meta_variants := _df.shape[0]):
@@ -173,7 +174,7 @@ class ScorePipeline:
                     "genotypes array"
                 )
             else:
-                logger.critical(f"Loading {filename=} {self.sampleset=} failed")
+                logger.critical(f"Loading {zarr_group=} {self.sampleset=} failed")
                 raise ValueError(f"{n_geno_variants=} but {n_meta_variants=}")
 
             # it's OK to insert the variant data to the database now
@@ -186,14 +187,15 @@ class ScorePipeline:
                     ref,
                     alts,
                     variant_id,
-                    filename,
+                    zarr_group,
                     sampleset
                 FROM _df""")
             logger.info(f"{_df.shape=} finished loading into targetvariants table")
 
         conn.sql("""
         -- data integrity check after loading is finished
-        ALTER TABLE targetvariants ADD PRIMARY KEY (variant_id, filename, sampleset);
+        -- zarr_group is the full path to the shard, so it implies the sampleset
+        ALTER TABLE targetvariants ADD PRIMARY KEY (variant_id, zarr_group);
         """)
 
     def match_variants(
@@ -362,7 +364,9 @@ def get_variants_from_zarr(
                 meta[arr_name] = arr[:]
             # meta is ready for conversion to a DF
             # (key = column name, value = 1D numpy vector/rows)
-            yield group.basename, meta
+            # the path is relative to the store root, so it identifies the shard
+            # whatever the depth of the hierarchy (e.g. UKB/1/batch1.vcf.gz)
+            yield group.path, meta
         else:
             # recurse the group tree
             yield from get_variants_from_zarr(subgrp)

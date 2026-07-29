@@ -70,7 +70,7 @@ def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
             chr_pos UINTEGER,
             ref TEXT,
             alts TEXT[],
-            filename TEXT,
+            zarr_group TEXT,
             sampleset TEXT
         );
     """)
@@ -79,10 +79,10 @@ def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
     conn.execute(
         """
         INSERT INTO targetvariants
-        (geno_index, chr_name, chr_pos, ref, alts, filename, sampleset)
+        (geno_index, chr_name, chr_pos, ref, alts, zarr_group, sampleset)
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """,
-        [10, "11", 69516650, "T", ["C"], "file.bgen", "test"],
+        [10, "11", 69516650, "T", ["C"], "test/ALL/file.bgen", "test"],
     )
 
     return conn
@@ -257,7 +257,7 @@ def _make_conn_from_json(
            chr_pos UINTEGER,
            ref TEXT,
            alts TEXT[],
-           filename TEXT,
+           zarr_group TEXT,
            sampleset TEXT
        );
        """

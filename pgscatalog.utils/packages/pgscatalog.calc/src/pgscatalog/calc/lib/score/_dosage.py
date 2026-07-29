@@ -112,7 +112,7 @@ def make_dosage_arrays(
         compressors=config.ZARR_COMPRESSOR,
     )
 
-    # calculate dosage for each genotype group (sampleset/filename) and store
+    # calculate dosage for each genotype group (sampleset/chromosome/filename) and store
     # it in a specific region (contiguous row range) in the big dosage array
     write_dosage_regions(
         genotypes_group=genotypes_group,
@@ -138,7 +138,8 @@ def write_dosage_regions(
     """
     Compute and write per-region genotype dosages into Zarr arrays.
 
-    For each zarr subgroup (sampleset/filename) in `df_groups`, this function:
+    For each zarr subgroup (sampleset/chromosome/filename) in `df_groups`, this
+    function:
 
     1. Loads genotype data from the genotypes (read-only) Zarr group.
     2. Calculates effect allele dosages and imputes missing values.
@@ -495,16 +496,20 @@ def get_n_samples(group: zarr.Group, sampleset: str) -> int:
 def get_sample_ids(group: zarr.Group, sampleset: str) -> list[str]:
     samples = None
     root = cast("zarr.Group", group[sampleset])
-    for x in root:
+    # only leaf groups (shards) carry sample IDs, so walk the whole subtree instead
+    # of assuming how deep the hierarchy is
+    for _, node in root.members(max_depth=None):
+        if "samples" not in node.attrs:
+            continue
+
+        node_samples = cast("list[str]", node.attrs["samples"])
         if samples is None:
             # initialise the sample list
-            samples = cast("list[str]", root[x].attrs["samples"])
-        else:
+            samples = node_samples
+        elif samples != node_samples:
             # compare sample names
-            if samples != cast("list[str]", root[x].attrs["samples"]):
-                raise NotImplementedError(
-                    "Different samples across target genome files"
-                )
+            raise NotImplementedError("Different samples across target genome files")
+
     if samples is None:
         raise TypeError("Couldn't get samples from zarr attribute")
 

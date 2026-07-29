@@ -51,7 +51,7 @@ def add_match_log(
         is_ambiguous BOOLEAN,
         is_multiallelic BOOLEAN,
         target_row_nr UINTEGER,
-        filename VARCHAR,
+        zarr_group VARCHAR,
         -- each variant in a scoring file can only match once
         PRIMARY KEY(sampleset, accession, row_nr)
     );
@@ -77,14 +77,14 @@ def add_match_log(
          matches.match_result.is_ambiguous,
          matches.match_result.is_multiallelic,
          matches.target_row_nr,
-         matches.filename
+         matches.zarr_group
      FROM score_variant_table score
               LEFT JOIN allele_match_table matches
                         ON score.accession = matches.accession
                             AND score.row_nr = matches.row_nr
               LEFT JOIN targetvariants target
                         ON target.geno_index = matches.target_row_nr
-                            AND target.filename = matches.filename
+                            AND target.zarr_group = matches.zarr_group
      ORDER BY sampleset, score.accession, score.row_nr;
     """,
         [sampleset],

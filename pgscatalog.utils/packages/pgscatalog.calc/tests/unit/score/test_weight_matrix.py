@@ -77,7 +77,7 @@ def empty_db(tmp_path) -> str:
             row_nr UBIGINT,
             match_result STRUCT(effect_allele_idx UINT8),
             target_row_nr UBIGINT,
-            filename TEXT
+            zarr_group TEXT
         );
         """
     )
@@ -136,7 +136,7 @@ def test_create_wide_weights_table(db_with_scores):
 
     assert "wide_score_variants" in table_names
     assert test_weight_mat_row_nr == 0
-    assert test_zarr_group == "test/test.vcf.gz"
+    assert test_zarr_group == "test/ALL/test.vcf.gz"
     assert test_is_recessive is False
     assert test_is_dominant is False
     assert test_target_row_nr == 0
@@ -219,10 +219,10 @@ def test_store_group_weight_arrays_success(db_with_scores, zarr_group):
     )
 
     assert set(result.keys()) == {
-        "test/test.vcf.gz",
+        "test/ALL/test.vcf.gz",
     }
 
-    df = result["test/test.vcf.gz"]
+    df = result["test/ALL/test.vcf.gz"]
 
     assert isinstance(df, pl.DataFrame)
     assert df.shape == (1, 5)  # (n_variants, n_columns)

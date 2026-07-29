@@ -55,7 +55,7 @@ def create_wide_weights_table(
                 target_row_nr UBIGINT NOT NULL,
                 -- UINT8: indexes are always teeny tiny, save space in these big arrays
                 effect_allele_idx UINT8,
-                filename VARCHAR,
+                zarr_group VARCHAR,
                 effect_weight DOUBLE NOT NULL,
                 -- each score variant must only have one row
                 PRIMARY KEY (accession, row_nr)
@@ -73,7 +73,7 @@ def create_wide_weights_table(
                s.row_nr,
                m.target_row_nr,
                m.match_result.effect_allele_idx AS effect_allele_idx,
-               m.filename,
+               m.zarr_group,
                s.effect_weight
         FROM score_variant_table s
         JOIN allele_match_table m ON s.row_nr = m.row_nr
@@ -106,7 +106,7 @@ def create_wide_weights_table(
                 */
                 GROUP BY
                     sampleset,
-                    filename,
+                    zarr_group,
                     is_recessive,
                     is_dominant,
                     target_row_nr,
@@ -115,8 +115,7 @@ def create_wide_weights_table(
             )
             SELECT
                 row_number() OVER ()  - 1 AS weight_mat_row_nr,
-                concat_ws('/', sampleset, filename) AS zarr_group,
-                * EXCLUDE(sampleset, filename)
+                * EXCLUDE(sampleset)
             FROM pivoted_scores;
             """)
 
@@ -211,8 +210,8 @@ def store_results_in_zarr(
     conn : duckdb.DuckDBPyConnection
         Active DuckDB connection containing the `wide_score_variants` table.
     group_path : str
-        Identifier for the Zarr group. This value corresponds to the
-        `sampleset/filename` combination used during pivoting.
+        Identifier for the Zarr group: the shard's path relative to the store
+        root (`sampleset/chromosome/filename`).
     """
     logger.info(f"Getting weight matrix for {group_path=}")
     logger.info(f"{config.ZARR_VARIANT_CHUNK_SIZE=} {config.ZARR_COMPRESSOR=}")

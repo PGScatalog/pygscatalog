@@ -66,7 +66,7 @@ def update_match_table(
             target.chr_pos,
             target.ref,
             target.alts,
-            target.filename,
+            target.zarr_group,
             target.sampleset
         FROM score_variant_table AS score
         JOIN targetvariants AS target
@@ -92,7 +92,7 @@ def update_match_table(
                 match_type match_type_enum,
                 match_summary match_summary_enum) NOT NULL,
             target_row_nr UINTEGER NOT NULL,
-            filename TEXT NOT NULL,
+            zarr_group TEXT NOT NULL,
             PRIMARY KEY (sampleset, accession, row_nr)
         );
         """)
@@ -105,7 +105,7 @@ def update_match_table(
                 sampleset,
                 accession,
                 row_nr,
-                filename,
+                zarr_group,
                 match_variant(effect_allele, other_allele, ref, alts)
                     AS match_result,
                 target_row_nr
@@ -128,7 +128,7 @@ def update_match_table(
             row_nr,
             match_result,
             target_row_nr,
-            filename
+            zarr_group
         FROM ranked_matches
         WHERE rn = 1
         ORDER BY accession, row_nr;

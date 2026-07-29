@@ -55,7 +55,7 @@ class Scorefiles:
         logger.info(f"Querying unique positions from scoring files: {path_strings}")
 
         # first, check the zarr metadata cache
-        # the zarr group = sampleset + filename
+        # the zarr group = sampleset + chromosome + filename
         # _ prefix for duckdb object scan / ruff complaining
         _cached_positions: pl.DataFrame
         if zarr_group is None:

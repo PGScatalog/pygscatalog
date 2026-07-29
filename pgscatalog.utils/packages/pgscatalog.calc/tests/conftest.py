@@ -244,11 +244,11 @@ def gt_array_with_missingness(
     # test parquet files are written
     store = zarr.storage.LocalStore(cache_dir / "genotypes.zarr")
     group = zarr.open_group(
-        store=store, path=f"{sampleset_name}/{target_with_missingness.name}"
+        store=store, path=f"{sampleset_name}/ALL/{target_with_missingness.name}"
     )
     """
     zarr stucture:
-    /test/missing.vcf.gz
+    /test/ALL/missing.vcf.gz
     ├── genotypes (3, 3202, 2) uint8 -> (n_variants, n_samples, ploidy)
     └── meta
         ├── alts (3,) StringDType()

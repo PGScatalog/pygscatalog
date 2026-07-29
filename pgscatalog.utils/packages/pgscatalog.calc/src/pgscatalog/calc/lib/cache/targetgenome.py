@@ -104,15 +104,16 @@ class TargetGenome:
 
         / (root of zarr array
         └── <sampleset> zarr group
-            └── <filename> zarr group
-                └── genotypes (n_variants, n_samples, PLOIDY) uint8 array
-                └── meta zarr group
-                    └── chr_pos
-                    └── ...
-                    └──
-                    └──
+            └── <chromosome> zarr group ("ALL" if the input isn't chromosome split)
+                └── <filename> zarr group
+                    └── genotypes (n_variants, n_samples, PLOIDY) uint8 array
+                    └── meta zarr group
+                        └── chr_pos
+                        └── ...
+                        └──
+                        └──
         """
-        return f"{self.sampleset}/{pathlib.Path(self.filename).name}"
+        return f"{self.sampleset}/{self.chrom or 'ALL'}/{self.filename}"
 
     @property
     def _zarr_store(self) -> zarr.storage.LocalStore:
