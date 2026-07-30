@@ -140,7 +140,7 @@ def create_allele_match_table(
 
     SCORE reads neither, and passes ``target_alleles=False`` on purpose: the
     ungated ``matches.parquet`` carries both columns, so ``INSERT ... BY NAME``
-    refuses it against this narrower table (docs/tickets/0018).
+    refuses it against this narrower table.
     """
     target_allele_columns = (
         """

@@ -1,8 +1,8 @@
 """MATCH_COMBINE: pool every chromosome's matches and apply `min_overlap`.
 
-The match rate is genome-wide, so no single chromosome's MATCH task can decide it
-(docs/tickets/0004). This stage has no cache to read - only the parquet artefacts
-MATCH published - so the sampleset it is pooling has to be passed in.
+The match rate is genome-wide, so no single chromosome's MATCH task can decide it.
+This stage has no cache to read - only the parquet artefacts MATCH published - so
+the sampleset it is pooling has to be passed in.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ class MatchCombineStage:
         self._sampleset = sampleset
 
         # every query this stage runs goes through the database, so the resource
-        # limits the CLI was given reach all of them (docs/tickets/0016)
+        # limits the CLI was given reach all of them
         self._db = ScoreDatabase(
             path=scratch / "pgs.db",
             max_memory_gb=max_memory_gb,
@@ -137,7 +137,7 @@ def check_sample_union(
 
     Scoped to chromosomes present in the cache, which is automatic: a chromosome
     whose index query returned nothing is deleted by `cleanup_empty_zarr_group`,
-    runs no MATCH task and writes no samples file (docs/tickets/0004).
+    runs no MATCH task and writes no samples file.
     """
     mismatched = conn.execute(
         """

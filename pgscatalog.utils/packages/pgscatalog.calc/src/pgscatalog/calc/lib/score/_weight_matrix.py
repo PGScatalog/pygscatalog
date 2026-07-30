@@ -36,7 +36,7 @@ def create_wide_weights_table(
     conn : duckdb.DuckDBPyConnection
         A writable connection to the score database. The PIVOT below is the
         memory-hungriest query in SCORE, so it matters that this connection carries
-        the stage's resource limits (docs/tickets/0016).
+        the stage's resource limits.
     sampleset : str
         Identifier for the set of samples to pivot.
     zarr_group : str

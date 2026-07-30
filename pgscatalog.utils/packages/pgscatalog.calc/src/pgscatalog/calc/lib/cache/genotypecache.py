@@ -11,11 +11,11 @@ SCORE per shard - so this module is the one place that knows how those levels ar
 arranged. Callers ask it which shards a staged cache holds, which chromosome, which
 single shard, whose samples those shards hold and what variant metadata they carry;
 nobody outside it slices a path, counts a depth or walks the tree a second time
-(ADR 0003, docs/tickets/0012, docs/tickets/0013).
+(ADR 0003).
 
-The shape invariants live here too, because they are checks on the cache
-(docs/tickets/0005). They read zarr attributes and variant metadata only: nothing
-here touches the 3D genotype arrays.
+The shape invariants live here too, because they are checks on the cache. They
+read zarr attributes and variant metadata only: nothing here touches the 3D
+genotype arrays.
 """
 
 from __future__ import annotations
@@ -47,8 +47,7 @@ def leaf_group_path(sampleset: str, chromosome: str | None, filename: str) -> st
     validation has to check the string LOAD will actually write to. Two functions
     building the rule separately agree only by coincidence, and if they drifted the
     guard would pass while two shards of one chromosome sharing a basename collided
-    at merge time, one leaf silently overwriting the other (ADR 0003,
-    docs/tickets/0002, docs/tickets/0014).
+    at merge time, one leaf silently overwriting the other (ADR 0003).
 
     Parameters
     ----------
@@ -69,7 +68,7 @@ def meta_group_path(leaf_path: str) -> str:
     """Where a leaf keeps its 1D variant metadata.
 
     Built here and nowhere else, because LOAD writes this group and every later
-    stage reads it (docs/tickets/0013).
+    stage reads it.
 
     Parameters
     ----------
@@ -131,7 +130,7 @@ class GenotypeCache:
     # ponytail: `root` still hands out a raw zarr group because SCORE reads the 3D
     # genotype arrays through it (`make_dosage_arrays`), which is an array read
     # rather than a walk of the hierarchy. It goes when dosage takes a shard instead
-    # of the root group, which splitting the stages (docs/tickets/0017) left alone.
+    # of the root group, which splitting the stages left alone.
     @property
     def root(self) -> zarr.Group:
         """The store's root group, opened read only"""
@@ -170,7 +169,7 @@ class GenotypeCache:
         """Every shard this cache holds.
 
         One traversal, cached: a stage asks this several times and the store does
-        not change under it (docs/tickets/0012).
+        not change under it.
 
         The chromosome is the group a leaf sits under rather than a slice of its
         path, and leaves are found by carrying sample IDs rather than by being at
@@ -194,7 +193,7 @@ class GenotypeCache:
         """The single leaf group this SCORE task holds.
 
         weight_mat_row_nr indexes this task's dosage array, so staging two shards
-        at once would silently misalign it (docs/tickets/0007).
+        at once would silently misalign it.
         """
         if len(self.shards) != 1:
             paths = sorted(shard.path for shard in self.shards)
@@ -211,7 +210,7 @@ class GenotypeCache:
         Every shard has to agree, which is why this is one list rather than a union.
         A SCORE task is staged with one shard, so there is nothing left to disagree
         with: the assumption stopped being load-bearing rather than being fixed, and
-        the check is kept as it was (ADR 0003, docs/tickets/0013).
+        the check is kept as it was (ADR 0003).
         """
         samples: list[str] | None = None
 
@@ -266,7 +265,7 @@ def check_cache_shape(
     """Check the shards under this chromosome can be scored independently.
 
     Reads zarr attributes and variant metadata only - nothing touches the 3D
-    genotype arrays. Returns the chromosome (docs/tickets/0005).
+    genotype arrays. Returns the chromosome.
 
     Parameters
     ----------

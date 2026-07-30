@@ -10,7 +10,7 @@ point in that space, built from the same records so they all hold the same
 - ``sample_batch_targets``    sample axis only, two whole-genome batches
 - ``grid_targets``            both axes, chromosome x sample batch
 - ``variant_split_targets``   two files per chromosome sharing every sample, which
-                              docs/tickets/0005 rejects
+                              the cache shape invariants reject
 """
 
 import gzip
@@ -152,7 +152,7 @@ def sample_batch_targets(unsplit_target, target_samples, tmp_path_factory) -> li
 
 @pytest.fixture(scope="session")
 def grid_targets(chromosome_targets, target_samples, tmp_path_factory) -> list[tuple]:
-    """Chromosome x sample batch, the shape docs/tickets/0008 has to reduce"""
+    """Chromosome x sample batch, the shape SCORE_COMBINE has to reduce"""
     out_dir = tmp_path_factory.mktemp("grid")
 
     targets = []
@@ -172,7 +172,7 @@ def grid_targets(chromosome_targets, target_samples, tmp_path_factory) -> list[t
 def variant_split_targets(target_records, tmp_path_factory) -> list[tuple]:
     """Two files per chromosome sharing every sample, splitting the variants.
 
-    docs/tickets/0005 makes this an error: leaves under one chromosome must have
+    This is an error: leaves under one chromosome must have
     disjoint samples, because the chromosome *is* the variant axis.
     """
     header, by_chrom = target_records

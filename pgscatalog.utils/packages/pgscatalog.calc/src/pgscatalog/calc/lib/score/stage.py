@@ -1,10 +1,9 @@
 """What the four stages of split-apply-combine share.
 
 MATCH, MATCH_COMBINE, SCORE and SCORE_COMBINE are four modules, one per stage, each
-taking only what it needs over the cache seam (docs/tickets/0012) and the database
-seam (docs/tickets/0016). They are not variations of one thing, so there is no base
-class here: what genuinely repeats is the directory layout, and loading the two
-tables more than one stage loads.
+taking only what it needs over the cache seam and the database seam. They are not
+variations of one thing, so there is no base class here: what genuinely repeats
+is the directory layout, and loading the two tables more than one stage loads.
 
 A stage's output directory holds two different kinds of thing::
 
@@ -19,7 +18,7 @@ A stage's output directory holds two different kinds of thing::
 Published artefacts stay at the root because the process declarations and
 `publishDir` globs in `pgsc_calc` name them there (ADR 0001). Everything else -
 including the dosage array, the largest thing SCORE creates - goes under `scratch`,
-so a task's outputs are enumerable without listing its scratch (docs/tickets/0017).
+so a task's outputs are enumerable without listing its scratch.
 """
 
 from __future__ import annotations
@@ -99,7 +98,7 @@ def import_match_tables(
     The two artefacts are structurally interchangeable under ``INSERT ... BY NAME``,
     so `target_alleles` is what keeps SCORE from scoring accessions that failed
     `min_overlap`: it declares only the columns SCORE reads, and the binder then
-    refuses a table carrying more (docs/tickets/0018).
+    refuses a table carrying more.
 
     ponytail: the rejection is structural - SCORE declares only what it reads, so
     the binder refuses the ungated table. That holds only while the two tables'

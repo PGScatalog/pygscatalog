@@ -1,4 +1,4 @@
-"""The cache hierarchy: what a staged cache holds (docs/tickets/0012, ADR 0003)"""
+"""The cache hierarchy: what a staged cache holds (ADR 0003)"""
 
 import numpy as np
 import pytest
@@ -142,7 +142,7 @@ def test_a_cache_holding_one_shard_is_what_score_wants(tmp_path):
 
 def test_score_rejects_a_cache_holding_more_than_one_shard(tmp_path):
     """weight_mat_row_nr indexes this task's dosage array, so staging two shards
-    would silently misalign it (docs/tickets/0007)"""
+    would silently misalign it"""
     cache = _build_cache(
         tmp_path / "genotypes.zarr",
         [("1/a.vcf.gz", ["s1"]), ("1/b.vcf.gz", ["s2"])],

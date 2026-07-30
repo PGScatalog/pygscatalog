@@ -16,7 +16,7 @@ from pgscatalog.calc.lib.score.scoredb import ScoreDatabase
 """
 The _weight_matrix functions take a connection to a database with at least two tables:
 score_variant_table and allele_match_table. Most of these tests never need the
-database on disk, so they take an in-memory connection (docs/tickets/0016).
+database on disk, so they take an in-memory connection.
 """
 
 

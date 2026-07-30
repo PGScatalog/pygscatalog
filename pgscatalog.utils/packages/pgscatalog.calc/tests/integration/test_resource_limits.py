@@ -1,5 +1,4 @@
-"""Every connection to the score database carries the stage's resource limits
-(docs/tickets/0016).
+"""Every connection to the score database carries the stage's resource limits.
 
 duckdb's default is a share of *visible* RAM, which inside a scheduled task is
 usually the host's rather than the task's limit, so a query that ignores

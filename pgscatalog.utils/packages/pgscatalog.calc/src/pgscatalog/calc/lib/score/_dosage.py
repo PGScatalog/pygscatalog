@@ -66,7 +66,7 @@ def make_dosage_arrays(
         Identifier of the sample set within the Zarr store
     n_samples : int
         Number of samples the shard holds, which the cache reports (it owns the
-        hierarchy, so nothing here walks it - docs/tickets/0013)
+        hierarchy, so nothing here walks it)
     conn : duckdb.DuckDBPyConnection
         A connection to the score database, which holds the variant metadata
         (read-only is enough)
@@ -204,7 +204,7 @@ def write_dosage_arrays(
 
     # the arrays hold this shard and nothing else, so each is written whole:
     # weight_mat_row_nr is the position of a row in this shard's ordering, so there
-    # is no region to offset into (docs/tickets/0015)
+    # is no region to offset into
     dask_tasks = [
         effect_type_adjusted.to_zarr(url=dosage_array, compute=False),
         is_dosage_nan.to_zarr(url=missing_array, compute=False),

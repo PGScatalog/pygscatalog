@@ -455,7 +455,7 @@ def test_setup_enums() -> None:
 
 
 def _make_test_conn(pgs000001) -> duckdb.DuckDBPyConnection:
-    # nothing here needs the database on disk (docs/tickets/0016)
+    # nothing here needs the database on disk
     conn = duckdb.connect(":memory:")
 
     # score_variant_table loading via load_scoring_files functions from Scorefiles

@@ -1,9 +1,8 @@
 """SCORE: calculate partial polygenic scores for one shard.
 
 Staged with one shard, because `weight_mat_row_nr` indexes this task's dosage array
-and staging two at once would silently misalign it (docs/tickets/0007). The dosage
-and weight arrays it builds are scratch, not output: only `partial_scores.parquet`
-is published.
+and staging two at once would silently misalign it. The dosage and weight arrays
+it builds are scratch, not output: only `partial_scores.parquet` is published.
 """
 
 from __future__ import annotations
@@ -56,7 +55,7 @@ class ScoreStage:
     minimum_samples_for_impute : int
         Minimum number of samples required to impute a missing dosage from mean
         effect allele frequency. Only SCORE calculates dosage, so only SCORE has
-        anything to say about the floor (docs/tickets/0009).
+        anything to say about the floor.
     """
 
     def __init__(
@@ -69,14 +68,14 @@ class ScoreStage:
         self._scratch = stage.scratch_dir(out_dir)
 
         # the cache owns the zarr hierarchy, so this stage asks it what it holds
-        # instead of deriving paths (docs/tickets/0012). SCORE is staged with a cache,
-        # so it reads the sampleset name and the shard from it
+        # instead of deriving paths. SCORE is staged with a cache, so it reads
+        # the sampleset name and the shard from it
         self._cache = GenotypeCache(path=self._scratch / "genotypes.zarr")
 
         self._n_minimum_samples_for_impute = minimum_samples_for_impute
 
         # every query this stage runs goes through the database, so the resource
-        # limits the CLI was given reach all of them (docs/tickets/0016)
+        # limits the CLI was given reach all of them
         self._db = ScoreDatabase(
             path=self._scratch / "pgs.db",
             max_memory_gb=max_memory_gb,
@@ -95,7 +94,7 @@ class ScoreStage:
 
         `target_alleles=False` declares only the columns SCORE reads, which is
         what makes MATCH's ungated `matches.parquet` fail to load rather than
-        score accessions that failed `min_overlap` (docs/tickets/0018).
+        score accessions that failed `min_overlap`.
         """
         stage.import_match_tables(db=self._db, paths=paths, target_alleles=False)
 
@@ -111,7 +110,7 @@ class ScoreStage:
         sample_ids = self._cache.sample_ids
 
         # the dosage array is the largest thing this stage creates and nothing
-        # downstream reads it, so it goes in the scratch (docs/tickets/0017)
+        # downstream reads it, so it goes in the scratch
         pgs_store = zarr.storage.LocalStore(self._scratch)
         pgs_group = zarr.open_group(store=pgs_store, mode="w", path=f"pgs/{sampleset}")
 

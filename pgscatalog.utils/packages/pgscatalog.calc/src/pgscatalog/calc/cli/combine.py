@@ -1,9 +1,9 @@
 """SCORE_COMBINE: reduce every shard's partial scores into the final output.
 
 Once SCORE is fanned out no task produces final output, so this is a single duckdb
-reduction (docs/tickets/0008). It needs no awareness of how the cache was split:
-the reduction is valid because every (sample, variant) pair appears in exactly one
-shard, which docs/tickets/0005 enforces at MATCH.
+reduction. It needs no awareness of how the cache was split: the reduction is
+valid because every (sample, variant) pair appears in exactly one shard, which
+MATCH's shape invariants enforce.
 """
 
 from __future__ import annotations

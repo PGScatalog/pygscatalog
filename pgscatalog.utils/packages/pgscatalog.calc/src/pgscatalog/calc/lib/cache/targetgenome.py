@@ -115,8 +115,7 @@ class TargetGenome:
                         └──
 
         The path itself comes from `leaf_group_path`, which samplesheet validation
-        calls too, so the string checked before LOAD is the string written by it
-        (docs/tickets/0014).
+        calls too, so the string checked before LOAD is the string written by it.
         """
         return leaf_group_path(
             sampleset=self.sampleset, chromosome=self.chrom, filename=self.filename

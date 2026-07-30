@@ -1,9 +1,9 @@
 """SCORE_COMBINE: sum every shard's partial scores into the final output.
 
 The reduction is valid without any awareness of how the cache was split, because
-every (sample, variant) pair appears in exactly one shard (docs/tickets/0008). So
-this stage has no cache, no shard, no sampleset and no scoring files: parquet in,
-`scores.txt.gz` out.
+every (sample, variant) pair appears in exactly one shard. So this stage has no
+cache, no shard, no sampleset and no scoring files: parquet in, `scores.txt.gz`
+out.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ class ScoreCombineStage:
         scratch = stage.scratch_dir(out_dir)
 
         # every query this stage runs goes through the database, so the resource
-        # limits the CLI was given reach all of them (docs/tickets/0016)
+        # limits the CLI was given reach all of them
         self._db = ScoreDatabase(
             path=scratch / "pgs.db",
             max_memory_gb=max_memory_gb,
@@ -55,7 +55,7 @@ class ScoreCombineStage:
         """Sum every shard's partial scores.
 
         Valid without any awareness of how the cache was split, because every
-        (sample, variant) pair appears in exactly one shard (docs/tickets/0008).
+        (sample, variant) pair appears in exactly one shard.
         """
         logger.info(f"Combining {len(paths)} partial score tables")
         parquet_paths = [str(p) for p in paths]

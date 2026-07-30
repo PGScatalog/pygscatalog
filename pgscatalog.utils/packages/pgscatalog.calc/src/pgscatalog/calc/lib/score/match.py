@@ -1,9 +1,9 @@
 """MATCH: match scoring file variants against one chromosome's shards.
 
 Staged with every shard of one chromosome, so it matches against a complete variant
-list and no shard has a partial view (docs/tickets/0003). It reads the cache's 1D
-variant metadata only, never the 3D genotype arrays, and it reads the sampleset name
-from the cache rather than being told it.
+list and no shard has a partial view. It reads the cache's 1D variant metadata
+only, never the 3D genotype arrays, and it reads the sampleset name from the cache
+rather than being told it.
 """
 
 from __future__ import annotations
@@ -59,12 +59,12 @@ class MatchStage:
         scratch = stage.scratch_dir(out_dir)
 
         # the cache owns the zarr hierarchy, so this stage asks it what it holds
-        # instead of deriving paths (docs/tickets/0012). MATCH is staged with a cache,
-        # so it reads the sampleset name from it
+        # instead of deriving paths. MATCH is staged with a cache, so it reads
+        # the sampleset name from it
         self._cache = GenotypeCache(path=scratch / "genotypes.zarr")
 
         # every query this stage runs goes through the database, so the resource
-        # limits the CLI was given reach all of them (docs/tickets/0016)
+        # limits the CLI was given reach all of them
         self._db = ScoreDatabase(
             path=scratch / "pgs.db",
             max_memory_gb=max_memory_gb,
@@ -83,7 +83,7 @@ class MatchStage:
         Variant metadata is stored as 1D arrays in "meta" groups
 
         The cache owns the hierarchy, so it hands over each shard's metadata; this
-        builds a dataframe per shard and inserts it (docs/tickets/0013)
+        builds a dataframe per shard and inserts it
         """
         root: zarr.Group = self._cache.root
         sampleset: str = self._cache.sampleset
@@ -168,7 +168,7 @@ class MatchStage:
         """Match scoring file variants against one chromosome's shards.
 
         No `min_overlap` here: the match rate is genome-wide, so only
-        MATCH_COMBINE can decide it (docs/tickets/0003).
+        MATCH_COMBINE can decide it.
 
         Returns the chromosome that was matched.
         """

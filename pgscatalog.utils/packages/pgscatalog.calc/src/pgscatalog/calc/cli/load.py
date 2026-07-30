@@ -81,7 +81,7 @@ def check_leaf_paths(targets: list[AnnotatedGenomePath], sampleset: str) -> None
     one leaf would silently overwrite the other (ADR 0003).
 
     Pure path arithmetic, no file access: the leaf path is the one `TargetGenome`
-    writes to, so this guards the string that actually collides (docs/tickets/0014).
+    writes to, so this guards the string that actually collides.
     """
     seen: dict[str, str] = {}
 
@@ -207,7 +207,7 @@ def load_cli(args: argparse.Namespace) -> None:
         # record the declaration on the leaf, not the sampleset: LOAD is fanned out
         # per shard and merging the zips is last-write-wins on an ancestor zarr.json,
         # so a sampleset-level attr would swallow a contradictory declaration instead
-        # of letting MATCH detect it (docs/tickets/0006, ADR 0004)
+        # of letting MATCH detect it (ADR 0004)
         target_genome.zarr_group.attrs["absence_semantics"] = args.absence_semantics
 
     # prepare to move the zarr array into a read-only single file archive
