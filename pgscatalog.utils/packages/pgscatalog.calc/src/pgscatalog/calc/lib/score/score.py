@@ -91,8 +91,13 @@ class ScoreStage:
         stage.load_scores(db=self._db, scorefile_paths=scorefile_paths)
 
     def import_match_tables(self, paths: Sequence[Pathish]) -> None:
-        """Load the gated match table written by MATCH_COMBINE"""
-        stage.import_match_tables(db=self._db, paths=paths)
+        """Load the gated match table written by MATCH_COMBINE.
+
+        `target_alleles=False` declares only the columns SCORE reads, which is
+        what makes MATCH's ungated `matches.parquet` fail to load rather than
+        score accessions that failed `min_overlap` (docs/tickets/0018).
+        """
+        stage.import_match_tables(db=self._db, paths=paths, target_alleles=False)
 
     def calculate_scores(self) -> None:
         with self._db.connect() as conn:

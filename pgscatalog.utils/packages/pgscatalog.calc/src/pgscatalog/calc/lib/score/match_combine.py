@@ -68,7 +68,8 @@ class MatchCombineStage:
 
     def import_match_tables(self, paths: Sequence[Pathish]) -> None:
         """Load the partial match tables written by every chromosome's MATCH task"""
-        stage.import_match_tables(db=self._db, paths=paths)
+        # the match log reports the target alleles, so this stage consumes them
+        stage.import_match_tables(db=self._db, paths=paths, target_alleles=True)
 
     def combine_matches(self, min_overlap: float, out_path: Pathish) -> None:
         """Pool every chromosome's matches, apply min_overlap, and write the

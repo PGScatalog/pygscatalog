@@ -247,8 +247,7 @@ def test_accession_below_min_overlap_is_rejected_genome_wide(
         # enough unmatchable variants to put the rate under 75%
         for i in range(len(chrom_1)):
             f.write(
-                f"8\t{9_000_000 + i}\tA\tC\t0.1\tadditive\tFalse\t"
-                f"PGS999997\t{row_nr}\n"
+                f"8\t{9_000_000 + i}\tA\tC\t0.1\tadditive\tFalse\tPGS999997\t{row_nr}\n"
             )
             row_nr += 1
 
@@ -416,6 +415,62 @@ def test_score_rejects_a_cache_holding_more_than_one_shard(
 
     with pytest.raises(ValueError, match="SCORE runs per shard"):
         stage.calculate_scores()
+
+
+def test_score_rejects_the_ungated_match_table(
+    unsplit_target, scorefile, tmp_path, monkeypatch
+):
+    """MATCH's matches.parquet and MATCH_COMBINE's match_table.parquet are both
+    "the match table", and scoring the ungated one would score accessions that
+    failed min_overlap without a crash, a warning or a NaN (docs/tickets/0018).
+
+    Driven through the CLI because that is the wiring a real mistake goes through.
+    """
+    (zip_path,) = load_targets(
+        [unsplit_target], tmp_path / "load", scorefile, monkeypatch
+    )
+    match_dir = tmp_path / "match"
+    run_cli(
+        [
+            "pgsc_calc",
+            "match",
+            "--zarr_zip_file",
+            str(zip_path),
+            "--score_paths",
+            str(scorefile),
+            "--out_dir",
+            str(match_dir),
+        ],
+        monkeypatch,
+    )
+
+    score_dir = tmp_path / "score"
+    with pytest.raises(ValueError) as excinfo:
+        run_cli(
+            [
+                "pgsc_calc",
+                "score",
+                "--zarr_zip_file",
+                str(zip_path),
+                "--score_paths",
+                str(scorefile),
+                "--match_table",
+                str(match_dir / "matches.parquet"),
+                "--out_dir",
+                str(score_dir),
+            ],
+            monkeypatch,
+        )
+
+    # a bare BinderException reads like a corrupt parquet, so the message has to
+    # name both artefacts and say what would otherwise have been scored
+    message = str(excinfo.value)
+    assert "matches.parquet" in message
+    assert "match_table.parquet" in message
+    assert "min_overlap" in message
+
+    # it failed before doing any scoring work
+    assert not (score_dir / "partial_scores.parquet").exists()
 
 
 def test_match_rejects_more_than_one_chromosome(

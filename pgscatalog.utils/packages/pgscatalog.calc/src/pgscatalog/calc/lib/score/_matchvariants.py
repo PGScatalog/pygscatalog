@@ -78,7 +78,7 @@ def update_match_table(
     )
 
     logger.info("Creating allele match table if it doesn't exist")
-    create_allele_match_table(conn)
+    create_allele_match_table(conn, target_alleles=True)
 
     logger.info("Matching alleles to find effect allele index")
     conn.sql("""
@@ -128,13 +128,29 @@ def update_match_table(
         """)
 
 
-def create_allele_match_table(conn: duckdb.DuckDBPyConnection) -> None:
-    """One definition of the match table, shared by MATCH and MATCH_COMBINE.
+def create_allele_match_table(
+    conn: duckdb.DuckDBPyConnection, *, target_alleles: bool
+) -> None:
+    """The match table, declared as the stage that's about to fill it consumes it.
 
     target_ref / target_alts are carried here rather than joined back from
-    targetvariants, which only MATCH ever populates.
+    targetvariants, which only MATCH ever populates. MATCH writes them and
+    MATCH_COMBINE reads them into the match log, so both pass
+    ``target_alleles=True``.
+
+    SCORE reads neither, and passes ``target_alleles=False`` on purpose: the
+    ungated ``matches.parquet`` carries both columns, so ``INSERT ... BY NAME``
+    refuses it against this narrower table (docs/tickets/0018).
     """
-    conn.sql("""
+    target_allele_columns = (
+        """
+            target_ref TEXT,
+            target_alts TEXT[],
+        """
+        if target_alleles
+        else ""
+    )
+    conn.sql(f"""
         -- custom allele matching logic is applied here
         CREATE TABLE IF NOT EXISTS allele_match_table (
             sampleset TEXT NOT NULL,
@@ -149,8 +165,7 @@ def create_allele_match_table(conn: duckdb.DuckDBPyConnection) -> None:
                 match_summary match_summary_enum) NOT NULL,
             target_row_nr UINTEGER NOT NULL,
             zarr_group TEXT NOT NULL,
-            target_ref TEXT,
-            target_alts TEXT[],
+            {target_allele_columns}
             -- one match per scoring variant per shard (docs/adr/0003)
             PRIMARY KEY (sampleset, accession, row_nr, zarr_group)
         );

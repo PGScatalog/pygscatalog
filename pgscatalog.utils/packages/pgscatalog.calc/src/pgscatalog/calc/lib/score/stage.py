@@ -28,6 +28,8 @@ import logging
 import pathlib
 from typing import TYPE_CHECKING
 
+import duckdb
+
 from pgscatalog.calc.lib.scorefile import load_scoring_files
 
 from ._matchvariants import _setup_enums, create_allele_match_table
@@ -84,7 +86,9 @@ def load_scores(db: ScoreDatabase, scorefile_paths: Pathish | PathishList) -> No
         load_scoring_files(conn=conn, scorefile_paths=scorefile_paths)
 
 
-def import_match_tables(db: ScoreDatabase, paths: Sequence[Pathish]) -> None:
+def import_match_tables(
+    db: ScoreDatabase, paths: Sequence[Pathish], *, target_alleles: bool
+) -> None:
     """Load partial match tables written by MATCH (or the gated table written
     by MATCH_COMBINE, which drops the target allele columns)
 
@@ -92,23 +96,50 @@ def import_match_tables(db: ScoreDatabase, paths: Sequence[Pathish]) -> None:
     gated table. Neither of them runs the matcher, so the enums the match table
     declares have to be set up here.
 
+    The two artefacts are structurally interchangeable under ``INSERT ... BY NAME``,
+    so `target_alleles` is what keeps SCORE from scoring accessions that failed
+    `min_overlap`: it declares only the columns SCORE reads, and the binder then
+    refuses a table carrying more (docs/tickets/0018).
+
+    ponytail: the rejection is structural - SCORE declares only what it reads, so
+    the binder refuses the ungated table. That holds only while the two tables'
+    column sets differ. If SCORE ever needs target_ref, mark the gate explicitly
+    instead: ``COPY ... (FORMAT parquet, KV_METADATA {gated: 'true'})`` in
+    MATCH_COMBINE, read back with ``parquet_kv_metadata()``, which annotates the
+    file without touching any row schema.
+
     Parameters
     ----------
     db : ScoreDatabase
         The stage's score database.
     paths : Sequence[Pathish]
         Parquet match tables to load.
+    target_alleles : bool
+        Whether this stage consumes `target_ref` / `target_alts`. True for
+        MATCH_COMBINE, which writes them into the match log; False for SCORE.
     """
     logger.info(f"Importing {len(paths)} match tables")
     with db.connect() as conn:
         # score_log_table declares enum-typed columns, and update_match_table
         # (the only other caller) never runs in a combine task
         _setup_enums(conn)
-        create_allele_match_table(conn)
-        conn.execute(
-            """
-            INSERT INTO allele_match_table BY NAME
-            SELECT * FROM read_parquet($paths)
-            """,
-            {"paths": [str(p) for p in paths]},
-        )
+        create_allele_match_table(conn, target_alleles=target_alleles)
+        try:
+            conn.execute(
+                """
+                INSERT INTO allele_match_table BY NAME
+                SELECT * FROM read_parquet($paths)
+                """,
+                {"paths": [str(p) for p in paths]},
+            )
+        except duckdb.BinderException as e:
+            if target_alleles or "target_ref" not in str(e):
+                raise
+            raise ValueError(
+                f"{[str(p) for p in paths]} looks like matches.parquet written by "
+                "match, not match_table.parquet written by match-combine: it "
+                "carries the target allele columns that match-combine drops. "
+                "Scoring it would include accessions that failed the min_overlap "
+                "match rate threshold, producing plausible-looking scores that are "
+                "not reproductions of the published scores."
+            ) from e
