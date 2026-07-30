@@ -3,9 +3,6 @@ from __future__ import annotations
 import argparse
 import pathlib
 
-from pgscatalog.core.cli.download_cli import add_download_args, download_cli
-from pgscatalog.core.cli.format_cli import add_format_args, format_cli
-
 from pgscatalog.calc import GenomeFileType
 from pgscatalog.calc.cli._utils import absence_semantics, check_positive
 from pgscatalog.calc.cli.combine import add_combine_args
@@ -13,6 +10,8 @@ from pgscatalog.calc.cli.load import load_cli
 from pgscatalog.calc.cli.match import add_match_args
 from pgscatalog.calc.cli.match_combine import add_match_combine_args
 from pgscatalog.calc.cli.score import add_score_args
+from pgscatalog.core.cli.download_cli import add_download_args, download_cli
+from pgscatalog.core.cli.format_cli import add_format_args, format_cli
 
 
 def main() -> None:

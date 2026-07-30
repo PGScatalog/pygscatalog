@@ -20,9 +20,10 @@ def really_big_bgen(tmp_path_factory, big_bgen_n_samples, big_bgen_n_variants):
     bgi_path = base_dir / "test_large_file.bgen.bgi"
 
     # this file ~1GB
+    rng = np.random.default_rng()
     with BgenWriter(bgen_path, n_samples=big_bgen_n_samples) as bfile:
         for i in range(big_bgen_n_variants):
-            geno = np.random.rand(big_bgen_n_samples, 3).astype(np.float16)
+            geno = rng.random((big_bgen_n_samples, 3)).astype(np.float16)
             bfile.add_variant(
                 varid=f"var{i}",
                 rsid="rsid{i}",

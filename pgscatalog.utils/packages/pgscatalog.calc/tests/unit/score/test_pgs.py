@@ -88,16 +88,6 @@ def tiny_effect_weights_zarr():
 
 
 @pytest.fixture
-def tiny_effect_weights_zarr():
-    """
-    Simple effect weights for 4 variants (variants, 1) : all 1.0.
-    """
-    weights = np.ones((4, 1), dtype=np.float64)
-    store = zarr.storage.MemoryStore()
-    return zarr.create_array(store=store, data=weights)
-
-
-@pytest.fixture
 def zero_dosage():
     return np.zeros(shape=(4, 3))  # 4 variants, 3 samples
 

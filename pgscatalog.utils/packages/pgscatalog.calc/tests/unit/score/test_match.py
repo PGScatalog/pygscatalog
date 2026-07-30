@@ -13,7 +13,9 @@ from pgscatalog.calc.lib.score._matchvariants import (
 )
 from pgscatalog.calc.lib.scorefile import load_scoring_files
 
-# Test functions of: update_match_table,_setup_enums, match_variant, get_variant_match_priority, is_biallelic_variant_ambiguous, classify_match(complement ,complement_table)
+# Test functions of: update_match_table, _setup_enums, match_variant,
+# get_variant_match_priority, is_biallelic_variant_ambiguous,
+# classify_match (complement, complement_table)
 
 
 @pytest.mark.parametrize(

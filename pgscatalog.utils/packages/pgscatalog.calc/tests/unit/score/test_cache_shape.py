@@ -152,7 +152,9 @@ def test_shards_differing_by_swapped_variants_are_rejected():
     """Equal counts, different variants: comparing identifiers catches this, and
     comparing counts alone would not"""
     conn = duckdb.connect()
-    conn.execute("CREATE TABLE targetvariants (ref TEXT, variant_id TEXT, zarr_group TEXT);")
+    conn.execute(
+        "CREATE TABLE targetvariants (ref TEXT, variant_id TEXT, zarr_group TEXT);"
+    )
     conn.executemany(
         "INSERT INTO targetvariants VALUES (?, ?, ?)",
         [

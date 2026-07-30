@@ -1,4 +1,4 @@
-from decimal import *
+from decimal import Decimal, getcontext
 
 import duckdb
 import pytest
@@ -215,7 +215,7 @@ def _make_conn_from_json(
     conn.execute(
         """
         CREATE TABLE score_variant_table AS
-        SELECT * 
+        SELECT *
         FROM read_json(?, format='nd');
         """,
         [str(score_variant_table)],
@@ -244,7 +244,8 @@ def test_add_match_log_with_ndjson(
 
     conn = _make_conn_from_json(allele_match_table, score_variant_table)
 
-    # Test data includes two sample sets, one test data with match_rate=1.0; while 1000G with match_rate=0.93, so we set threshold 0.9 at here.
+    # Test data includes two samplesets: the test data has match_rate=1.0 and
+    # 1000G has match_rate=0.93, so the threshold goes at 0.9
     add_match_log(conn, sampleset=sampleset, min_overlap=0.95)
 
     # check the match_rate from the summary_log_table
