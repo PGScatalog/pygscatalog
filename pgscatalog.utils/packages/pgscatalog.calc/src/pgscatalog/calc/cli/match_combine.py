@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 import duckdb
 from rich import print
 
-from pgscatalog.calc import ScorePipeline
 from pgscatalog.calc.cli._stage import (
     add_score_paths_arg,
     add_stage_args,
@@ -23,7 +22,10 @@ from pgscatalog.calc.cli._stage import (
     setup_stage,
 )
 from pgscatalog.calc.cli._utils import zero_one_float
-from pgscatalog.calc.lib.score.scorepipeline import check_sample_union
+from pgscatalog.calc.lib.score.match_combine import (
+    MatchCombineStage,
+    check_sample_union,
+)
 
 if TYPE_CHECKING:
     import argparse
@@ -68,7 +70,9 @@ def add_match_combine_args(parser: argparse.ArgumentParser) -> None:
 def match_combine_cli(args: argparse.Namespace) -> None:
     out_dir = setup_stage(args)
 
-    pipeline = ScorePipeline(
+    # there is no cache here to read the sampleset from, only the parquet files
+    # MATCH published, so it's passed in
+    stage = MatchCombineStage(
         max_memory_gb=args.max_memory_gb,
         threads=args.threads,
         out_dir=out_dir,
@@ -81,13 +85,13 @@ def match_combine_cli(args: argparse.Namespace) -> None:
     # reloading the scoring files is required, not redundant: the min_overlap
     # denominator is every variant in the scoring file, including variants on
     # chromosomes that aren't in the cache at all
-    pipeline.load_scores(scorefile_paths=args.score_paths)
-    pipeline.import_match_tables(check_paths_exist(args.matches))
+    stage.load_scores(scorefile_paths=args.score_paths)
+    stage.import_match_tables(check_paths_exist(args.matches))
 
-    pipeline.combine_matches(
+    stage.combine_matches(
         min_overlap=args.min_overlap, out_path=out_dir / "match_table.parquet"
     )
-    pipeline.export_full_match_log(out_directory=out_dir / "logs")
-    pipeline.export_summary_match_log(out_path=out_dir / "logs" / "summary.csv")
+    stage.export_full_match_log(out_directory=out_dir / "logs")
+    stage.export_summary_match_log(out_path=out_dir / "logs" / "summary.csv")
 
     print("Finished combining matches :tada:")

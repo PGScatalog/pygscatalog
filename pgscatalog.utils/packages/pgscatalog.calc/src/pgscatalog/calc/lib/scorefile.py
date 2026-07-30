@@ -10,6 +10,7 @@ import polars as pl
 import zarr
 import zarr.errors
 
+from .cache.genotypecache import meta_group_path
 from .constants import VALID_CHROMOSOMES
 
 if TYPE_CHECKING:
@@ -101,21 +102,19 @@ class Scorefiles:
 
 
 def load_scoring_files(
-    db_path: Pathish, scorefile_paths: PathishList, max_memory_gb: str, threads: int
+    conn: duckdb.DuckDBPyConnection, scorefile_paths: PathishList
 ) -> None:
     """Load scoring files into the score_variant_table
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the DuckDB database file.
+    conn : duckdb.DuckDBPyConnection
+        A writable connection to the score database (see
+        pgscatalog.calc.lib.score.scoredb, which owns the resource limits it
+        carries).
     scorefile_paths : PathishList
         A list of Pathish objects to the scoring CSV file(s). Scoring files must be
         in a  structured format as created by pgscatalog-format.
-    max_memory_gb : str
-        Maximum memory DuckDB is allowed to use (e.g., "4GB").
-    threads : int
-        Number of threads for DuckDB to use.
 
     Notes
     -----
@@ -130,54 +129,50 @@ def load_scoring_files(
     """
     path_strings: list[str] = [str(pathlib.Path(x).resolve()) for x in scorefile_paths]
 
-    with duckdb.connect(
-        str(db_path),
-        config={"max_memory": max_memory_gb, "threads": str(threads)},
-    ) as conn:
-        logger.info(f"Loading {path_strings} into {db_path=} score_variant_table")
-        conn.sql("""
-        CREATE OR REPLACE TABLE score_variant_table (
-            chr_name VARCHAR,
-            chr_position UINTEGER,
-            effect_allele VARCHAR,
-            other_allele VARCHAR,
-            effect_weight DOUBLE,
-            effect_type VARCHAR,
-            is_duplicated BOOLEAN,
-            accession VARCHAR,
-            row_nr UINTEGER,
-            PRIMARY KEY(row_nr, accession)
-        );
-        """)
-        # column types are manually set here, because chr_name often fools auto-detect
-        # (1-22... X)
-        conn.execute(
-            """
-        INSERT INTO score_variant_table
-        SELECT * FROM read_csv(?, columns={
-            'chr_name': 'VARCHAR',
-            'chr_position': 'UINTEGER',
-            'effect_allele': 'VARCHAR',
-            'other_allele': 'VARCHAR',
-            'effect_weight': 'DOUBLE',
-            'effect_type': 'VARCHAR',
-            'is_duplicated': 'BOOLEAN',
-            'accession': 'VARCHAR',
-            'row_nr': 'UINTEGER'
-        })
-        -- this data can't be matched so drop it
-        WHERE chr_name IS NOT NULL AND chr_position IS NOT NULL;
-        """,
-            [path_strings],
-        )
-        logger.info("Finished loading score_variant_table")
+    logger.info(f"Loading {path_strings} into score_variant_table")
+    conn.sql("""
+    CREATE OR REPLACE TABLE score_variant_table (
+        chr_name VARCHAR,
+        chr_position UINTEGER,
+        effect_allele VARCHAR,
+        other_allele VARCHAR,
+        effect_weight DOUBLE,
+        effect_type VARCHAR,
+        is_duplicated BOOLEAN,
+        accession VARCHAR,
+        row_nr UINTEGER,
+        PRIMARY KEY(row_nr, accession)
+    );
+    """)
+    # column types are manually set here, because chr_name often fools auto-detect
+    # (1-22... X)
+    conn.execute(
+        """
+    INSERT INTO score_variant_table
+    SELECT * FROM read_csv(?, columns={
+        'chr_name': 'VARCHAR',
+        'chr_position': 'UINTEGER',
+        'effect_allele': 'VARCHAR',
+        'other_allele': 'VARCHAR',
+        'effect_weight': 'DOUBLE',
+        'effect_type': 'VARCHAR',
+        'is_duplicated': 'BOOLEAN',
+        'accession': 'VARCHAR',
+        'row_nr': 'UINTEGER'
+    })
+    -- this data can't be matched so drop it
+    WHERE chr_name IS NOT NULL AND chr_position IS NOT NULL;
+    """,
+        [path_strings],
+    )
+    logger.info("Finished loading score_variant_table")
 
 
 def get_position_df(zarr_group: zarr.Group) -> pl.DataFrame:
     """Get variants from the "meta" zarr group array"""
     try:
         meta_root = zarr.open_group(
-            path=f"{zarr_group.path}/meta", store=zarr_group.store, mode="r"
+            path=meta_group_path(zarr_group.path), store=zarr_group.store, mode="r"
         )
     except zarr.errors.GroupNotFoundError:
         logger.info("No variants in cache")

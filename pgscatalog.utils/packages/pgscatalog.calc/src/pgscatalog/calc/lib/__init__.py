@@ -11,7 +11,6 @@ from .legacy.polygenicscore import (
     PolygenicScore,
 )
 from .legacy.principalcomponents import PopulationType, PrincipalComponents
-from .score.scorepipeline import ScorePipeline
 from .scorefile import Scorefiles
 from .types import Pathish, PathishList
 
@@ -19,7 +18,6 @@ __all__ = [
     "Scorefiles",
     "TargetGenome",
     "TargetVariants",
-    "ScorePipeline",
     "GenomeFileType",
     "Pathish",
     "PathishList",

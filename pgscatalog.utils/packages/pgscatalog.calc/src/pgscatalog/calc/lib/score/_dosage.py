@@ -4,7 +4,6 @@ import logging
 from typing import TYPE_CHECKING, TypedDict, cast
 
 import dask.config
-import duckdb
 import numpy as np
 import zarr
 import zarr.storage
@@ -18,21 +17,22 @@ from pgscatalog.calc.lib.constants import (
 from ._impute import calculate_mean_dosage
 
 if TYPE_CHECKING:
+    import duckdb
     import polars as pl
     from numpy import typing as npt
-
-    from pgscatalog.calc.lib.types import Pathish
 
 
 logger = logging.getLogger(__name__)
 
 
 def make_dosage_arrays(
-    df_groups: dict[str, pl.DataFrame],
+    df: pl.DataFrame,
+    zarr_group: str,
     genotypes_group: zarr.Group,
     pgs_store: zarr.storage.StoreLike,
     sampleset: str,
-    db_path: Pathish,
+    n_samples: int,
+    conn: duckdb.DuckDBPyConnection,
     n_workers: int = 1,
     n_minimum_impute: int = 50,
 ) -> tuple[zarr.Array, zarr.Array]:
@@ -40,8 +40,8 @@ def make_dosage_arrays(
     Calculate and adjust effect allele dosage, storing dosage and missingness masks in
     Zarr arrays (disk-backed).
 
-    This function basically iterates over all 3D genotype arrays in zarr groups to
-    create a 2D dosage array where rows = samples and columns = dosage.
+    This function reads one shard's 3D genotype array to create a 2D dosage array
+    where rows = samples and columns = dosage.
 
     Missing dosages are imputed from mean effect allele frequency.
 
@@ -49,21 +49,27 @@ def make_dosage_arrays(
 
     Parameters
     ----------
-    df_groups : dict of str -> pl.DataFrame
-        Mapping of Zarr genotype group names to dataframes describing score variants
-        within that group. Each dataframe must contain:
+    df : pl.DataFrame
+        Score variants in the shard being scored, which must contain:
         - ``target_row_nr``: row indices of variants in the genotype array
         - ``effect_allele_idx``: allele index for effect allele dosage calculation
         - ``is_recessive``: boolean mask for recessive effect type
         - ``is_dominant``: boolean mask for dominant effect type
+    zarr_group : str
+        The shard being scored: its path relative to the store root
+        (``sampleset/chromosome/filename``)
     genotypes_group: zarr.Group
         A read only group which contains genotype arrays
     pgs_store : zarr.storage.StoreLike
         A writable zarr store where dosage and missing arrays will be written
     sampleset : str
         Identifier of the sample set within the Zarr store
-    db_path : Pathish
-        Path to the variant database which contains metadata
+    n_samples : int
+        Number of samples the shard holds, which the cache reports (it owns the
+        hierarchy, so nothing here walks it - docs/tickets/0013)
+    conn : duckdb.DuckDBPyConnection
+        A connection to the score database, which holds the variant metadata
+        (read-only is enough)
     n_workers : int, default=1
         Number of threads to use when writing dosage/missing arrays with Dask
     n_minimum_impute : int, default=50
@@ -82,12 +88,10 @@ def make_dosage_arrays(
     -----
     - Dosages are imputed as ``2 * mean(effect allele frequency)`` when sufficient
       non-missing calls are present
-    - Array writes are performed in blocks using the region argument to minimise I/O
     - Both arrays are created with chunking along the variant dimension,
       using ``ZARR_VARIANT_CHUNK_SIZE`` and compressed with ``ZARR_COMPRESSOR``.
     """
-    n_samples = get_n_samples(group=genotypes_group, sampleset=sampleset)
-    n_variants = get_n_score_variants(db_path=db_path)
+    n_variants = get_n_score_variants(conn=conn)
     pgs_group = zarr.open_group(store=pgs_store, path=f"pgs/{sampleset}")
 
     # an array to record dosage of effect alleles
@@ -112,11 +116,12 @@ def make_dosage_arrays(
         compressors=config.ZARR_COMPRESSOR,
     )
 
-    # calculate dosage for each genotype group (sampleset/chromosome/filename) and store
-    # it in a specific region (contiguous row range) in the big dosage array
-    write_dosage_regions(
+    # calculate dosage for this shard's genotypes (sampleset/chromosome/filename) and
+    # store it in the dosage array, which holds nothing else
+    write_dosage_arrays(
         genotypes_group=genotypes_group,
-        df_groups=df_groups,
+        zarr_group=zarr_group,
+        df=df,
         n_minimum_impute=n_minimum_impute,
         dosage_array=dosage_array,
         missing_array=missing_array,
@@ -127,126 +132,92 @@ def make_dosage_arrays(
     return missing_array, dosage_array
 
 
-def write_dosage_regions(
+def write_dosage_arrays(
     genotypes_group: zarr.Group,
-    df_groups: dict[str, pl.DataFrame],
+    zarr_group: str,
+    df: pl.DataFrame,
     n_minimum_impute: int,
     dosage_array: zarr.Array,
     missing_array: zarr.Array,
     n_workers: int = 1,
 ) -> None:
     """
-    Compute and write per-region genotype dosages into Zarr arrays.
+    Compute one shard's genotype dosages and write them into Zarr arrays.
 
-    For each zarr subgroup (sampleset/chromosome/filename) in `df_groups`, this
-    function:
+    For the shard being scored, this function:
 
     1. Loads genotype data from the genotypes (read-only) Zarr group.
     2. Calculates effect allele dosages and imputes missing values.
     3. Adjusts for dominant/recessive effect types.
-    4. Writes the resulting array to a region of the dosage and missingness arrays.
+    4. Writes the resulting arrays to the dosage and missingness arrays.
 
     Args:
-        genotypes_group: Root Zarr group containing subgroups per region.
-        df_groups: Mapping of region names to DataFrames with variant metadata.
+        genotypes_group: Root Zarr group containing the shard.
+        zarr_group: Path of the shard being scored, relative to the store root.
+        df: DataFrame of the shard's score variants with variant metadata.
         n_minimum_impute: Minimum number of samples required to impute missing dosages.
         dosage_array: Target Zarr array to store computed dosages.
         missing_array: Target Zarr array to store missingness flags.
 
     Notes:
         The dosage_array and missing_array are initialised with np.nan. If any NaN
-        values remain after all writes are finished an exception will be raised.
+        values remain after the writes are finished an exception will be raised.
 
         The input arrays dosage_array and missing_array are modified in place.
     """
-    start = 0
-    for zarr_group, df in df_groups.items():
-        logger.info(f"Calculating and storing dosage for {zarr_group=}")
+    logger.info(f"Calculating and storing dosage for {zarr_group=}")
 
-        # weight_mat_row_nr is used directly as a row index into dosage_array by
-        # calculate_score_statistics, so the region this group writes must be exactly
-        # the range of row numbers it was assigned in the weight matrix
-        if start != (first_row := df["weight_mat_row_nr"].min()):
-            raise ValueError(
-                f"{zarr_group=} writes dosage rows from {start} but its weight matrix "
-                f"rows start at {first_row!r}"
-            )
+    target_group = genotypes_group[zarr_group]
 
-        target_group = genotypes_group[zarr_group]
+    if not isinstance(target_group, zarr.Group):
+        raise TypeError
 
-        if not isinstance(target_group, zarr.Group):
-            raise TypeError
+    target_zarr = target_group["genotypes"]
 
-        target_zarr = target_group["genotypes"]
+    target_idx = df["target_row_nr"].to_numpy().astype(np.int64)
+    effect_idx = df["effect_allele_idx"].to_numpy()
 
-        target_idx = df["target_row_nr"].to_numpy().astype(np.int64)
-        effect_idx = df["effect_allele_idx"].to_numpy()
+    # extract score variants from cache
+    sliced_gts: da.Array = da.from_zarr(
+        target_zarr, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None, None)
+    )[target_idx]
 
-        # extract score variants from cache
-        sliced_gts: da.Array = da.from_zarr(
-            target_zarr, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None, None)
-        )[target_idx]
+    # replace missing calls with np.nan
+    missing_calls_masked: da.Array = sentinel_to_nan(sliced_gts)
 
-        # replace missing calls with np.nan
-        missing_calls_masked: da.Array = sentinel_to_nan(sliced_gts)
+    # calculate dosage of the effect allele
+    dosage: da.Array = calculate_effect_allele_dosage(missing_calls_masked, effect_idx)
 
-        # calculate dosage of the effect allele
-        dosage: da.Array = calculate_effect_allele_dosage(
-            missing_calls_masked, effect_idx
-        )
+    # impute missing dosage: 2 * mean effect allele frequency
+    is_dosage_nan, filled = fill_missing_dosages(
+        dosage_array=dosage, n_minimum_samples=n_minimum_impute
+    )
 
-        # impute missing dosage: 2 * mean effect allele frequency
-        is_dosage_nan, filled = fill_missing_dosages(
-            dosage_array=dosage, n_minimum_samples=n_minimum_impute
-        )
+    # adjust dosages for recessive / dominant effect types
+    recessive_mask: npt.NDArray[np.bool_] = df["is_recessive"].to_numpy()
+    dominant_mask: npt.NDArray[np.bool_] = df["is_dominant"].to_numpy()
+    effect_type_adjusted: da.Array = adjust_dosage_for_effect(
+        dosage_array=filled,
+        recessive_mask=recessive_mask,
+        dominant_mask=dominant_mask,
+    )
 
-        # adjust dosages for recessive / dominant effect types
-        recessive_mask: npt.NDArray[np.bool_] = df["is_recessive"].to_numpy()
-        dominant_mask: npt.NDArray[np.bool_] = df["is_dominant"].to_numpy()
-        effect_type_adjusted: da.Array = adjust_dosage_for_effect(
-            dosage_array=filled,
-            recessive_mask=recessive_mask,
-            dominant_mask=dominant_mask,
-        )
-
-        n_group_variants = target_idx.shape[0]
-        end = start + n_group_variants
-
-        # write specific regions to the zarr array to minimise memory usage
-        dask_tasks = [
-            effect_type_adjusted.to_zarr(
-                url=dosage_array,
-                component="dosage",
-                # region is important to avoid writing the entire array
-                region=(slice(start, end), slice(None)),
-                compute=False,
-            ),
-            is_dosage_nan.to_zarr(
-                url=missing_array,
-                component="missing",
-                region=(slice(start, end), slice(None)),
-                compute=False,
-            ),
-        ]
-        start = end
-
-        # after some testing, I don't think the dask scheduler is aware of the to_zarr
-        # region argument (NaNs - the fill value - end up sneaking into the output)
-        # background:
-        # multiple processes can write to a zarr array if each worker uses a different
-        # chunk. otherwise you need a chunk-level lock or something complicated
-
-        # to keep things as simple as possible, avoid this implementation pattern
-        # here each zarr subgroup writes to the dosage array serially (bottleneck?)
-        # but the creation of the arrays that get inserted uses multiple dask workers
-        with dask.config.set(scheduler="threads", num_workers=n_workers):
-            logger.info(
-                f"Computing effect allele dosage and missing calls with {n_workers=}"
-            )
-            dask.compute(*dask_tasks)
+    # the arrays hold this shard and nothing else, so each is written whole:
+    # weight_mat_row_nr is the position of a row in this shard's ordering, so there
+    # is no region to offset into (docs/tickets/0015)
+    dask_tasks = [
+        effect_type_adjusted.to_zarr(url=dosage_array, compute=False),
+        is_dosage_nan.to_zarr(url=missing_array, compute=False),
+    ]
 
     with dask.config.set(scheduler="threads", num_workers=n_workers):
+        logger.info(
+            f"Computing effect allele dosage and missing calls with {n_workers=}"
+        )
+        dask.compute(*dask_tasks)
 
+        # the arrays were created full of NaN, so a write that didn't cover them
+        # leaves NaNs behind - a wrong score, with nothing else to notice it
         def has_nan(zarr_array: zarr.Array) -> np.bool_:
             return cast(
                 "np.bool_", da.any(da.isnan(da.from_zarr(zarr_array))).compute()
@@ -466,14 +437,15 @@ class ScoreStats(TypedDict):
     n_matched: list[int]
 
 
-def get_n_score_variants(db_path: Pathish) -> int:
+def get_n_score_variants(conn: duckdb.DuckDBPyConnection) -> int:
     """
     Get the total number of score variants from the weight matrix.
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the DuckDB database containing the `wide_score_variants` table.
+    conn : duckdb.DuckDBPyConnection
+        A connection to the score database, which holds the `wide_score_variants`
+        table (read-only is enough).
 
     Returns
     -------
@@ -485,52 +457,9 @@ def get_n_score_variants(db_path: Pathish) -> int:
     ValueError
         If the query returns no results, which indicates bad database state.
     """
-    with duckdb.connect(str(db_path), read_only=True) as conn:
-        query = conn.sql("SELECT COUNT(*) FROM wide_score_variants").fetchone()
+    query = conn.sql("SELECT COUNT(*) FROM wide_score_variants").fetchone()
 
     if query is None:
         logger.critical("Couldn't get number of variants from dosage table")
         raise ValueError("Query returned no results")
     return int(query[0])
-
-
-def get_n_samples(group: zarr.Group, sampleset: str) -> int:
-    """
-    Get the number of samples in a given sample set stored in Zarr.
-
-    Parameters
-    ----------
-    store : zarr.Group
-        Read only zarr group which contains 3D genotype arrays.
-    sampleset : str
-        Name of the sample set (group) in the store.
-
-    Returns
-    -------
-    n_samples : int
-        Number of samples in the sample set.
-    """
-    return len(get_sample_ids(group=group, sampleset=sampleset))
-
-
-def get_sample_ids(group: zarr.Group, sampleset: str) -> list[str]:
-    samples = None
-    root = cast("zarr.Group", group[sampleset])
-    # only leaf groups (shards) carry sample IDs, so walk the whole subtree instead
-    # of assuming how deep the hierarchy is
-    for _, node in root.members(max_depth=None):
-        if "samples" not in node.attrs:
-            continue
-
-        node_samples = cast("list[str]", node.attrs["samples"])
-        if samples is None:
-            # initialise the sample list
-            samples = node_samples
-        elif samples != node_samples:
-            # compare sample names
-            raise NotImplementedError("Different samples across target genome files")
-
-    if samples is None:
-        raise TypeError("Couldn't get samples from zarr attribute")
-
-    return samples

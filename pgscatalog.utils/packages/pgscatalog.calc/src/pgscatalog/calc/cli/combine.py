@@ -14,12 +14,12 @@ from typing import TYPE_CHECKING
 
 from rich import print
 
-from pgscatalog.calc import ScorePipeline
 from pgscatalog.calc.cli._stage import (
     add_stage_args,
     check_paths_exist,
     setup_stage,
 )
+from pgscatalog.calc.lib.score.score_combine import ScoreCombineStage
 
 if TYPE_CHECKING:
     import argparse
@@ -42,13 +42,13 @@ def add_combine_args(parser: argparse.ArgumentParser) -> None:
 def combine_cli(args: argparse.Namespace) -> None:
     out_dir = setup_stage(args)
 
-    pipeline = ScorePipeline(
+    stage = ScoreCombineStage(
         max_memory_gb=args.max_memory_gb,
         threads=args.threads,
         out_dir=out_dir,
     )
 
-    pipeline.combine_scores(check_paths_exist(args.partial_scores))
-    pipeline.export_scores(out_path=out_dir)
+    stage.combine_scores(check_paths_exist(args.partial_scores))
+    stage.export_scores(out_path=out_dir)
 
     print("Finished calculating :tada: Goodbye!")

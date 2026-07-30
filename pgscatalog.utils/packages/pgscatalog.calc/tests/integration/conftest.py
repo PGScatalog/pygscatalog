@@ -255,11 +255,17 @@ def run_pipeline(
     monkeypatch,
     min_overlap: str = "0.75",
     score_paths: list | None = None,
+    max_memory_gb: str = "16",
+    threads: str = "1",
 ) -> pl.DataFrame:
     """Drive MATCH -> MATCH_COMBINE -> SCORE -> SCORE_COMBINE, mirroring the
     Nextflow DAG: one task per chromosome, then one, then one per shard, then one.
+
+    Every stage is its own task with its own resource limits (ADR 0001), so the
+    limits are passed to each one just like Nextflow does.
     """
     score_paths = [str(p) for p in (score_paths or [scorefile])]
+    resources = ["--max_memory_gb", max_memory_gb, "--threads", threads]
     zips = load_targets(targets, work_dir / "load", scorefile, monkeypatch)
 
     # MATCH fans out per chromosome, so group the shards by the chromosome they
@@ -282,6 +288,7 @@ def run_pipeline(
                 *score_paths,
                 "--out_dir",
                 str(out_dir),
+                *resources,
             ],
             monkeypatch,
         )
@@ -305,6 +312,7 @@ def run_pipeline(
             min_overlap,
             "--out_dir",
             str(combine_dir),
+            *resources,
         ],
         monkeypatch,
     )
@@ -325,6 +333,7 @@ def run_pipeline(
                 str(match_table),
                 "--out_dir",
                 str(out_dir),
+                *resources,
             ],
             monkeypatch,
         )
@@ -339,6 +348,7 @@ def run_pipeline(
             *[str(p) for p in partials],
             "--out_dir",
             str(final_dir),
+            *resources,
         ],
         monkeypatch,
     )
