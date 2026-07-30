@@ -2,8 +2,8 @@
 
 Scoring used to merge every shard's genotypes into a single zarr store and compute
 over it as one dask array in one task, which is the OOM in pgsc_calc#459. Fanning
-out per shard is the fix and the point of alpha2 (docs/tickets/0007): peak memory
-scales with one shard rather than the sampleset.
+out per shard is the fix and the point of alpha2: peak memory scales with one
+shard rather than the sampleset.
 
 Accessions rejected by `min_overlap` were dropped by MATCH_COMBINE, so they cost
 no scoring compute here.

@@ -197,7 +197,7 @@ def test_calculate_scores_tiny(tiny_dosage_zarr, tiny_effect_weights_zarr):
 
 
 def test_create_score_table():
-    """Nothing here needs the database on disk (docs/tickets/0016)"""
+    """Nothing here needs the database on disk"""
     with duckdb.connect(":memory:") as conn:
         create_score_table(conn)
 
@@ -278,7 +278,6 @@ def test_calculate_score_statistics_tiny(
     tiny_sample_ids,
 ):
     # an in-memory connection is enough, so this test needs no database on disk
-    # (docs/tickets/0016)
     conn = duckdb.connect(":memory:")
 
     # 1) Raw table with plain match_summary

@@ -1,10 +1,10 @@
 """MATCH: match scoring file variants against one chromosome's shards.
 
-Fanning out per chromosome rather than per shard is the load-bearing choice
-(docs/tickets/0003): a chromosome-level task holds every shard's variant metadata
-for that chromosome, so it matches against a complete variant list and no shard
-has a partial view. It reads 1D metadata only, never the 3D genotype arrays, so
-peak memory doesn't scale with sample count.
+Fanning out per chromosome rather than per shard is the load-bearing choice: a
+chromosome-level task holds every shard's variant metadata for that chromosome,
+so it matches against a complete variant list and no shard has a partial view. It
+reads 1D metadata only, never the 3D genotype arrays, so peak memory doesn't
+scale with sample count.
 """
 
 from __future__ import annotations
@@ -91,7 +91,7 @@ def match_cli(args: argparse.Namespace) -> None:
     stage.load_scores(scorefile_paths=args.score_paths)
 
     # no min_overlap here: the match rate is genome-wide, so only MATCH_COMBINE
-    # can decide it (docs/tickets/0003)
+    # can decide it
     chromosome = stage.match_variants(
         match_multiallelic=args.keep_multiallelic,
         match_ambiguous=args.keep_ambiguous,

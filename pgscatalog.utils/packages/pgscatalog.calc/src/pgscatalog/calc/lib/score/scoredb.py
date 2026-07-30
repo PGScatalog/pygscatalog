@@ -8,7 +8,7 @@ a scheduled task is usually the host's rather than the task's, so exceeding it g
 the task killed by the scheduler instead of spilled to disk.
 
 This module is the only place that opens a connection to it. Functions that query
-the database take a connection, never a path (docs/tickets/0016).
+the database take a connection, never a path.
 """
 
 from __future__ import annotations

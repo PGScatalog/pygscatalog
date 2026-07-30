@@ -72,8 +72,8 @@ def db_metadata():
 
 
 def test_small_shard_without_missing_calls_skips_the_floor():
-    """docs/tickets/0009: the sample floor only applies if there's something to
-    impute, so a tiny shard with complete calls scores instead of crashing"""
+    """The sample floor only applies if there's something to impute, so a tiny
+    shard with complete calls scores instead of crashing"""
     dosage = da.from_array(np.ones(shape=(4, 10)))
 
     is_nan, filled = fill_missing_dosages(dosage_array=dosage, n_minimum_samples=50)

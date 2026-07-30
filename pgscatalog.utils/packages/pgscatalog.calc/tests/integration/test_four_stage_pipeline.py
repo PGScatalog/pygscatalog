@@ -1,4 +1,4 @@
-"""Acceptance tests for split-apply-combine scoring (docs/tickets/0003-0008).
+"""Acceptance tests for split-apply-combine scoring.
 
 Scoring runs as four stages that fan out at different levels of the cache
 hierarchy: MATCH (per chromosome) -> MATCH_COMBINE (once) -> SCORE (per shard) ->
@@ -87,7 +87,7 @@ def test_n_matched_is_genome_wide(
     grid_targets, scorefile, n_score_variants, tmp_path, monkeypatch
 ):
     """n_matched is a count of scoring variants, never a per-shard count summed
-    four times (docs/tickets/0008)"""
+    four times"""
     scores = run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
 
     assert scores["n_matched"].unique().to_list() == [n_score_variants]
@@ -144,7 +144,7 @@ def test_shared_samples_under_one_chromosome_are_rejected(
     variant_split_targets, scorefile, tmp_path, monkeypatch
 ):
     """Splitting variants within a chromosome leaves two shards sharing every
-    sample, which would double-count dosage (docs/tickets/0005)"""
+    sample, which would double-count dosage"""
     zips = load_targets(variant_split_targets, tmp_path, scorefile, monkeypatch)
     chrom = variant_split_targets[0][1]
     same_chrom = [
@@ -179,7 +179,7 @@ def test_ragged_shards_are_rejected_without_suggesting_homref(
     """Ragged shards are ambiguous in cause: dropped monomorphic sites (where
     homozygous reference is true) and a re-imputed sample subset (where it is
     false) produce the same shape. `homref` is a claim about how a callset was
-    generated, not a remedy for an error message (docs/tickets/0005).
+    generated, not a remedy for an error message.
     """
     header, by_chrom = target_records
     chrom, records = next(iter(by_chrom.items()))
@@ -225,7 +225,7 @@ def test_accession_below_min_overlap_is_rejected_genome_wide(
     chromosome_targets, target_records, tmp_path, monkeypatch
 ):
     """The gate is genome-wide, so an accession can sit above the threshold on one
-    chromosome and still be rejected (docs/tickets/0004)"""
+    chromosome and still be rejected"""
     _, by_chrom = target_records
     chrom_1 = by_chrom["1"]
 
@@ -265,7 +265,7 @@ def test_sparse_scoring_file_does_not_trip_the_union_check(
     chromosome_targets, target_records, tmp_path, monkeypatch
 ):
     """A scoring file covering only some chromosomes leaves the others empty in the
-    cache, which is not a sample mismatch (docs/tickets/0004)"""
+    cache, which is not a sample mismatch"""
     _, by_chrom = target_records
     path = tmp_path / "PGS999996.txt.gz"
     with gzip.open(path, "wt") as f:
@@ -339,7 +339,7 @@ def test_dosage_array_is_sized_to_one_shard(
     grid_targets, scorefile, n_score_variants, tmp_path, monkeypatch
 ):
     """Peak memory per SCORE task scales with one shard rather than the sampleset,
-    which is the point of the exercise (docs/tickets/0007).
+    which is the point of the exercise.
 
     The mechanism is the dosage array's shape: it is allocated as (variants in this
     shard, samples in this shard), not (all variants, whole cohort).
@@ -348,7 +348,7 @@ def test_dosage_array_is_sized_to_one_shard(
 
     shapes = []
     for score_dir in sorted((tmp_path / "score").iterdir()):
-        # the dosage array is scratch, not output (docs/tickets/0017)
+        # the dosage array is scratch, not output
         store = zarr.storage.LocalStore(score_dir / "scratch")
         dosage = zarr.open_group(store=store, mode="r")[f"pgs/{SAMPLESET}"]["dosage"]
         shapes.append(dosage.shape)
@@ -365,7 +365,7 @@ def test_score_rejects_a_cache_holding_more_than_one_shard(
     chromosome_targets, scorefile, tmp_path, monkeypatch
 ):
     """weight_mat_row_nr indexes this task's dosage array, so SCORE staging two
-    shards at once would silently misalign it (docs/tickets/0007)"""
+    shards at once would silently misalign it"""
     zips = load_targets(chromosome_targets, tmp_path / "load", scorefile, monkeypatch)
     match_dir = tmp_path / "match"
     run_cli(
@@ -422,7 +422,7 @@ def test_score_rejects_the_ungated_match_table(
 ):
     """MATCH's matches.parquet and MATCH_COMBINE's match_table.parquet are both
     "the match table", and scoring the ungated one would score accessions that
-    failed min_overlap without a crash, a warning or a NaN (docs/tickets/0018).
+    failed min_overlap without a crash, a warning or a NaN.
 
     Driven through the CLI because that is the wiring a real mistake goes through.
     """
@@ -500,8 +500,7 @@ def test_published_outputs_are_enumerable_without_the_scratch(
     grid_targets, scorefile, tmp_path, monkeypatch
 ):
     """A Nextflow process declares its outputs by name, so they have to be
-    distinguishable from the things a task only needed while it ran
-    (docs/tickets/0017).
+    distinguishable from the things a task only needed while it ran.
 
     The score database, the unzipped cache and SCORE's dosage arrays all go under
     `scratch`, so the top level of a task's directory is exactly what it publishes.

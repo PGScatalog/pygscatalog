@@ -1,4 +1,4 @@
-"""Each stage of split-apply-combine takes only what it needs (docs/tickets/0017).
+"""Each stage of split-apply-combine takes only what it needs.
 
 `ScorePipeline` was one module whose interface was the union of four stages' needs,
 with three parts that were conditional on the stage and invisible in a type

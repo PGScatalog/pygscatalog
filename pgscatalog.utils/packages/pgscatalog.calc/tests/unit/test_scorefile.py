@@ -93,7 +93,7 @@ def test_scorefiles(tmp_path, pgs000001, pgs001229):
 def test_load_scoring_files(pgs000001, pgs001229):
     from pgscatalog.calc.lib.scorefile import load_scoring_files
 
-    # an in-memory connection is enough, so no database on disk (docs/tickets/0016)
+    # an in-memory connection is enough, so no database on disk
     with duckdb.connect(":memory:") as conn:
         load_scoring_files(conn=conn, scorefile_paths=[pgs000001, pgs001229])
 

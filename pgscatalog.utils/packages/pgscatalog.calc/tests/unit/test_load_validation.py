@@ -1,4 +1,4 @@
-"""Samplesheet validation that runs before any work (docs/tickets/0002, ADR 0003)"""
+"""Samplesheet validation that runs before any work (ADR 0003)"""
 
 import argparse
 
@@ -50,7 +50,7 @@ def test_validated_leaf_path_is_the_written_leaf_path(
 ):
     """The validated string and the written group are one string, including the ALL
     sentinel. If they drifted, the guard would pass and a colliding leaf would
-    silently overwrite the other (docs/tickets/0014, ADR 0003)"""
+    silently overwrite the other (ADR 0003)"""
     target = TargetGenome(
         target_path=vcf_path,
         target_index_path=vcf_index_path,
@@ -96,8 +96,8 @@ def test_absence_semantics_default_is_accepted():
 
 
 def test_homref_is_rejected_not_ignored():
-    """docs/tickets/0006: silently ignoring the declaration would score a
-    sparse-called callset as if every absent variant were unknown"""
+    """Silently ignoring the declaration would score a sparse-called callset as
+    if every absent variant were unknown"""
     with pytest.raises(argparse.ArgumentTypeError, match="not implemented yet"):
         absence_semantics("homref")
 

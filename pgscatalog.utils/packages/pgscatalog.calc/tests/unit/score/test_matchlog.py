@@ -44,7 +44,7 @@ def test_complement_macro(input, result):
 # Test if the add_match_log insert the correct data into score_log_table
 # Test if the add_match_log create the table summary_log_table
 def _make_test_conn(pgs000001) -> duckdb.DuckDBPyConnection:
-    # nothing here needs the database on disk (docs/tickets/0016)
+    # nothing here needs the database on disk
     conn = duckdb.connect(":memory:")
 
     # score_variant_table loading via load_scoring_files functions from Scorefiles

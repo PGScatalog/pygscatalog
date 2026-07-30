@@ -2,8 +2,8 @@
 pass `min_overlap`.
 
 No single chromosome's MATCH task can make this decision, because the match rate
-is genome-wide (docs/tickets/0004). Pooling happens once, centrally, and its
-output is the gated match table that SCORE fans out over.
+is genome-wide. Pooling happens once, centrally, and its output is the gated
+match table that SCORE fans out over.
 """
 
 from __future__ import annotations

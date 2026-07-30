@@ -1,5 +1,4 @@
-"""Cache shape invariants checked at MATCH and SCORE_COMBINE
-(docs/tickets/0004, 0005, 0008)"""
+"""Cache shape invariants checked at MATCH and SCORE_COMBINE"""
 
 import duckdb
 import polars as pl
