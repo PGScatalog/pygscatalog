@@ -157,9 +157,7 @@ def grid_targets(chromosome_targets, target_samples, tmp_path_factory) -> list[t
 
     targets = []
     for source, chrom in chromosome_targets:
-        for i, half in enumerate(
-            (target_samples[::2], target_samples[1::2]), start=1
-        ):
+        for i, half in enumerate((target_samples[::2], target_samples[1::2]), start=1):
             path = _subset_samples(
                 source, out_dir / f"chr{chrom}.batch{i}.vcf.gz", half
             )
@@ -242,9 +240,7 @@ def load_targets(
             spec = f"{path}:{chrom}"
         else:
             spec = str(target)
-        zips.append(
-            load_target(spec, cache_dir / f"cache{i}", scorefile, monkeypatch)
-        )
+        zips.append(load_target(spec, cache_dir / f"cache{i}", scorefile, monkeypatch))
     return zips
 
 

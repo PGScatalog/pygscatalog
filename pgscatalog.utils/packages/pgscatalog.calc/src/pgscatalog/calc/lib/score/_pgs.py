@@ -299,7 +299,8 @@ def calculate_nonmissing_allele_count(
 
     # return a per-sample sum of non-missing allele count in this accession
     # think about X / Y / MT here too
-    per_sample_allele_count: npt.NDArray[np.int64] = da.sum(
-        ~da.isnan(missing_variants[accession_idx,]), axis=0
-    ).compute() * ZARR_PLOIDY
+    per_sample_allele_count: npt.NDArray[np.int64] = (
+        da.sum(~da.isnan(missing_variants[accession_idx,]), axis=0).compute()
+        * ZARR_PLOIDY
+    )
     return per_sample_allele_count

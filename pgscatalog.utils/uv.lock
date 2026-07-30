@@ -684,7 +684,7 @@ test = [
 
 [[package]]
 name = "pgscatalog-core"
-version = "1.0.2"
+version = "1.1.0"
 source = { editable = "packages/pgscatalog.core" }
 dependencies = [
     { name = "httpx" },
@@ -766,7 +766,7 @@ test = [
 
 [[package]]
 name = "pgscatalog-utils"
-version = "2.0.2"
+version = "3.0.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "pgscatalog-calc" },

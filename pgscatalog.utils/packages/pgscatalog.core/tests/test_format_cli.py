@@ -234,7 +234,6 @@ def test_combine_score_harmonised(
 
 def test_combine_omicspred_score_harmonised(
     tmp_path, harmonised_omicspred_scorefiles, expected_fields, n_variants_omicspred
-
 ):
     """Test combining OmicsPred harmonised data: OPGS017309 and OPGS019828.
     The genome build always matches across both files, so combining should work."""
@@ -243,7 +242,11 @@ def test_combine_omicspred_score_harmonised(
 
     op_log = "log_combined_omicspred.json"
 
-    args = [("pgscatalog-format", "-s"), paths, ("-o", str(tmp_path), "-t", build, "-l", op_log)]
+    args = [
+        ("pgscatalog-format", "-s"),
+        paths,
+        ("-o", str(tmp_path), "-t", build, "-l", op_log),
+    ]
     flargs = list(itertools.chain(*args))
 
     with patch("sys.argv", flargs):

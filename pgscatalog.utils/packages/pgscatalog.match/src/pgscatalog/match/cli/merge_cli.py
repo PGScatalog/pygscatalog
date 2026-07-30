@@ -58,12 +58,15 @@ def run_merge():
     Config.SPLIT = args.split
     Config.COMBINED = args.combined
 
-    with ScoringFileFrame(
-        paths=Config.SCOREFILE,
-        chrom=None,  # when merging, scoring files can't be filtered
-        cleanup=Config.CLEANUP,
-        tmpdir=Config.TMPDIR,
-    ) as score_df, pl.StringCache():
+    with (
+        ScoringFileFrame(
+            paths=Config.SCOREFILE,
+            chrom=None,  # when merging, scoring files can't be filtered
+            cleanup=Config.CLEANUP,
+            tmpdir=Config.TMPDIR,
+        ) as score_df,
+        pl.StringCache(),
+    ):
         matchresults = MatchResults(
             *(MatchResult.from_ipc(x, dataset=Config.DATASET) for x in args.matches)
         )
