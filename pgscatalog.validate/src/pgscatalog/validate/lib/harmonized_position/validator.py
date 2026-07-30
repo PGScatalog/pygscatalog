@@ -1,6 +1,14 @@
 import re
-from ..schemas import *
-from ..validator_base import *
+from ..schemas import (
+    CHR_COLS_VAR_POS,
+    HM_META_POS,
+    POS_VALIDATORS,
+    SNP_COLS_VAR_POS,
+    STD_COLS_VAR_POS,
+    VALID_COLS_POS,
+    VALID_TYPE_POS,
+)
+from ..validator_base import ValidatorBase
 
 '''
 PGS Catalog Harmonized file validator

@@ -2,7 +2,33 @@ import numpy as np
 from pandas_schema import Column
 from pandas_schema.validation import MatchesPatternValidation, InListValidation, CanConvertValidation, LeadingWhitespaceValidation, TrailingWhitespaceValidation, CustomElementValidation
 from .helpers import InInclusiveRangeValidation
-from .common_constants import *
+from .common_constants import (
+    BETA_DSET,
+    BP_DSET,
+    CHR_DSET,
+    DOSAGE_0_WEIGHT,
+    DOSAGE_1_WEIGHT,
+    DOSAGE_2_WEIGHT,
+    DSET_TYPES,
+    EFFECT_DSET,
+    EFFECT_WEIGHT_DSET,
+    FREQ_DSET,
+    HM_BP_DSET,
+    HM_CHR_DSET,
+    HM_CODE_DSET,
+    HM_INFO_DSET,
+    HM_MATCH_BP_DSET,
+    HM_MATCH_CHR_DSET,
+    HM_OTH_DSET,
+    HM_SNP_DSET,
+    HM_SOURCE_DSET,
+    HR_DSET,
+    LOCUS_DSET,
+    OR_DSET,
+    OTH_DSET,
+    SNP_DSET,
+    VARIANT_DSET,
+)
 
 
 #### Validation types ####
