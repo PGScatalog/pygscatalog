@@ -3,10 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import duckdb
-
 if TYPE_CHECKING:
-    from pgscatalog.calc.lib.types import Pathish
+    import duckdb
 
 logger = logging.getLogger(__name__)
 
@@ -161,20 +159,21 @@ def add_match_log(
     )
 
 
-def get_ok_accessions(db_path: Pathish, sampleset: str) -> list[str]:
+def get_ok_accessions(conn: duckdb.DuckDBPyConnection, sampleset: str) -> list[str]:
     """Get accessions that have passed the match rate threshold.
+
+    Takes a connection to the score database (read-only is enough).
 
     Raises a ValueError if no accessions pass the match rate threshold.
     """
-    with duckdb.connect(str(db_path), read_only=True) as conn:
-        accessions: list[tuple[str, bool, float]] = conn.execute(
-            """
-            SELECT DISTINCT accession, is_match_rate_ok, match_rate
-            FROM summary_log_table
-            WHERE sampleset = ?
-        """,
-            [sampleset],
-        ).fetchall()
+    accessions: list[tuple[str, bool, float]] = conn.execute(
+        """
+        SELECT DISTINCT accession, is_match_rate_ok, match_rate
+        FROM summary_log_table
+        WHERE sampleset = ?
+    """,
+        [sampleset],
+    ).fetchall()
     passed: list[tuple[str, bool, float]] = list(
         filter(lambda x: x[1] is True, accessions)
     )

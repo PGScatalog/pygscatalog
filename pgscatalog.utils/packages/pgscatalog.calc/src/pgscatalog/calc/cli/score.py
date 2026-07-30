@@ -25,7 +25,6 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from pgscatalog.calc import ScorePipeline
 from pgscatalog.calc.cli._stage import (
     add_score_paths_arg,
     add_stage_args,
@@ -34,6 +33,8 @@ from pgscatalog.calc.cli._stage import (
 )
 from pgscatalog.calc.cli._utils import check_positive
 from pgscatalog.calc.lib.config import config
+from pgscatalog.calc.lib.score.score import ScoreStage
+from pgscatalog.calc.lib.score.stage import scratch_dir
 
 from .load import unzip_zarr
 
@@ -74,8 +75,10 @@ def score_cli(args: argparse.Namespace) -> None:
     config.ZARR_VARIANT_CHUNK_SIZE = args.batch_size
     logger.info(f"After update {config.ZARR_VARIANT_CHUNK_SIZE=}")
 
+    # the cache is scratch, and so are the dosage arrays derived from it: this task
+    # publishes partial_scores.parquet and nothing else
     (zip_file,) = check_paths_exist([args.zarr_zip_file])
-    unzip_zarr(zip_file, out_dir)
+    unzip_zarr(zip_file, scratch_dir(out_dir))
 
     with Progress(
         SpinnerColumn(),
@@ -86,36 +89,36 @@ def score_cli(args: argparse.Namespace) -> None:
         TimeRemainingColumn(),
         refresh_per_second=2,
     ) as progress:
-        stages = [
+        phases = [
             "Load scoring files",
             "Load match table",
             "Calculate scores",
             "Export partial scores",
         ]
-        tasks = {stage: progress.add_task(stage, total=1) for stage in stages}
+        tasks = {phase: progress.add_task(phase, total=1) for phase in phases}
 
         progress.print(":test_tube:", "pgsc_calc score", ":dna:", "starting...")
 
-        pipeline = ScorePipeline(
+        stage = ScoreStage(
             max_memory_gb=args.max_memory_gb,
             threads=args.threads,
             out_dir=out_dir,
         )
 
         progress.start_task(tasks["Load scoring files"])
-        pipeline.load_scores(scorefile_paths=args.score_paths)
+        stage.load_scores(scorefile_paths=args.score_paths)
         progress.update(tasks["Load scoring files"], advance=1)
 
         progress.start_task(tasks["Load match table"])
-        pipeline.import_match_tables(check_paths_exist([args.match_table]))
+        stage.import_match_tables(check_paths_exist([args.match_table]))
         progress.update(tasks["Load match table"], advance=1)
 
         progress.start_task(tasks["Calculate scores"])
-        pipeline.calculate_scores()
+        stage.calculate_scores()
         progress.update(tasks["Calculate scores"], advance=1)
 
         progress.start_task(tasks["Export partial scores"])
-        pipeline.export_partial_scores(out_dir / "partial_scores.parquet")
+        stage.export_partial_scores(out_dir / "partial_scores.parquet")
         progress.update(tasks["Export partial scores"], advance=1)
 
         progress.print("Finished scoring this shard :tada:")

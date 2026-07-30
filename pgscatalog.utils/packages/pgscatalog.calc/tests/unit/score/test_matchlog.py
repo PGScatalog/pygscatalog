@@ -40,27 +40,15 @@ def test_complement_macro(input, result):
         assert conn.sql(f"SELECT complement('{input}')").fetchone() == (result,)
 
 
-@pytest.fixture
-def db_path(tmp_path):
-    """Path to a temporary DuckDB file used by tests."""
-    return tmp_path / "test_matchlog.duckdb"
-
-
 # Test if the add_match_log create the table score_log_table
 # Test if the add_match_log insert the correct data into score_log_table
 # Test if the add_match_log create the table summary_log_table
-def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
-    db_path = tmp_path / "test.duckdb"
+def _make_test_conn(pgs000001) -> duckdb.DuckDBPyConnection:
+    # nothing here needs the database on disk (docs/tickets/0016)
+    conn = duckdb.connect(":memory:")
 
     # score_variant_table loading via load_scoring_files functions from Scorefiles
-    load_scoring_files(
-        db_path=db_path,
-        scorefile_paths=[pgs000001],
-        threads=1,
-        max_memory_gb="4GB",
-    )
-
-    conn = duckdb.connect(db_path)
+    load_scoring_files(conn=conn, scorefile_paths=[pgs000001])
 
     # minimal targetvariants table matching the SQL in update_match_table
     conn.execute("""
@@ -88,11 +76,9 @@ def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
     return conn
 
 
-def test_add_match_log_with_one_mapped_variants(
-    db_path, sampleset_name, pgs000001, tmp_path
-):
+def test_add_match_log_with_one_mapped_variants(sampleset_name, pgs000001):
     """add_match_log should create score_log_table and summary_log_table."""
-    conn = _make_test_conn(tmp_path, pgs000001)
+    conn = _make_test_conn(pgs000001)
 
     # update_match_table from matchvariants to create allele_match_table
     update_match_table(
@@ -214,16 +200,15 @@ def test_add_match_log_with_one_mapped_variants(
 
 # Test with more variants
 def _make_conn_from_json(
-    db_path,
     allele_match_table,
     score_variant_table,
 ) -> duckdb.DuckDBPyConnection:
     """
-    Create a DuckDB DB with:
+    Create an in-memory DuckDB database with:
     - score_variant_table (from JSON)
     - allele_match_table (from JSON)
     """
-    conn = duckdb.connect(str(db_path))
+    conn = duckdb.connect(":memory:")
     _setup_enums(conn)
 
     # Load the pre-defined test data score_variant_table
@@ -252,13 +237,12 @@ def _make_conn_from_json(
 
 
 def test_add_match_log_with_ndjson(
-    db_path,
     allele_match_table,
     score_variant_table,
 ):
     sampleset = "1000G"
 
-    conn = _make_conn_from_json(db_path, allele_match_table, score_variant_table)
+    conn = _make_conn_from_json(allele_match_table, score_variant_table)
 
     # Test data includes two sample sets, one test data with match_rate=1.0; while 1000G with match_rate=0.93, so we set threshold 0.9 at here.
     add_match_log(conn, sampleset=sampleset, min_overlap=0.95)
@@ -304,12 +288,13 @@ def test_add_match_log_with_ndjson(
     assert test_1000G_match_rate == Decimal("0.93")
     assert test_sum_is_ok is True
     assert test_1000G_sum_is_ok is False
-    conn.close()
 
     # "test" sampleset pass the threshold 0.95
-    accessions = get_ok_accessions(db_path, "test")
+    accessions = get_ok_accessions(conn, "test")
     assert accessions[0] == "test"
 
     # Test the get_ok_accessions function returns ValueError for 1000G sampleset
     with pytest.raises(ValueError, match="No scores passed matching threshold"):
-        get_ok_accessions(db_path, "1000G")
+        get_ok_accessions(conn, "1000G")
+
+    conn.close()

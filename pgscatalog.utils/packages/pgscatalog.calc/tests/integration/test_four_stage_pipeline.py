@@ -19,8 +19,9 @@ import pytest
 import zarr
 import zarr.storage
 
-from pgscatalog.calc import ScorePipeline
 from pgscatalog.calc.cli.load import unzip_zarr
+from pgscatalog.calc.lib.score.score import ScoreStage
+from pgscatalog.calc.lib.score.stage import scratch_dir
 
 from .conftest import (
     SAMPLESET,
@@ -348,7 +349,8 @@ def test_dosage_array_is_sized_to_one_shard(
 
     shapes = []
     for score_dir in sorted((tmp_path / "score").iterdir()):
-        store = zarr.storage.LocalStore(score_dir)
+        # the dosage array is scratch, not output (docs/tickets/0017)
+        store = zarr.storage.LocalStore(score_dir / "scratch")
         dosage = zarr.open_group(store=store, mode="r")[f"pgs/{SAMPLESET}"]["dosage"]
         shapes.append(dosage.shape)
 
@@ -406,14 +408,14 @@ def test_score_rejects_a_cache_holding_more_than_one_shard(
     out_dir = tmp_path / "score"
     out_dir.mkdir()
     for zip_path in zips:
-        unzip_zarr(zip_path, out_dir)
+        unzip_zarr(zip_path, scratch_dir(out_dir))
 
-    pipeline = ScorePipeline(max_memory_gb=4, threads=1, out_dir=out_dir)
-    pipeline.load_scores(scorefile_paths=[scorefile])
-    pipeline.import_match_tables([combine_dir / "match_table.parquet"])
+    stage = ScoreStage(max_memory_gb=4, threads=1, out_dir=out_dir)
+    stage.load_scores(scorefile_paths=[scorefile])
+    stage.import_match_tables([combine_dir / "match_table.parquet"])
 
     with pytest.raises(ValueError, match="SCORE runs per shard"):
-        pipeline.calculate_scores()
+        stage.calculate_scores()
 
 
 def test_match_rejects_more_than_one_chromosome(
@@ -437,6 +439,36 @@ def test_match_rejects_more_than_one_chromosome(
             ],
             monkeypatch,
         )
+
+
+def test_published_outputs_are_enumerable_without_the_scratch(
+    grid_targets, scorefile, tmp_path, monkeypatch
+):
+    """A Nextflow process declares its outputs by name, so they have to be
+    distinguishable from the things a task only needed while it ran
+    (docs/tickets/0017).
+
+    The score database, the unzipped cache and SCORE's dosage arrays all go under
+    `scratch`, so the top level of a task's directory is exactly what it publishes.
+    """
+    run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
+
+    published = {
+        tmp_path / "match" / "1": {"matches.parquet", "samples.parquet"},
+        tmp_path / "match" / "8": {"matches.parquet", "samples.parquet"},
+        tmp_path / "match_combine": {"match_table.parquet", "logs"},
+        tmp_path / "combine": {"scores.txt.gz"},
+        # 2 chromosomes x 2 sample batches
+        **{tmp_path / "score" / str(i): {"partial_scores.parquet"} for i in range(4)},
+    }
+
+    for out_dir, artefacts in published.items():
+        assert {path.name for path in out_dir.iterdir()} == artefacts | {"scratch"}
+
+    # and the scratch is where the unpublished things actually went, so the
+    # assertions above aren't passing because nothing was written
+    scratch = {path.name for path in (tmp_path / "score" / "0" / "scratch").iterdir()}
+    assert {"genotypes.zarr", "pgs.db", "pgs"} <= scratch
 
 
 def test_match_logs_are_written(grid_targets, scorefile, tmp_path, monkeypatch):
