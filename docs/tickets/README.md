@@ -21,6 +21,7 @@ Derived from ADRs 0001, 0003, 0004. Read `CONTEXT.md` and those ADRs before star
 | 0015 | [Delete the multi-shard dosage machinery](0015-delete-multi-shard-dosage-machinery.md) | — |
 | 0016 | [One connection seam for the score database](0016-score-db-connection-seam.md) | — |
 | 0017 | [Split `ScorePipeline` per stage](0017-split-scorepipeline-per-stage.md) | 0012, 0016 |
+| 0018 | [SCORE must reject an ungated match table](0018-gated-match-table-marker.md) | — |
 
 Grab first: 0001 unblocks most of the pipeline. 0002, 0006 and 0009 are independent and can go in parallel.
 
@@ -40,4 +41,4 @@ A pre-flight validation process reading VCF headers and bgen `.sample` files wou
 
 Reference-database backfill for variants absent from the whole sampleset — needs its own ADR, because it decouples "matched" from "has a dosage" and would otherwise drive the match rate to 100% by construction and kill `min_overlap`.
 
-Two further findings from the same architecture review, not ticketed yet. Naming the stage artefacts: `matches.parquet` and `match_table.parquet` load through the same import with `INSERT BY NAME`, so feeding SCORE the ungated one scores accessions that failed `min_overlap`, silently — the guard `min_overlap` exists to provide. And deciding whether a run has one sampleset: it is asserted three ways and iterated once, with a `_matchlog.py` TODO recording that the multi-sampleset path is untested.
+One finding from the same architecture review is still unticketed: deciding whether a run has one sampleset. It is asserted three ways and iterated once, with a `_matchlog.py` TODO recording that the multi-sampleset path is untested. The interchangeable match tables from that same review are now 0018.
