@@ -13,8 +13,12 @@ Derived from ADRs 0001, 0003, 0004. Read `CONTEXT.md` and those ADRs before star
 | 0007 | [SCORE per shard](0007-score-stage-per-shard.md) | 0001, 0004 |
 | 0008 | [SCORE_COMBINE](0008-score-combine.md) | 0007 |
 | 0009 | [Imputation floor guard](0009-impute-floor-guard.md) | — |
+| 0010 | [Match rate quantisation](0010-match-rate-quantisation.md) | — |
+| 0011 | [`match_flipped` always zero](0011-match-flipped-always-zero.md) | — |
 
 Grab first: 0001 unblocks most of the pipeline. 0002, 0006 and 0009 are independent and can go in parallel.
+
+0010 and 0011 are pre-existing match log bugs found while implementing 0004. Both were left alone there because fixing them changes match log output, which would have invalidated 0004's "logs match today's output" acceptance criterion.
 
 ## Not in this repo
 

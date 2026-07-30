@@ -69,8 +69,8 @@ def add_match_log(
          score.chr_position,
          score.effect_allele,
          score.other_allele,
-         target.ref AS target_ref,
-         target.alts AS target_alts,
+         matches.target_ref,
+         matches.target_alts,
          COALESCE(matches.match_result.is_matched, FALSE) AS is_matched,
          COALESCE(matches.match_result.match_type, 'NO_MATCH') AS match_type,
          COALESCE(matches.match_result.match_summary, 'unmatched') AS match_summary,
@@ -82,9 +82,16 @@ def add_match_log(
               LEFT JOIN allele_match_table matches
                         ON score.accession = matches.accession
                             AND score.row_nr = matches.row_nr
-              LEFT JOIN targetvariants target
-                        ON target.geno_index = matches.target_row_nr
-                            AND target.zarr_group = matches.zarr_group
+     /*
+     the match table holds one row per scoring variant *per shard*, but this log
+     must stay one row per scoring variant: its primary key says so, and without
+     the dedup the min_overlap denominator multiplies by the number of sample
+     batches and every accession fails the gate.
+     */
+     QUALIFY row_number() OVER (
+         PARTITION BY score.accession, score.row_nr
+         ORDER BY matches.match_result.match_priority DESC, matches.zarr_group
+     ) = 1
      ORDER BY sampleset, score.accession, score.row_nr;
     """,
         [sampleset],

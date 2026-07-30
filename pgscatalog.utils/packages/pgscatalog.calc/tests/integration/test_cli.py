@@ -10,7 +10,13 @@ from pgscatalog.calc.cli.main import main
     [
         (["pgsc_calc", "--help"], ["usage: pgsc_calc [-h]"]),
         (["pgsc_calc", "load", "--help"], ["usage: pgsc_calc load [-h]"]),
+        (["pgsc_calc", "match", "--help"], ["usage: pgsc_calc match [-h]"]),
+        (
+            ["pgsc_calc", "match-combine", "--help"],
+            ["usage: pgsc_calc match-combine [-h]"],
+        ),
         (["pgsc_calc", "score", "--help"], ["usage: pgsc_calc score [-h]"]),
+        (["pgsc_calc", "combine", "--help"], ["usage: pgsc_calc combine [-h]"]),
     ],
 )
 def test_cli_help(capsys, monkeypatch, argv, expected_text):

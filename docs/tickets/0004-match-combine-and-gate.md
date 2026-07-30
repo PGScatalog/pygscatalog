@@ -22,3 +22,11 @@ No single chromosome's MATCH task can decide `min_overlap` — the rate is genom
 - Divergent per-batch rates warn and do not alter which accessions pass.
 - A scoring file covering only chr1–chr5 does not trip the cross-chromosome union check.
 - Match logs match today's output for a single-shard sampleset.
+
+## Deferred in implementation
+
+**The per-batch match rate divergence warning is not implemented.** It would be dead
+code by construction: 0005 rejects ragged shards at MATCH, so by the time
+MATCH_COMBINE runs, every batch under a chromosome has been proven to hold the same
+variants and therefore the same match rate. The warning becomes meaningful only when
+`homref` semantics make ragged batches legal, and it belongs with that work.

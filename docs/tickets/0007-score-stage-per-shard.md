@@ -12,7 +12,7 @@
 
 - `pgscatalog-calc score` operates on **one shard**: its own leaf's subtree only, staged via the existing partial extraction (`unzip_zarr(group_path=...)`).
 - Takes the passing accession list from MATCH_COMBINE; rejected accessions cost no compute.
-- Emits a partial `score_table` (`sampleset`, `accession`, `sample_id`, `n_matched`, `allele_count`, `score`, `dosage_sum`) instead of writing final output.
+- Emits a partial `score_table` (`sampleset`, `accession`, `sample_id`, `n_matched`, `allele_count`, `score`, `dosage_sum`, `zarr_group`) instead of writing final output. `zarr_group` names the shard the rows came from: parquet carries no keys, so it is what lets SCORE_COMBINE re-assert that a shard contributes exactly once. Without it, a shard whose output arrives twice doubles its score, allele count and dosage sum silently.
 - Dask stays on the local threaded scheduler — intra-node only, no dask-distributed cluster. Horizontal scaling is Nextflow's job, because TREs vary too much in what cross-node networking they permit (ADR 0001).
 
 ## Notes
@@ -26,3 +26,10 @@
 - Scoring a sampleset shard-by-shard and combining (0008) reproduces today's single-task scores bit-for-bit on the existing test data.
 - Peak memory per task scales with one shard, not the sampleset.
 - An accession rejected by `min_overlap` is never read.
+
+## Correction
+
+"bit-for-bit" is unachievable and the acceptance criterion is equality within
+`pytest.approx`. One `da.dot` over every variant becomes N partial dot products plus a
+duckdb `SUM`, and floating point addition is not associative, so the last digits move.
+The published output is rounded to 6 decimal places, which absorbs it.

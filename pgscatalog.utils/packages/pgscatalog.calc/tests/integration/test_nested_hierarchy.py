@@ -1,242 +1,60 @@
 """Acceptance tests for the nested /{sampleset}/{chromosome}/{filename} cache
 hierarchy (docs/tickets/0001, ADR 0003).
 
-The interesting shapes are:
-
-- more than one file per chromosome, which the old depth-2 layout couldn't store
-- unsplit whole-genome input, which lands under the ALL sentinel chromosome
-
-Both are scored end-to-end and must agree, because they hold the same
-(sample, variant) pairs.
+Scoring these shapes lives in test_four_stage_pipeline.py; this file is only about
+where things land in the cache.
 """
 
-import gzip
-import pathlib
-import sys
 import zipfile
 
-import polars as pl
-import pysam
-import pytest
 import zarr
 import zarr.storage
 
 from pgscatalog.calc.cli.load import unzip_zarr
-from pgscatalog.calc.cli.main import main
 
-# two chromosomes, split into two files each
-TEST_CHROMS = ("1", "8")
-SAMPLESET = "test"
+from .conftest import SAMPLESET, load_target, load_targets, run_cli
 
 
-def _is_ambiguous(ref: str, alt: str) -> bool:
-    """Ambiguous variants get excluded by the matcher, which would drag the match
-    rate down for no reason here"""
-    return {ref, alt} in ({"A", "T"}, {"C", "G"})
+def _leaf_prefix(chrom: str, filename: str) -> str:
+    return f"genotypes.zarr/{SAMPLESET}/{chrom}/{filename}/"
 
 
-def _write_vcf(path: pathlib.Path, header: pysam.VariantHeader, records: list) -> None:
-    with pysam.VariantFile(str(path), mode="w", header=header) as out:
-        for rec in records:
-            out.write(rec)
-    pysam.bcftools.index(str(path))
+def test_two_files_per_chromosome(grid_targets, scorefile, tmp_path, monkeypatch):
+    """Each shard is stored at its own chromosome, so basenames no longer collide"""
+    zips = load_targets(grid_targets, tmp_path, scorefile, monkeypatch)
 
-
-@pytest.fixture(scope="module")
-def targets(vcf_path, tmp_path_factory):
-    """Simple biallelic SNPs from two chromosomes, written out twice:
-
-    - as four files (2 chromosomes x 2 files), the nested case
-    - as one whole-genome file, the ALL sentinel case
-    """
-    out_dir = tmp_path_factory.mktemp("targets")
-    by_chrom: dict[str, list] = {chrom: [] for chrom in TEST_CHROMS}
-
-    with pysam.VariantFile(str(vcf_path)) as vcf:
-        header = vcf.header.copy()
-        for rec in vcf.fetch():
-            if rec.chrom not in by_chrom:
-                continue
-            if len(rec.ref) != 1 or len(rec.alts) != 1 or len(rec.alts[0]) != 1:
-                continue
-            if _is_ambiguous(rec.ref, rec.alts[0]):
-                continue
-            by_chrom[rec.chrom].append(rec)
-
-    # 2 files per chromosome, splitting the variants between them
-    split: list[tuple[pathlib.Path, str]] = []
-    for chrom, records in by_chrom.items():
-        assert len(records) > 10, f"not enough test variants on {chrom}"
-        for batch, half in enumerate((records[::2], records[1::2]), start=1):
-            path = out_dir / f"chr{chrom}.batch{batch}.vcf.gz"
-            _write_vcf(path, header, half)
-            split.append((path, chrom))
-
-    unsplit = out_dir / "unsplit.vcf.gz"
-    _write_vcf(unsplit, header, [r for recs in by_chrom.values() for r in recs])
-
-    return split, unsplit, by_chrom
-
-
-@pytest.fixture(scope="module")
-def scorefile(targets, tmp_path_factory):
-    """A scoring file covering every variant in the target genomes"""
-    _, _, by_chrom = targets
-    path = tmp_path_factory.mktemp("scorefile") / "PGS999998.txt.gz"
-
-    with gzip.open(path, "wt") as f:
-        f.write(
-            "chr_name\tchr_position\teffect_allele\tother_allele\teffect_weight\t"
-            "effect_type\tis_duplicated\taccession\trow_nr\n"
-        )
-        row_nr = 0
-        for records in by_chrom.values():
-            for rec in records:
-                weight = round(0.001 * (row_nr % 20) - 0.01, 6)
-                f.write(
-                    f"{rec.chrom}\t{rec.pos}\t{rec.alts[0]}\t{rec.ref}\t{weight}\t"
-                    f"additive\tFalse\tPGS999998\t{row_nr}\n"
-                )
-                row_nr += 1
-
-    return path
-
-
-def _run(argv: list[str], monkeypatch) -> None:
-    monkeypatch.setattr(sys, "argv", argv)
-    main()
-
-
-def _load(target: str, cache_dir: pathlib.Path, scorefile, monkeypatch) -> pathlib.Path:
-    """LOAD one target genome into its own cache, like a Nextflow task would"""
-    _run(
-        [
-            "pgsc_calc",
-            "load",
-            "--target_genomes",
-            target,
-            "--sampleset",
-            SAMPLESET,
-            "--format",
-            "vcf",
-            "--cache_dir",
-            str(cache_dir),
-            "--score_paths",
-            str(scorefile),
-        ],
-        monkeypatch,
-    )
-    return cache_dir / "genotypes.zarr.zip"
-
-
-def _score(
-    zips: list[pathlib.Path], out_dir: pathlib.Path, scorefile, monkeypatch
-) -> pl.DataFrame:
-    _run(
-        [
-            "pgsc_calc",
-            "score",
-            "--zarr_zip_file",
-            *[str(z) for z in zips],
-            "--score_paths",
-            str(scorefile),
-            "--out_dir",
-            str(out_dir),
-            "--min_overlap",
-            "0.75",
-        ],
-        monkeypatch,
-    )
-    return pl.read_csv(out_dir / "scores.txt.gz")
-
-
-def test_two_files_per_chromosome(targets, scorefile, tmp_path, monkeypatch):
-    """2 chromosomes x 2 files per chromosome loads, zips, and scores"""
-    split, _, by_chrom = targets
-    n_variants = sum(len(recs) for recs in by_chrom.values())
-
-    zips = []
-    for i, (path, chrom) in enumerate(split):
-        zips.append(
-            _load(f"{path}:{chrom}", tmp_path / f"cache{i}", scorefile, monkeypatch)
-        )
-
-    # each shard is stored at its own chromosome, so basenames no longer collide
-    for (path, chrom), zip_path in zip(split, zips, strict=True):
+    for (path, chrom), zip_path in zip(grid_targets, zips, strict=True):
         names = zipfile.ZipFile(zip_path).namelist()
-        prefix = f"genotypes.zarr/{SAMPLESET}/{chrom}/{path.name}/"
+        prefix = _leaf_prefix(chrom, path.name)
         assert any(n.startswith(prefix + "genotypes/") for n in names), names[:5]
 
-    scores = _score(zips, tmp_path / "out", scorefile, monkeypatch)
 
-    assert scores["sampleset"].unique().to_list() == [SAMPLESET]
-    assert scores["accession"].unique().to_list() == ["PGS999998"]
-    # every sample gets one score
-    assert scores.shape[0] == 3202
-    # all four shards contributed, not just one
-    assert scores["n_matched"].unique().to_list() == [n_variants]
-    assert scores["score"].n_unique() > 1
-
-
-def test_unsplit_input_uses_all_sentinel(targets, scorefile, tmp_path, monkeypatch):
-    """Whole-genome input lands under ALL and scores the same as the split input"""
-    split, unsplit, _ = targets
-
-    unsplit_zip = _load(
-        str(unsplit), tmp_path / "unsplit_cache", scorefile, monkeypatch
+def test_unsplit_input_uses_all_sentinel(
+    unsplit_target, scorefile, tmp_path, monkeypatch
+):
+    """Whole-genome input lands under the ALL sentinel chromosome"""
+    zip_path = load_target(
+        str(unsplit_target), tmp_path / "cache", scorefile, monkeypatch
     )
-    names = zipfile.ZipFile(unsplit_zip).namelist()
-    prefix = f"genotypes.zarr/{SAMPLESET}/ALL/{unsplit.name}/"
+
+    names = zipfile.ZipFile(zip_path).namelist()
+    prefix = _leaf_prefix("ALL", unsplit_target.name)
     assert any(n.startswith(prefix + "genotypes/") for n in names), names[:5]
 
-    unsplit_scores = _score(
-        [unsplit_zip], tmp_path / "unsplit_out", scorefile, monkeypatch
-    )
 
-    split_zips = [
-        _load(f"{path}:{chrom}", tmp_path / f"split{i}", scorefile, monkeypatch)
-        for i, (path, chrom) in enumerate(split)
-    ]
-    split_scores = _score(split_zips, tmp_path / "split_out", scorefile, monkeypatch)
-
-    # same (sample, variant) pairs however the cache is shaped, so same scores
-    key = ["sampleset", "accession", "sample_id"]
-    assert unsplit_scores.sort(key)["score"].to_list() == pytest.approx(
-        split_scores.sort(key)["score"].to_list()
-    )
-
-
-def test_two_whole_genome_batches(targets, scorefile, tmp_path, monkeypatch):
+def test_two_whole_genome_batches(
+    sample_batch_targets, scorefile, tmp_path, monkeypatch
+):
     """Two whole-genome VCFs holding disjoint samples are sample batches, not an
     ambiguous samplesheet: they load together and land side by side under ALL
     (docs/tickets/0002)"""
-    _, unsplit, _ = targets
-
-    with pysam.VariantFile(str(unsplit)) as vcf:
-        samples = list(vcf.header.samples)
-
-    batches = []
-    for i, half in enumerate((samples[::2], samples[1::2]), start=1):
-        path = tmp_path / f"batch{i}.vcf.gz"
-        pysam.bcftools.view(
-            "-s",
-            ",".join(half),
-            "-Oz",
-            "-o",
-            str(path),
-            str(unsplit),
-            catch_stdout=False,
-        )
-        pysam.bcftools.index(str(path))
-        batches.append(path)
-
     # one LOAD, both inputs: the old unsplit-chromosome rule rejected this
-    _run(
+    run_cli(
         [
             "pgsc_calc",
             "load",
             "--target_genomes",
-            *[str(p) for p in batches],
+            *[str(p) for p in sample_batch_targets],
             "--sampleset",
             SAMPLESET,
             "--format",
@@ -250,17 +68,20 @@ def test_two_whole_genome_batches(targets, scorefile, tmp_path, monkeypatch):
     )
 
     names = zipfile.ZipFile(tmp_path / "cache" / "genotypes.zarr.zip").namelist()
-    for path in batches:
-        prefix = f"genotypes.zarr/{SAMPLESET}/ALL/{path.name}/genotypes/"
+    for path in sample_batch_targets:
+        prefix = _leaf_prefix("ALL", path.name) + "genotypes/"
         assert any(n.startswith(prefix) for n in names), names[:5]
 
 
-def test_partial_extract_of_one_leaf(targets, scorefile, tmp_path, monkeypatch):
+def test_partial_extract_of_one_leaf(
+    chromosome_targets, scorefile, tmp_path, monkeypatch
+):
     """Extracting a single leaf brings every ancestor zarr.json with it, whatever
     the depth of the hierarchy"""
-    split, _, _ = targets
-    path, chrom = split[0]
-    zip_path = _load(f"{path}:{chrom}", tmp_path / "cache", scorefile, monkeypatch)
+    path, chrom = chromosome_targets[0]
+    zip_path = load_target(
+        f"{path}:{chrom}", tmp_path / "cache", scorefile, monkeypatch
+    )
 
     extract_dir = tmp_path / "extracted"
     extract_dir.mkdir()
@@ -275,3 +96,23 @@ def test_partial_extract_of_one_leaf(targets, scorefile, tmp_path, monkeypatch):
 
     # and nothing else got dragged along
     assert list(root[SAMPLESET].group_keys()) == [chrom]
+
+
+def test_absence_semantics_lands_on_the_leaf(
+    unsplit_target, scorefile, tmp_path, monkeypatch
+):
+    """LOAD is fanned out per shard and merging zips is last-write-wins on an
+    ancestor zarr.json, so the declaration goes on the leaf where a disagreement
+    stays detectable (docs/tickets/0006)"""
+    cache_dir = tmp_path / "cache"
+    load_target(str(unsplit_target), cache_dir, scorefile, monkeypatch)
+
+    extract_dir = tmp_path / "extracted"
+    extract_dir.mkdir()
+    unzip_zarr(cache_dir / "genotypes.zarr.zip", extract_dir)
+
+    store = zarr.storage.LocalStore(root=extract_dir / "genotypes.zarr")
+    root = zarr.open_group(store=store, mode="r")
+    leaf = root[f"{SAMPLESET}/ALL/{unsplit_target.name}"]
+
+    assert leaf.attrs["absence_semantics"] == "unobserved"

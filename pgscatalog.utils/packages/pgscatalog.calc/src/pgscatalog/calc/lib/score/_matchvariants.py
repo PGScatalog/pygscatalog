@@ -78,6 +78,62 @@ def update_match_table(
     )
 
     logger.info("Creating allele match table if it doesn't exist")
+    create_allele_match_table(conn)
+
+    logger.info("Matching alleles to find effect allele index")
+    conn.sql("""
+        -- first apply the allele matching UDF
+        WITH match_candidates AS (
+            SELECT
+                sampleset,
+                accession,
+                row_nr,
+                zarr_group,
+                match_variant(effect_allele, other_allele, ref, alts)
+                    AS match_result,
+                target_row_nr,
+                ref AS target_ref,
+                alts AS target_alts
+            FROM position_match_table
+        ),
+        /*
+        keep the best match_priority *per leaf*, not per scoring variant. Under
+        sample batching the same (accession, row_nr) legitimately matches in every
+        batch, and discarding all but one would leave the losing batch's shard with
+        no weight-matrix row: its samples would silently vanish from the scores.
+        Dedup to one row per scoring variant happens once, in the match log.
+        target_row_nr breaks priority ties deterministically.
+        */
+        ranked_matches AS (
+            SELECT *,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY accession, row_nr, zarr_group
+                       ORDER BY match_result.match_priority DESC, target_row_nr
+                   ) AS rn
+            FROM match_candidates
+        )
+        INSERT INTO allele_match_table
+        SELECT
+            sampleset,
+            accession,
+            row_nr,
+            match_result,
+            target_row_nr,
+            zarr_group,
+            target_ref,
+            target_alts
+        FROM ranked_matches
+        WHERE rn = 1
+        ORDER BY accession, row_nr, zarr_group;
+        """)
+
+
+def create_allele_match_table(conn: duckdb.DuckDBPyConnection) -> None:
+    """One definition of the match table, shared by MATCH and MATCH_COMBINE.
+
+    target_ref / target_alts are carried here rather than joined back from
+    targetvariants, which only MATCH ever populates.
+    """
     conn.sql("""
         -- custom allele matching logic is applied here
         CREATE TABLE IF NOT EXISTS allele_match_table (
@@ -93,47 +149,12 @@ def update_match_table(
                 match_summary match_summary_enum) NOT NULL,
             target_row_nr UINTEGER NOT NULL,
             zarr_group TEXT NOT NULL,
-            PRIMARY KEY (sampleset, accession, row_nr)
+            target_ref TEXT,
+            target_alts TEXT[],
+            -- one match per scoring variant per shard (docs/adr/0003)
+            PRIMARY KEY (sampleset, accession, row_nr, zarr_group)
         );
         """)
-
-    logger.info("Matching alleles to find effect allele index")
-    conn.sql("""
-        -- first apply the allele matching UDF
-        WITH match_candidates AS (
-            SELECT
-                sampleset,
-                accession,
-                row_nr,
-                zarr_group,
-                match_variant(effect_allele, other_allele, ref, alts)
-                    AS match_result,
-                target_row_nr
-            FROM position_match_table
-        ),
-        -- filter rows during insert to only include the best match_priority
-        -- breaks ties with row_number
-        ranked_matches AS (
-            SELECT *,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY accession, row_nr
-                       ORDER BY match_result.match_priority DESC
-                   ) AS rn
-            FROM match_candidates
-        )
-        INSERT INTO allele_match_table
-        SELECT
-            sampleset,
-            accession,
-            row_nr,
-            match_result,
-            target_row_nr,
-            zarr_group
-        FROM ranked_matches
-        WHERE rn = 1
-        ORDER BY accession, row_nr;
-        """)
-    pass
 
 
 def match_variant(

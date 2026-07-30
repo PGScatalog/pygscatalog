@@ -7,9 +7,12 @@ from pgscatalog.core.cli.download_cli import add_download_args, download_cli
 from pgscatalog.core.cli.format_cli import add_format_args, format_cli
 
 from pgscatalog.calc import GenomeFileType
-from pgscatalog.calc.cli._utils import check_positive, zero_one_float
+from pgscatalog.calc.cli._utils import absence_semantics, check_positive
+from pgscatalog.calc.cli.combine import add_combine_args
 from pgscatalog.calc.cli.load import load_cli
-from pgscatalog.calc.cli.score import score_cli
+from pgscatalog.calc.cli.match import add_match_args
+from pgscatalog.calc.cli.match_combine import add_match_combine_args
+from pgscatalog.calc.cli.score import add_score_args
 
 
 def main() -> None:
@@ -19,6 +22,10 @@ def main() -> None:
     Polygenic Score (PGS) Catalog Calculator.
 
     A set of programs to apply PGS scoring files to new target genomes.
+
+    Scoring is split into four stages which fan out at different levels of the
+    genotype cache: match (per chromosome) -> match-combine (once) ->
+    score (per shard) -> combine (once).
     """,
     )
     subparsers = parser.add_subparsers(required=True)
@@ -28,8 +35,23 @@ def main() -> None:
     )
     parser_load_args(parser_load)
 
-    parser_score = subparsers.add_parser("score", help="Calculate polygenic scores")
-    parser_score_args(parser_score)
+    add_match_args(
+        subparsers.add_parser(
+            "match", help="Match scoring file variants against one chromosome"
+        )
+    )
+    add_match_combine_args(
+        subparsers.add_parser(
+            "match-combine",
+            help="Pool match counts across chromosomes and apply min_overlap",
+        )
+    )
+    add_score_args(
+        subparsers.add_parser("score", help="Calculate polygenic scores for one shard")
+    )
+    add_combine_args(
+        subparsers.add_parser("combine", help="Sum partial scores from every shard")
+    )
 
     parser_format = subparsers.add_parser(
         "format", help="Format scoring files to a consistent structure "
@@ -55,80 +77,6 @@ def parser_download_args(parser: argparse.ArgumentParser) -> None:
 def parser_format_args(parser: argparse.ArgumentParser) -> None:
     add_format_args(parser)
     parser.set_defaults(func=format_cli)
-
-
-def parser_score_args(parser: argparse.ArgumentParser) -> None:
-    """Arguments for the score program"""
-    parser.add_argument(
-        "--zarr_zip_file",
-        type=pathlib.Path,
-        nargs="+",
-        dest="zarr_zip_file",
-        required=True,
-        help="A list of zarr zip files created by pgsc_calc load.",
-    )
-    parser.add_argument(
-        "--score_paths",
-        type=pathlib.Path,
-        nargs="+",
-        help="PGS Catalog scoring file paths (processed with pgscatalog-format)",
-        required=True,
-    )
-    parser.add_argument(
-        "--out_dir",
-        type=pathlib.Path,
-        help="Directory path for output",
-        required=True,
-    )
-    parser.add_argument(
-        "--min_overlap",
-        type=zero_one_float,
-        dest="min_overlap",
-        help="Minimum variant overlap",
-        required=False,
-        default=0.75,
-    )
-    parser.add_argument(
-        "--keep_multiallelic",
-        dest="keep_multiallelic",
-        action="store_true",
-        help="Flag to allow matching to multiallelic variants (default: false).",
-        required=False,
-    )
-    parser.add_argument(
-        "--keep_ambiguous",
-        dest="keep_ambiguous",
-        action="store_true",
-        help="""
-            Flag to force the program to keep variants with
-            ambiguous alleles, (e.g. A/T and G/C SNPs), which are normally
-            excluded (default: false). In this case the program proceeds
-            assuming that the genotype data is on the same strand as the
-            GWAS whose summary statistics were used to construct the score.
-        """,
-    )
-    parser.add_argument(
-        "--threads",
-        type=check_positive,
-        help="Number of threads to use",
-        required=False,
-        default=1,
-    )
-    parser.add_argument(
-        "--batch_size",
-        type=check_positive,
-        default=5_000,
-        help="Number of variants to buffer before writing to zarr",
-    )
-    parser.add_argument(
-        "--max_memory_gb",
-        # have to double %: argparse uses % to parse strings
-        help="Maximum RAM to use in GB (default: ~90%% of system RAM if not set)",
-        type=check_positive,
-        required=False,
-        default=16,
-    )
-    parser.set_defaults(func=score_cli)
 
 
 def parser_load_args(parser: argparse.ArgumentParser) -> None:
@@ -173,6 +121,19 @@ def parser_load_args(parser: argparse.ArgumentParser) -> None:
         nargs="+",
         help="PGS Catalog scoring file paths",
         required=True,
+    )
+    parser.add_argument(
+        "--absence_semantics",
+        type=absence_semantics,
+        default="unobserved",
+        help="""
+            What it means for a variant to be absent from a target genome file:
+            'unobserved' (never assessed, the default and the only mode implemented)
+            or 'homref' (assessed, and every sample here is homozygous reference).
+            The two produce identical files so this can only be declared. bgen is
+            dense - every bgen shard records every variant it assessed - so this
+            declaration cannot change how bgen input behaves.
+        """,
     )
     parser.add_argument("--verbose", action="store_true", help="More logging!")
     parser.add_argument(

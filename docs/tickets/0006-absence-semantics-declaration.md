@@ -24,3 +24,13 @@ The `homref` code path entirely: constant fill rows, union-derived allele indice
 - A samplesheet without the column loads and behaves exactly as today.
 - `homref` produces a clear not-implemented error, not a wrong score.
 - The value reaches MATCH and drives 0005's ragged check.
+
+## Not in this repo
+
+The samplesheet column itself lives in `pgsc_calc`'s `assets/schema_input.json`, which
+sets `additionalProperties: false`, so the column has to be declared there before a
+samplesheet can carry it. This repo exposes it as `pgsc_calc load --absence_semantics`
+and records the declaration on each **leaf** zarr group, not the sampleset group: LOAD
+is fanned out per shard and merging the per-shard zips is last-write-wins on an
+ancestor `zarr.json`, so a sampleset-level attribute would silently swallow a
+contradictory declaration instead of letting MATCH detect it.

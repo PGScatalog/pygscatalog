@@ -19,6 +19,28 @@ def check_positive(value: Any) -> int:
     return ivalue
 
 
+def absence_semantics(value: Any) -> str:
+    """What it means for a variant to be absent from a target genome file.
+
+    The two possibilities produce byte-identical files, so this can only ever be
+    declared, never detected (ADR 0004). Only `unobserved` is implemented; `homref`
+    is rejected loudly rather than silently ignored, because ignoring it would score
+    a sparse-called callset as if every absent variant were simply unknown.
+    """
+    if value == "unobserved":
+        return "unobserved"
+
+    if value == "homref":
+        raise argparse.ArgumentTypeError(
+            "--absence_semantics 'homref' is not implemented yet. Absent variants are "
+            "always treated as never assessed in this release."
+        )
+
+    raise argparse.ArgumentTypeError(
+        f"{value!r} is not valid absence semantics, choose 'unobserved' or 'homref'"
+    )
+
+
 def zero_one_float(x: Any) -> float:
     try:
         floating = float(x)

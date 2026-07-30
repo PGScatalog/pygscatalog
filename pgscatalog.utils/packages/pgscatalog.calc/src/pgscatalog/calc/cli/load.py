@@ -190,6 +190,12 @@ def load_cli(args: argparse.Namespace) -> None:
             )
             target_genome.cache_variants(positions)
 
+        # record the declaration on the leaf, not the sampleset: LOAD is fanned out
+        # per shard and merging the zips is last-write-wins on an ancestor zarr.json,
+        # so a sampleset-level attr would swallow a contradictory declaration instead
+        # of letting MATCH detect it (docs/tickets/0006, ADR 0004)
+        target_genome.zarr_group.attrs["absence_semantics"] = args.absence_semantics
+
     # prepare to move the zarr array into a read-only single file archive
     logger.info("Packaging zarr zip store")
     zip_path = args.cache_dir / "genotypes.zarr.zip"

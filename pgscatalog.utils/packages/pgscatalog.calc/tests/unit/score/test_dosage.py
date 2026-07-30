@@ -1,9 +1,11 @@
+import dask.array as da
 import numpy as np
 import pytest
 import zarr
 
 from pgscatalog.calc.lib.score._dosage import (
     adjust_dosage_for_effect,
+    fill_missing_dosages,
 )
 
 N_SAMPLES = 5
@@ -67,3 +69,26 @@ def test_bad_effect_types(dosage, tmp_path):
 @pytest.fixture
 def db_metadata():
     return "PGS001229_hmPOS_GRCh38", "1000G"
+
+
+def test_small_shard_without_missing_calls_skips_the_floor():
+    """docs/tickets/0009: the sample floor only applies if there's something to
+    impute, so a tiny shard with complete calls scores instead of crashing"""
+    dosage = da.from_array(np.ones(shape=(4, 10)))
+
+    is_nan, filled = fill_missing_dosages(dosage_array=dosage, n_minimum_samples=50)
+
+    assert not bool(is_nan.any().compute())
+    np.testing.assert_array_equal(filled.compute(), dosage.compute())
+
+
+def test_small_shard_with_missing_calls_still_raises():
+    """...but imputing from 10 samples is still not allowed"""
+    array = np.ones(shape=(4, 10))
+    array[0, 0] = np.nan
+    dosage = da.from_array(array)
+
+    with pytest.raises(ValueError) as e:
+        fill_missing_dosages(dosage_array=dosage, n_minimum_samples=50)
+
+    assert "n_minimum_samples=50" in str(e.value)

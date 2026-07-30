@@ -1,7 +1,10 @@
 """Samplesheet validation that runs before any work (docs/tickets/0002, ADR 0003)"""
 
+import argparse
+
 import pytest
 
+from pgscatalog.calc.cli._utils import absence_semantics
 from pgscatalog.calc.cli.load import (
     AnnotatedGenomePath,
     check_chromosomes,
@@ -56,3 +59,19 @@ def test_two_unsplit_genomes_are_accepted():
     check_chromosomes(targets)  # only needs .chrom
 
     assert [x.leaf_path for x in targets] == ["ALL/batch1.vcf.gz", "ALL/batch2.vcf.gz"]
+
+
+def test_absence_semantics_default_is_accepted():
+    assert absence_semantics("unobserved") == "unobserved"
+
+
+def test_homref_is_rejected_not_ignored():
+    """docs/tickets/0006: silently ignoring the declaration would score a
+    sparse-called callset as if every absent variant were unknown"""
+    with pytest.raises(argparse.ArgumentTypeError, match="not implemented yet"):
+        absence_semantics("homref")
+
+
+def test_unknown_absence_semantics_is_rejected():
+    with pytest.raises(argparse.ArgumentTypeError, match="not valid"):
+        absence_semantics("missing")

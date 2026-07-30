@@ -26,3 +26,13 @@ The `min_overlap` decision, which needs every chromosome (0004). MATCH emits cou
 - Matching one chromosome's shards produces the same match table rows as today's whole-store run, restricted to that chromosome.
 - Peak memory is flat as the number of samples per shard grows (no genotype array reads).
 - Two shards under one chromosome with differing ALT orderings at a shared position both resolve their own `effect_allele_idx` correctly.
+
+## Deferred in implementation
+
+**The chromosome's assessed variant set is not emitted.** Only `homref` absence
+semantics consumes it: under `unobserved` (the only mode alpha2 implements, see 0006)
+an absent variant counts against `min_overlap` whether or not another shard assessed
+it, so nothing downstream reads the set. MATCH does check that shards under one
+chromosome assessed the same variants (0005), which is the part that has to hold
+before `homref` can be added; emitting the set itself is additive work for whoever
+implements it.

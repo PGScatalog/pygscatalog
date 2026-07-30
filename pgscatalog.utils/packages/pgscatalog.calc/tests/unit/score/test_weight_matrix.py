@@ -95,7 +95,12 @@ def zarr_group(tmp_path) -> zarr.Group:
 # ---
 def test_create_wide_weights_table(db_with_scores):
     db_path = db_with_scores
-    create_wide_weights_table(db_path, sampleset="test", accessions="test")
+    create_wide_weights_table(
+        db_path,
+        sampleset="test",
+        accessions="test",
+        zarr_group="test/ALL/test.vcf.gz",
+    )
 
     conn = duckdb.connect(str(db_path))
 
@@ -149,7 +154,10 @@ def test_get_variant_metadata(db_with_scores):
 
     # create the zarr_group
     group_path = create_wide_weights_table(
-        db_path, sampleset="test", accessions="test"
+        db_path,
+        sampleset="test",
+        accessions="test",
+        zarr_group="test/ALL/test.vcf.gz",
     )[0]
 
     df = get_variant_metadata(db_path=db_with_scores, group_path=group_path)
@@ -173,7 +181,10 @@ def test_get_weight_matrix(db_with_scores):
 
     # create the zarr_group
     group_path = create_wide_weights_table(
-        db_path, sampleset="test", accessions="test"
+        db_path,
+        sampleset="test",
+        accessions="test",
+        zarr_group="test/ALL/test.vcf.gz",
     )[0]
 
     cols, mat = get_weight_matrix(db_path=db_with_scores, group_path=group_path)
@@ -192,7 +203,10 @@ def test_store_results_in_zarr(db_with_scores, zarr_group):
 
     # create the zarr_group
     group_path = create_wide_weights_table(
-        db_path, sampleset="test", accessions="test"
+        db_path,
+        sampleset="test",
+        accessions="test",
+        zarr_group="test/ALL/test.vcf.gz",
     )[0]
 
     store_results_in_zarr(
@@ -216,6 +230,7 @@ def test_store_group_weight_arrays_success(db_with_scores, zarr_group):
         sampleset="test",
         pgs_group=zarr_group,
         accessions=["test"],
+        zarr_group="test/ALL/test.vcf.gz",
     )
 
     assert set(result.keys()) == {
@@ -230,6 +245,98 @@ def test_store_group_weight_arrays_success(db_with_scores, zarr_group):
     assert df["target_row_nr"].to_list() == [0]
 
 
+SHARD_A = "test/1/a.vcf.gz"
+SHARD_B = "test/8/b.vcf.gz"
+
+
+@pytest.fixture
+def db_two_shards(tmp_path) -> str:
+    """A genome-wide match table covering two shards, as MATCH_COMBINE writes it.
+
+    target_row_nr is shard-local, so both shards number their variants from 0. In
+    shard A, two scoring variants match the same target row with different effect
+    allele indices (the REFALT/ALTREF case).
+    """
+    db_path = tmp_path / "two_shards.duckdb"
+
+    # (accession, row_nr, target_row_nr, effect_allele_idx, zarr_group)
+    matches = [
+        ("PGS000001", 0, 0, 1, SHARD_A),
+        ("PGS000001", 1, 1, 1, SHARD_A),
+        ("PGS000002", 2, 1, 0, SHARD_A),
+        ("PGS000002", 3, 2, 1, SHARD_A),
+        ("PGS000001", 4, 0, 1, SHARD_B),
+        ("PGS000002", 5, 1, 1, SHARD_B),
+    ]
+
+    with duckdb.connect(str(db_path)) as conn:
+        conn.execute("""
+            CREATE TABLE score_variant_table (
+                accession TEXT, effect_type TEXT, row_nr UBIGINT, effect_weight DOUBLE
+            );
+        """)
+        conn.executemany(
+            "INSERT INTO score_variant_table VALUES (?, 'additive', ?, ?)",
+            [(accession, row_nr, 0.1) for accession, row_nr, *_ in matches],
+        )
+        conn.execute("""
+            CREATE TABLE allele_match_raw (
+                sampleset TEXT,
+                accession TEXT,
+                row_nr UBIGINT,
+                target_row_nr UBIGINT,
+                effect_allele_idx UINT8,
+                zarr_group TEXT
+            );
+        """)
+        conn.executemany(
+            "INSERT INTO allele_match_raw VALUES ('test', ?, ?, ?, ?, ?)", matches
+        )
+        # match_result is a struct in the real schema
+        conn.execute("""
+            CREATE VIEW allele_match_table AS
+            SELECT sampleset, accession, row_nr,
+                   struct_pack(effect_allele_idx := effect_allele_idx) AS match_result,
+                   target_row_nr, zarr_group
+            FROM allele_match_raw;
+        """)
+
+    return str(db_path)
+
+
+def test_weights_are_scoped_to_one_shard(db_two_shards):
+    """SCORE stages the genome-wide match table but holds one shard's genotypes.
+
+    Without the zarr_group predicate, weights get built for a group whose arrays
+    aren't in this task's cache, and weight_mat_row_nr stops being a valid index
+    into this task's dosage array.
+    """
+    groups = create_wide_weights_table(
+        db_two_shards,
+        sampleset="test",
+        accessions=["PGS000001", "PGS000002"],
+        zarr_group=SHARD_A,
+    )
+    assert groups == [SHARD_A]
+
+    with duckdb.connect(db_two_shards, read_only=True) as conn:
+        rows = conn.execute("""
+            SELECT weight_mat_row_nr, target_row_nr, effect_allele_idx
+            FROM wide_score_variants ORDER BY weight_mat_row_nr
+        """).fetchall()
+
+    # ordered by (target_row_nr, effect_allele_idx): ordering by target_row_nr alone
+    # leaves rows 1 and 2 in arbitrary order, and get_weight_matrix would then be
+    # free to disagree with the row numbers assigned here
+    assert rows == [(0, 0, 1), (1, 1, 0), (2, 1, 1), (3, 2, 1)]
+
+    # get_variant_metadata must agree, because write_dosage_regions indexes the
+    # genotype array with it
+    df = get_variant_metadata(db_path=db_two_shards, group_path=SHARD_A)
+    assert df["weight_mat_row_nr"].to_list() == [0, 1, 2, 3]
+    assert df["effect_allele_idx"].to_list() == [1, 0, 1, 1]
+
+
 def test_store_group_weight_arrays_raises_on_empty(empty_db, zarr_group):
     """
     When no variants are available for the given sampleset/accessions,
@@ -241,4 +348,5 @@ def test_store_group_weight_arrays_raises_on_empty(empty_db, zarr_group):
             sampleset="unknown_sampleset",
             pgs_group=zarr_group,
             accessions=["PGS000001"],
+            zarr_group="unknown/ALL/unknown.vcf.gz",
         )

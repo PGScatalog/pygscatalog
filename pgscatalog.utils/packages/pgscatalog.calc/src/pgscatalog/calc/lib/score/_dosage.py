@@ -162,6 +162,16 @@ def write_dosage_regions(
     start = 0
     for zarr_group, df in df_groups.items():
         logger.info(f"Calculating and storing dosage for {zarr_group=}")
+
+        # weight_mat_row_nr is used directly as a row index into dosage_array by
+        # calculate_score_statistics, so the region this group writes must be exactly
+        # the range of row numbers it was assigned in the weight matrix
+        if start != (first_row := df["weight_mat_row_nr"].min()):
+            raise ValueError(
+                f"{zarr_group=} writes dosage rows from {start} but its weight matrix "
+                f"rows start at {first_row!r}"
+            )
+
         target_group = genotypes_group[zarr_group]
 
         if not isinstance(target_group, zarr.Group):
@@ -340,7 +350,9 @@ def fill_missing_dosages(
         Missing dosages are represented as NaN.
     n_minimum_samples : int, default=50
         Minimum number of non-missing samples required to compute the mean dosage
-        for imputation. An exception will be raised if too few samples are present.
+        for imputation. An exception will be raised if too few samples are present
+        *and* there is something to impute — a small shard with no missing calls
+        needs no mean, so it is returned unchanged.
 
     Returns
     -------
@@ -351,6 +363,14 @@ def fill_missing_dosages(
         Float64 array with missing dosages replaced by the per-variant mean
     """
     is_dosage_nan = da.isnan(dosage_array)
+
+    # ponytail: only shards below the floor pay for the missingness scan. A shard with
+    # enough samples can't trip it, so don't walk the array to find that out.
+    if dosage_array.shape[1] < n_minimum_samples and not bool(
+        is_dosage_nan.any().compute()
+    ):
+        logger.info("No missing dosages to impute, skipping the sample floor check")
+        return is_dosage_nan, dosage_array
 
     mean_effect_dosage: da.Array = calculate_mean_dosage(
         dosage_array=dosage_array,

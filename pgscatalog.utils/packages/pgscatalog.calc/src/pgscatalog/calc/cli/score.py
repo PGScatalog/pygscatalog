@@ -1,9 +1,20 @@
+"""SCORE: calculate partial polygenic scores for one shard.
+
+Scoring used to merge every shard's genotypes into a single zarr store and compute
+over it as one dask array in one task, which is the OOM in pgsc_calc#459. Fanning
+out per shard is the fix and the point of alpha2 (docs/tickets/0007): peak memory
+scales with one shard rather than the sampleset.
+
+Accessions rejected by `min_overlap` were dropped by MATCH_COMBINE, so they cost
+no scoring compute here.
+"""
+
 from __future__ import annotations
 
 import logging
+import pathlib
 from typing import TYPE_CHECKING
 
-from rich.logging import RichHandler
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -15,6 +26,13 @@ from rich.progress import (
 )
 
 from pgscatalog.calc import ScorePipeline
+from pgscatalog.calc.cli._stage import (
+    add_score_paths_arg,
+    add_stage_args,
+    check_paths_exist,
+    setup_stage,
+)
+from pgscatalog.calc.cli._utils import check_positive
 from pgscatalog.calc.lib.config import config
 
 from .load import unzip_zarr
@@ -24,35 +42,40 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-logging.basicConfig(
-    level="INFO",
-    format="%(message)s",
-    datefmt="[%X]",
-    handlers=[RichHandler(rich_tracebacks=True)],
-)
+
+def add_score_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--zarr_zip_file",
+        type=pathlib.Path,
+        required=True,
+        help="A zarr zip file created by pgsc_calc load, holding one shard.",
+    )
+    add_score_paths_arg(parser)
+    parser.add_argument(
+        "--match_table",
+        type=pathlib.Path,
+        required=True,
+        help="match_table.parquet written by pgsc_calc match-combine",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=check_positive,
+        default=5_000,
+        help="Number of variants to buffer before writing to zarr",
+    )
+    add_stage_args(parser)
+    parser.set_defaults(func=score_cli)
 
 
 def score_cli(args: argparse.Namespace) -> None:
-    # update zarr chunk size
+    out_dir: pathlib.Path = setup_stage(args)
+
     logger.info(f"Default value {config.ZARR_VARIANT_CHUNK_SIZE=}")
     config.ZARR_VARIANT_CHUNK_SIZE = args.batch_size
     logger.info(f"After update {config.ZARR_VARIANT_CHUNK_SIZE=}")
 
-    # check the output directory is empty
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-
-    if any(files := [str(x) for x in args.out_dir.iterdir()]):
-        logger.critical(f"{str(args.out_dir)} directory must be empty")
-        raise FileExistsError(files)
-
-    # check all zip files exist and unzip them
-    for zip_file in args.zarr_zip_file:
-        if not zip_file.exists():
-            raise FileNotFoundError(f"{zip_file} does not exist")
-
-        unzip_zarr(zip_file, args.out_dir)
-
-    # zarr directory called genotypes.zarr now contains all variant and genotypes data
+    (zip_file,) = check_paths_exist([args.zarr_zip_file])
+    unzip_zarr(zip_file, out_dir)
 
     with Progress(
         SpinnerColumn(),
@@ -65,10 +88,9 @@ def score_cli(args: argparse.Namespace) -> None:
     ) as progress:
         stages = [
             "Load scoring files",
-            "Match variants",
-            "Export logs",
+            "Load match table",
             "Calculate scores",
-            "Export scores",
+            "Export partial scores",
         ]
         tasks = {stage: progress.add_task(stage, total=1) for stage in stages}
 
@@ -77,34 +99,23 @@ def score_cli(args: argparse.Namespace) -> None:
         pipeline = ScorePipeline(
             max_memory_gb=args.max_memory_gb,
             threads=args.threads,
-            out_dir=args.out_dir,
+            out_dir=out_dir,
         )
 
         progress.start_task(tasks["Load scoring files"])
         pipeline.load_scores(scorefile_paths=args.score_paths)
         progress.update(tasks["Load scoring files"], advance=1)
 
-        progress.start_task(tasks["Match variants"])
-        pipeline.match_variants(
-            min_overlap=args.min_overlap,
-            match_multiallelic=args.keep_multiallelic,
-            match_ambiguous=args.keep_ambiguous,
-        )
-        progress.update(tasks["Match variants"], advance=1)
-
-        progress.start_task(tasks["Export logs"])
-        pipeline.export_full_match_log(out_directory=args.out_dir / "logs")
-        pipeline.export_summary_match_log(
-            out_path=args.out_dir / "logs" / "summary.csv"
-        )
-        progress.update(tasks["Export logs"], advance=1)
+        progress.start_task(tasks["Load match table"])
+        pipeline.import_match_tables(check_paths_exist([args.match_table]))
+        progress.update(tasks["Load match table"], advance=1)
 
         progress.start_task(tasks["Calculate scores"])
         pipeline.calculate_scores()
         progress.update(tasks["Calculate scores"], advance=1)
 
-        progress.start_task(tasks["Export scores"])
-        pipeline.export_scores(out_path=args.out_dir)
-        progress.update(tasks["Export scores"], advance=1)
+        progress.start_task(tasks["Export partial scores"])
+        pipeline.export_partial_scores(out_dir / "partial_scores.parquet")
+        progress.update(tasks["Export partial scores"], advance=1)
 
-        progress.print("Finished calculating :tada: Goodbye!")
+        progress.print("Finished scoring this shard :tada:")
