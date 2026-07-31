@@ -108,7 +108,8 @@ def add_match_log(
                    is_multiallelic,
                    COUNT(match_summary) AS count,
                    -- count any match types which flipped the effect allele
-                   COUNT(*) FILTER (WHERE match_type LIKE '%flip') AS match_flipped
+                   -- (match_type_enum values are uppercase, LIKE is case sensitive)
+                   COUNT(*) FILTER (WHERE match_type ILIKE '%flip') AS match_flipped
             FROM score_log_table
             GROUP BY sampleset,
                      accession,
@@ -117,8 +118,10 @@ def add_match_log(
                      is_multiallelic
         )
         SELECT *,
-               CAST(count / sum(count) OVER (PARTITION BY sampleset, accession)
-                   AS DECIMAL(5, 2)) AS fraction
+               -- kept raw here: rounding is for display only, and rounding each
+               -- subgroup before summing can move the match rate across min_overlap
+               count / sum(count) OVER (PARTITION BY sampleset, accession)
+                   AS fraction
         FROM match_counts;
         """
     )
@@ -149,8 +152,8 @@ def add_match_log(
             is_multiallelic,
             match_flipped,
             count,
-            fraction,
-            match_rate,
+            CAST(fraction AS DECIMAL(5, 2)) AS fraction,
+            CAST(match_rate AS DECIMAL(5, 2)) AS match_rate,
             is_match_rate_ok
         FROM temp_summary_log_table
         JOIN temp_match_rates_ok

@@ -299,3 +299,83 @@ def test_add_match_log_with_ndjson(
         get_ok_accessions(conn, "1000G")
 
     conn.close()
+
+
+def _make_conn_from_rows(n_variants, match_rows) -> duckdb.DuckDBPyConnection:
+    """A scoring file of n_variants, where match_rows (row_nr, match_type,
+    is_ambiguous, is_multiallelic) matched and every other variant is unmatched."""
+    conn = duckdb.connect(":memory:")
+    _setup_enums(conn)
+    conn.execute(
+        """
+        CREATE TABLE score_variant_table AS
+        SELECT 'test' AS accession, i AS row_nr, '1' AS chr_name,
+               i AS chr_position, 'A' AS effect_allele, 'C' AS other_allele
+        FROM generate_series(0, ?) AS t(i);
+        """,
+        [n_variants - 1],
+    )
+    conn.execute("""
+        CREATE TABLE allele_match_table (
+            sampleset TEXT,
+            accession TEXT,
+            row_nr UINTEGER,
+            match_result STRUCT(is_matched BOOLEAN,
+                                match_type match_type_enum,
+                                match_summary match_summary_enum,
+                                is_ambiguous BOOLEAN,
+                                is_multiallelic BOOLEAN,
+                                match_priority UINTEGER),
+            target_row_nr UINTEGER,
+            zarr_group TEXT,
+            target_ref TEXT,
+            target_alts TEXT[]
+        );
+    """)
+    conn.executemany(
+        """
+        INSERT INTO allele_match_table VALUES
+        ('test', 'test', ?,
+         {'is_matched': TRUE, 'match_type': ?, 'match_summary': 'matched',
+          'is_ambiguous': ?, 'is_multiallelic': ?, 'match_priority': 6},
+         0, 'test/ALL/file.vcf.gz', 'A', ['C']);
+        """,
+        match_rows,
+    )
+    return conn
+
+
+def test_match_rate_sums_unrounded_fractions():
+    """Rounding each subgroup's fraction before summing them can move the match rate
+    across min_overlap, so the match rate must sum raw fractions and round once."""
+    # 735 of 1000 variants matched, split evenly across three subgroups: each
+    # subgroup's 0.245 rounds up to 0.25, which sums to 0.75 instead of 0.735
+    flags = [(False, False), (True, False), (False, True)]
+    rows = [(row_nr, "REFALT", *flags[row_nr % 3]) for row_nr in range(735)]
+    conn = _make_conn_from_rows(1000, rows)
+
+    add_match_log(conn, sampleset="test", min_overlap=0.75)
+
+    match_rate, is_ok = conn.execute(
+        "SELECT DISTINCT match_rate, is_match_rate_ok FROM summary_log_table"
+    ).fetchone()
+    assert is_ok is False
+    assert match_rate < Decimal("0.75")
+    # match_rate is still displayed at two decimal places
+    assert match_rate.as_tuple().exponent == -2
+
+    conn.close()
+
+
+def test_match_flipped_counts_strand_flips():
+    """match_type_enum values are uppercase and duckdb's LIKE is case sensitive."""
+    rows = [(0, "REFALT_FLIP", False, False), (1, "ALTREF_FLIP", False, False)]
+    conn = _make_conn_from_rows(2, rows)
+
+    add_match_log(conn, sampleset="test", min_overlap=0.75)
+
+    assert conn.execute(
+        "SELECT match_flipped FROM summary_log_table WHERE match_summary = 'matched'"
+    ).fetchone() == (2,)
+
+    conn.close()
