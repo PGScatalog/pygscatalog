@@ -126,6 +126,32 @@ def unsplit_target(target_records, tmp_path_factory) -> pathlib.Path:
 
 
 @pytest.fixture(scope="session")
+def chr_prefixed_target(unsplit_target, tmp_path_factory) -> pathlib.Path:
+    """The same whole-genome data, with chr-prefixed contigs.
+
+    The dialect some imputation servers hand back. `bcftools view -R` asked for
+    region "1" finds nothing in it, so before ADR 0008 every variant came back
+    unmatched instead of failing.
+    """
+    out_dir = tmp_path_factory.mktemp("chr_prefixed")
+    rename = out_dir / "rename.txt"
+    rename.write_text("".join(f"{chrom}\tchr{chrom}\n" for chrom in TEST_CHROMS))
+
+    path = out_dir / "prefixed.vcf.gz"
+    pysam.bcftools.annotate(
+        "--rename-chrs",
+        str(rename),
+        "-Oz",
+        "-o",
+        str(path),
+        str(unsplit_target),
+        catch_stdout=False,
+    )
+    pysam.bcftools.index(str(path))
+    return path
+
+
+@pytest.fixture(scope="session")
 def chromosome_targets(target_records, tmp_path_factory) -> list[tuple]:
     """One file per chromosome: shards on the variant axis only"""
     header, by_chrom = target_records
@@ -203,11 +229,17 @@ def run_cli(argv: list[str], monkeypatch) -> None:
 
 
 def load_target(
-    target: str, cache_dir: pathlib.Path, scorefile, monkeypatch
+    target: str,
+    cache_dir: pathlib.Path,
+    scorefile,
+    monkeypatch,
+    fmt: str = "vcf",
+    sample_file=None,
 ) -> pathlib.Path:
     """LOAD one target genome into its own cache, like a Nextflow task would
 
-    ``target`` is PATH or PATH:CHROM.
+    ``target`` is PATH or PATH:CHROM. ``sample_file`` is bgen's, which carries the
+    sample IDs a bgen doesn't hold itself.
     """
     run_cli(
         [
@@ -218,11 +250,12 @@ def load_target(
             "--sampleset",
             SAMPLESET,
             "--format",
-            "vcf",
+            fmt,
             "--cache_dir",
             str(cache_dir),
             "--score_paths",
             str(scorefile),
+            *(["--bgen_sample_file", str(sample_file)] if sample_file else []),
         ],
         monkeypatch,
     )
@@ -230,7 +263,12 @@ def load_target(
 
 
 def load_targets(
-    targets: list, cache_dir: pathlib.Path, scorefile, monkeypatch
+    targets: list,
+    cache_dir: pathlib.Path,
+    scorefile,
+    monkeypatch,
+    fmt: str = "vcf",
+    sample_file=None,
 ) -> list[pathlib.Path]:
     """LOAD every shard into its own cache, one task each"""
     zips = []
@@ -240,7 +278,11 @@ def load_targets(
             spec = f"{path}:{chrom}"
         else:
             spec = str(target)
-        zips.append(load_target(spec, cache_dir / f"cache{i}", scorefile, monkeypatch))
+        zips.append(
+            load_target(
+                spec, cache_dir / f"cache{i}", scorefile, monkeypatch, fmt, sample_file
+            )
+        )
     return zips
 
 
@@ -253,6 +295,8 @@ def run_pipeline(
     score_paths: list | None = None,
     max_memory_gb: str = "16",
     threads: str = "1",
+    fmt: str = "vcf",
+    sample_file=None,
 ) -> pl.DataFrame:
     """Drive MATCH -> MATCH_COMBINE -> SCORE -> SCORE_COMBINE, mirroring the
     Nextflow DAG: one task per chromosome, then one, then one per shard, then one.
@@ -262,7 +306,9 @@ def run_pipeline(
     """
     score_paths = [str(p) for p in (score_paths or [scorefile])]
     resources = ["--max_memory_gb", max_memory_gb, "--threads", threads]
-    zips = load_targets(targets, work_dir / "load", scorefile, monkeypatch)
+    zips = load_targets(
+        targets, work_dir / "load", scorefile, monkeypatch, fmt, sample_file
+    )
 
     # MATCH fans out per chromosome, so group the shards by the chromosome they
     # were loaded under

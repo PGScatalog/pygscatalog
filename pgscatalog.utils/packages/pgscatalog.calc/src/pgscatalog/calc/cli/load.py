@@ -27,6 +27,7 @@ from pgscatalog.calc import (
 )
 from pgscatalog.calc.lib.cache.genotypecache import leaf_group_path
 from pgscatalog.calc.lib.config import config
+from pgscatalog.calc.lib.constants import canonicalise_chrom
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,8 @@ class AnnotatedGenomePath:
         except ValueError:
             path, chrom = s, None
 
-        return cls(path=path, chrom=chrom)
+        # the samplesheet is a boundary too: `path:chrX` and `path:X` are one leaf
+        return cls(path=path, chrom=canonicalise_chrom(chrom))
 
     def leaf_path(self, sampleset: str) -> str:
         """Where this input lands in the cache hierarchy: the same string LOAD writes
@@ -128,8 +130,9 @@ def parse_genome_paths(
 
 def check_chromosomes(target_genomes: list[TargetGenome]) -> None:
     """Check chromosomes are valid before launching any work"""
-    if not {x.chrom for x in target_genomes}.issubset(VALID_CHROMOSOMES):
-        raise NotImplementedError("Chromosomes 1-22 supported but this will be fixed")
+    if unsupported := {x.chrom for x in target_genomes} - VALID_CHROMOSOMES:
+        names = ", ".join(sorted(str(chrom) for chrom in unsupported))
+        raise ValueError(f"{names} not supported yet: 1-22, X, Y and MT can be scored")
 
 
 def load_cli(args: argparse.Namespace) -> None:

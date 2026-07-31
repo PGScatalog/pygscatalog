@@ -133,7 +133,12 @@ class MatchCombineStage:
 def check_sample_union(
     conn: duckdb.DuckDBPyConnection, paths: Sequence[Pathish]
 ) -> None:
-    """Every chromosome in the cache must cover the same samples.
+    """Every chromosome in the cache must cover the same samples, except Y.
+
+    Y is the only chromosome a person can lack entirely - everyone has at least one
+    X and everyone has MT - so a male-only chrY leaf covers a subset of the sampleset
+    and is legitimate rather than truncated (ADR 0007). The two are indistinguishable,
+    which is the known cost of admitting the first.
 
     Scoped to chromosomes present in the cache, which is automatic: a chromosome
     whose index query returned nothing is deleted by `cleanup_empty_zarr_group`,
@@ -143,7 +148,8 @@ def check_sample_union(
         """
         WITH samples AS (SELECT * FROM read_parquet($paths)),
              union_of_all AS (SELECT DISTINCT sampleset, sample_id FROM samples),
-             chromosomes AS (SELECT DISTINCT sampleset, chromosome FROM samples),
+             chromosomes AS (SELECT DISTINCT sampleset, chromosome FROM samples
+                             WHERE chromosome != 'Y'),
              expected AS (SELECT * FROM chromosomes JOIN union_of_all
                           USING (sampleset))
         SELECT DISTINCT chromosome

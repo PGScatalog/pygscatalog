@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import pathlib
@@ -11,12 +12,30 @@ import zarr
 import zarr.errors
 
 from .cache.genotypecache import meta_group_path
-from .constants import VALID_CHROMOSOMES
+from .constants import VALID_CHROMOSOMES, canonicalise_chrom
 
 if TYPE_CHECKING:
     from .types import Pathish, PathishList
 
 logger = logging.getLogger(__name__)
+
+
+def register_canonicalise_chrom(conn: duckdb.DuckDBPyConnection) -> None:
+    """Make the boundary's canonicalisation available to SQL.
+
+    Scoring files are read straight into duckdb, so this is where a scoring file's
+    dialect (`X`, `XY`, `MT`) becomes the internal vocabulary (ADR 0008). NULL
+    chromosomes stay NULL: duckdb doesn't call the function for them.
+
+    Registering twice on one connection is an error in duckdb, and
+    `load_scoring_files` is documented as re-runnable, so drop any previous one.
+    """
+    with contextlib.suppress(duckdb.InvalidInputException):
+        conn.remove_function("canonicalise_chrom")
+
+    conn.create_function(
+        "canonicalise_chrom", canonicalise_chrom, ["VARCHAR"], "VARCHAR"
+    )
 
 
 class Scorefiles:
@@ -66,10 +85,12 @@ class Scorefiles:
 
         # now query the scoring files, excluding cached positions
         with duckdb.connect() as conn:
+            register_canonicalise_chrom(conn)
             try:
                 query = conn.sql(f"""
                 WITH scorefile_positions AS (
-                    SELECT DISTINCT chr_name, chr_position AS chr_pos
+                    SELECT DISTINCT canonicalise_chrom(chr_name) AS chr_name,
+                        chr_position AS chr_pos
                     FROM read_csv({path_strings}, columns={self.column_types})
                     WHERE chr_name IS NOT NULL AND chr_pos IS NOT NULL
                 )
@@ -146,10 +167,13 @@ def load_scoring_files(
     """)
     # column types are manually set here, because chr_name often fools auto-detect
     # (1-22... X)
+    register_canonicalise_chrom(conn)
     conn.execute(
         """
     INSERT INTO score_variant_table
-    SELECT * FROM read_csv(?, columns={
+    -- canonicalise on the way in, so MATCH never compares dialects (ADR 0008)
+    SELECT * REPLACE (canonicalise_chrom(chr_name) AS chr_name)
+    FROM read_csv(?, columns={
         'chr_name': 'VARCHAR',
         'chr_position': 'UINTEGER',
         'effect_allele': 'VARCHAR',

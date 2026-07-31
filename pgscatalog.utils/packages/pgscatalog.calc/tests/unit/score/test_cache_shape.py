@@ -43,6 +43,50 @@ def test_chromosome_missing_a_sample_is_rejected(tmp_path):
         check_sample_union(conn=conn, paths=paths)
 
 
+def test_a_male_only_chry_is_accepted(tmp_path):
+    """Y is the only chromosome a person can lack entirely, so a leaf covering a
+    subset of the sampleset is biology rather than a truncated file (ADR 0007)"""
+    paths = [
+        _samples_parquet(tmp_path, "chr1.parquet", [("test", "1", s) for s in "abc"]),
+        _samples_parquet(tmp_path, "chrY.parquet", [("test", "Y", s) for s in "ab"]),
+    ]
+    with duckdb.connect() as conn:
+        check_sample_union(conn=conn, paths=paths)
+
+
+def test_a_truncated_chry_is_indistinguishable_from_a_male_only_one(tmp_path):
+    """The known cost of the carve-out, asserted deliberately: a chrY file that
+    lost samples looks exactly like one that never had them, so it is accepted"""
+    paths = [
+        _samples_parquet(tmp_path, "chr1.parquet", [("test", "1", s) for s in "abc"]),
+        _samples_parquet(tmp_path, "chrY.parquet", [("test", "Y", "a")]),
+    ]
+    with duckdb.connect() as conn:
+        check_sample_union(conn=conn, paths=paths)
+
+
+def test_a_truncated_autosome_is_still_rejected_alongside_chry(tmp_path):
+    """The carve-out must not leak: Y being allowed a subset says nothing about 8"""
+    paths = [
+        _samples_parquet(tmp_path, "chr1.parquet", [("test", "1", s) for s in "abc"]),
+        _samples_parquet(tmp_path, "chr8.parquet", [("test", "8", s) for s in "ab"]),
+        _samples_parquet(tmp_path, "chrY.parquet", [("test", "Y", "a")]),
+    ]
+    with duckdb.connect() as conn, pytest.raises(ValueError, match=r"\['8'\]"):
+        check_sample_union(conn=conn, paths=paths)
+
+
+def test_a_sample_only_chry_has_is_rejected(tmp_path):
+    """Y may cover a subset of the sampleset, never more than it: a sample no other
+    chromosome holds is a truncated autosome, whichever file it was noticed in"""
+    paths = [
+        _samples_parquet(tmp_path, "chr1.parquet", [("test", "1", s) for s in "ab"]),
+        _samples_parquet(tmp_path, "chrY.parquet", [("test", "Y", s) for s in "ac"]),
+    ]
+    with duckdb.connect() as conn, pytest.raises(ValueError, match=r"\['1'\]"):
+        check_sample_union(conn=conn, paths=paths)
+
+
 def test_sparse_scoring_file_does_not_trip_the_union_check(tmp_path):
     """A chromosome whose index query returned nothing is deleted from the cache
     and runs no MATCH task, so it simply isn't here to compare against"""

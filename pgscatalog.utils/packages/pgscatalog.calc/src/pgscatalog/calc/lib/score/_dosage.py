@@ -12,6 +12,7 @@ from dask import array as da
 from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import (
     MISSING_GENOTYPE_SENTINEL_VALUE,
+    NO_ALLELE_SENTINEL_VALUE,
 )
 
 from ._impute import calculate_mean_dosage
@@ -35,7 +36,7 @@ def make_dosage_arrays(
     conn: duckdb.DuckDBPyConnection,
     n_workers: int = 1,
     n_minimum_impute: int = 50,
-) -> tuple[zarr.Array, zarr.Array]:
+) -> tuple[zarr.Array, zarr.Array, zarr.Array]:
     """
     Calculate and adjust effect allele dosage, storing dosage and missingness masks in
     Zarr arrays (disk-backed).
@@ -83,11 +84,14 @@ def make_dosage_arrays(
         dosage entries
     dosage_array : zarr.Array
         Float64 array of shape ``(n_variants, n_samples)`` storing effect allele dosages
+    ploidy_array : zarr.Array
+        Uint8 array of shape ``(n_variants, n_samples)`` holding each call's observed
+        ploidy, which is what ``allele_count`` sums
 
     Notes
     -----
-    - Dosages are imputed as ``2 * mean(effect allele frequency)`` when sufficient
-      non-missing calls are present
+    - Dosages are imputed as ``ploidy * mean(effect allele frequency)`` when
+      sufficient non-missing calls are present
     - Both arrays are created with chunking along the variant dimension,
       using ``ZARR_VARIANT_CHUNK_SIZE`` and compressed with ``ZARR_COMPRESSOR``.
     """
@@ -116,6 +120,17 @@ def make_dosage_arrays(
         compressors=config.ZARR_COMPRESSOR,
     )
 
+    # an array to record how many alleles each call actually holds, which is 2 for a
+    # diploid call and 1 for a hemizygous one (ADR 0007)
+    ploidy_array: zarr.Array = pgs_group.create_array(
+        "ploidy",
+        shape=(n_variants, n_samples),
+        dtype=np.uint8,
+        overwrite=True,
+        chunks=(config.ZARR_VARIANT_CHUNK_SIZE, n_samples),
+        compressors=config.ZARR_COMPRESSOR,
+    )
+
     # calculate dosage for this shard's genotypes (sampleset/chromosome/filename) and
     # store it in the dosage array, which holds nothing else
     write_dosage_arrays(
@@ -125,11 +140,12 @@ def make_dosage_arrays(
         n_minimum_impute=n_minimum_impute,
         dosage_array=dosage_array,
         missing_array=missing_array,
+        ploidy_array=ploidy_array,
         n_workers=n_workers,
     )
 
     # in these arrays the fill value (np.nan) has been replaced with computed values
-    return missing_array, dosage_array
+    return missing_array, dosage_array, ploidy_array
 
 
 def write_dosage_arrays(
@@ -139,6 +155,7 @@ def write_dosage_arrays(
     n_minimum_impute: int,
     dosage_array: zarr.Array,
     missing_array: zarr.Array,
+    ploidy_array: zarr.Array,
     n_workers: int = 1,
 ) -> None:
     """
@@ -158,6 +175,7 @@ def write_dosage_arrays(
         n_minimum_impute: Minimum number of samples required to impute missing dosages.
         dosage_array: Target Zarr array to store computed dosages.
         missing_array: Target Zarr array to store missingness flags.
+        ploidy_array: Target Zarr array to store each call's observed ploidy.
 
     Notes:
         The dosage_array and missing_array are initialised with np.nan. If any NaN
@@ -182,15 +200,20 @@ def write_dosage_arrays(
         target_zarr, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None, None)
     )[target_idx]
 
+    # ploidy is derived from the genotype array, never stored in the cache (ADR 0007)
+    ploidy: da.Array = da.sum(
+        sliced_gts != NO_ALLELE_SENTINEL_VALUE, axis=2, dtype=np.uint8
+    )
+
     # replace missing calls with np.nan
     missing_calls_masked: da.Array = sentinel_to_nan(sliced_gts)
 
     # calculate dosage of the effect allele
     dosage: da.Array = calculate_effect_allele_dosage(missing_calls_masked, effect_idx)
 
-    # impute missing dosage: 2 * mean effect allele frequency
+    # impute missing dosage: the call's own ploidy * mean effect allele frequency
     is_dosage_nan, filled = fill_missing_dosages(
-        dosage_array=dosage, n_minimum_samples=n_minimum_impute
+        dosage_array=dosage, ploidy_array=ploidy, n_minimum_samples=n_minimum_impute
     )
 
     # adjust dosages for recessive / dominant effect types
@@ -208,6 +231,7 @@ def write_dosage_arrays(
     dask_tasks = [
         effect_type_adjusted.to_zarr(url=dosage_array, compute=False),
         is_dosage_nan.to_zarr(url=missing_array, compute=False),
+        ploidy.to_zarr(url=ploidy_array, compute=False),
     ]
 
     with dask.config.set(scheduler="threads", num_workers=n_workers):
@@ -228,12 +252,34 @@ def write_dosage_arrays(
     logger.info("Finished calculating effect allele dosage")
 
     if is_any_nan:
+        reason = no_called_alleles_reason(dosage_array, ploidy_array)
         logger.critical(
-            "NaNs detected in dosage array or missing array after "
-            "calculating dosage. Impossible to continue PGS calculation."
+            "NaNs detected in dosage array or missing array after calculating "
+            f"dosage: some variants have no called alleles because {reason}. "
+            "Impossible to continue PGS calculation."
         )
-        raise ValueError("NaN values detected in dosage array or missing array")
+        raise ValueError(
+            "NaN values detected in dosage array or missing array: some variants "
+            f"have no called alleles because {reason}"
+        )
     logger.info("Dosage/missing arrays doesn't contain NaN values (good!)")
+
+
+def no_called_alleles_reason(dosage_array: zarr.Array, ploidy_array: zarr.Array) -> str:
+    """Why a variant had no called alleles to take an effect allele frequency from.
+
+    There are two ways to get there and they need different messages: the second is
+    biology, and reads as data corruption if you don't know that (ADR 0009).
+    """
+    nan_variants = da.any(da.isnan(da.from_zarr(dosage_array)), axis=1)
+    nobody_can_carry = da.all(da.from_zarr(ploidy_array) == 0, axis=1)
+
+    if bool(da.any(nan_variants & nobody_can_carry).compute()):
+        return (
+            "no sample can carry them (every call is nullploid, e.g. a chrY "
+            "variant in a shard of women)"
+        )
+    return "every call is missing"
 
 
 def calculate_effect_allele_dosage(
@@ -289,6 +335,11 @@ def sentinel_to_nan(target_dask: da.Array) -> da.Array:
     Genotype arrays may use a sentinel integer to represent missing values,
     which cannot be represented as NaN in integer arrays.
 
+    Only the missing-call sentinel goes down this path. The no-allele sentinel
+    must not: `calculate_effect_allele_dosage` NaNs a whole call if any of its
+    slots is NaN, so every hemizygous call would be imputed instead of scored
+    (ADR 0007). It needs no mask - no allele index equals it.
+
     Returns
     -------
     masked : dask.array.Array
@@ -304,14 +355,15 @@ def sentinel_to_nan(target_dask: da.Array) -> da.Array:
 
 def fill_missing_dosages(
     dosage_array: da.Array,
+    ploidy_array: da.Array,
     n_minimum_samples: int = 50,
 ) -> tuple[da.Array, da.Array]:
     """
     Replace missing dosages with mean effect allele dosage.
 
     Missing dosage values (NaN) are replaced with the mean effect allele dosage
-    calculated per variant, if at least `n_minimum_samples` non-missing values
-    are available. Returns both a mask of originally missing values and the
+    calculated per (variant, sample), if at least `n_minimum_samples` non-missing
+    values are available. Returns both a mask of originally missing values and the
     imputed dosage array.
 
     Parameters
@@ -319,6 +371,8 @@ def fill_missing_dosages(
     dosage_array : dask.array.Array
         2D array of effect allele dosages with shape (n_variants, n_samples).
         Missing dosages are represented as NaN.
+    ploidy_array : dask.array.Array
+        2D array of the same shape holding each call's observed ploidy (ADR 0007)
     n_minimum_samples : int, default=50
         Minimum number of non-missing samples required to compute the mean dosage
         for imputation. An exception will be raised if too few samples are present
@@ -331,7 +385,7 @@ def fill_missing_dosages(
         Boolean array of the same shape as `dosage_array` indicating which values
         were originally missing (NaN).
     filled : dask.array.Array
-        Float64 array with missing dosages replaced by the per-variant mean
+        Float64 array with missing dosages replaced by the mean for that call
     """
     is_dosage_nan = da.isnan(dosage_array)
 
@@ -345,13 +399,11 @@ def fill_missing_dosages(
 
     mean_effect_dosage: da.Array = calculate_mean_dosage(
         dosage_array=dosage_array,
+        ploidy_array=ploidy_array,
         n_minimum_samples=n_minimum_samples,
     )
 
-    # broadcast for per-row replacement
-    mean_dosage = mean_effect_dosage[:, np.newaxis]
-
-    filled: da.Array = da.where(is_dosage_nan, mean_dosage, dosage_array)
+    filled: da.Array = da.where(is_dosage_nan, mean_effect_dosage, dosage_array)
 
     return is_dosage_nan, filled
 
