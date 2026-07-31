@@ -4,12 +4,7 @@ Open work only. A ticket is deleted when it lands — the commit that closes it 
 
 Derived from ADRs 0001, 0003, 0004. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
 
-| # | Ticket | Depends on |
-|---|---|---|
-| 0010 | [Match rate quantisation](0010-match-rate-quantisation.md) | — |
-| 0011 | [`match_flipped` always zero](0011-match-flipped-always-zero.md) | — |
-
-Both are pre-existing match log bugs, found while splitting MATCH_COMBINE out. Both were left alone there because fixing them changes match log output, which would have invalidated that work's "logs match today's output" acceptance criterion. They are independent of each other.
+None. The two match log bugs found while splitting MATCH_COMBINE out (0010, 0011) are fixed — they were left alone at the time because fixing them changes match log output, which would have invalidated that work's "logs match today's output" acceptance criterion.
 
 ## Not in this repo
 
