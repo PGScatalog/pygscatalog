@@ -13,6 +13,7 @@ import zarr.errors
 import zarr.storage
 from zarr.core.group import GroupMetadata
 
+from pgscatalog.calc.lib.constants import VALID_CHROMOSOMES, canonicalise_chrom
 from pgscatalog.calc.lib.scorefile import get_position_df
 
 from ._genomefilehandlers import GenomeFileHandler, get_file_handler
@@ -45,7 +46,8 @@ class TargetGenome:
         self._target_path = target_path
         self._cache_dir = pathlib.Path(cache_dir).resolve()
         self._sampleset = sampleset
-        self._chrom = chrom
+        # canonical names are baked into the leaf path (ADR 0008)
+        self._chrom = canonicalise_chrom(chrom)
         self._threads = threads
         self._handler: GenomeFileHandler = get_file_handler(
             path=target_path,
@@ -151,7 +153,7 @@ class TargetGenome:
         """Query an indexed target genome and store variants in a zarr array"""
         logger.info(f"{len(positions)} positions requested")
 
-        # no support for X / XY / Y / patches yet
+        # no support for Y / MT / patches yet
         # drop them here but keep them in scoring files to correctly calculate overlap
         with duckdb.connect() as conn:
             cached = self.cached_positions
@@ -162,7 +164,7 @@ class TargetGenome:
             )
             logger.info(f"{query.shape[0]} rows to query")
 
-            missing: list[tuple[str, int]] = conn.sql("""
+            missing: list[tuple[str, int]] = conn.sql(f"""
                 WITH cached AS (SELECT * FROM cached),
                     queries AS (SELECT * FROM query),
                     missing AS (SELECT * FROM queries
@@ -170,10 +172,7 @@ class TargetGenome:
                         USING (chr_name, chr_pos))
                 SELECT chr_name, chr_pos
                 FROM missing
-                WHERE chr_name IN (
-                    SELECT CAST(i AS VARCHAR)
-                    FROM UNNEST(range(1, 23)) AS t(i)
-                )
+                WHERE chr_name IN {list(VALID_CHROMOSOMES - {None})}
                 ORDER BY (chr_name, chr_pos);
             """).fetchall()
             logger.info(f"{len(missing)} rows missing from cache")

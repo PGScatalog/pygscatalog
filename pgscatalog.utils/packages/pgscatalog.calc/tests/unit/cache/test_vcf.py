@@ -1,8 +1,8 @@
 import numpy as np
-import pysam
 import pytest
 
 from pgscatalog.calc.lib.cache._vcf import (
+    region_sort_key,
     vcf_buffer_variants,
     vcf_get_sample_list,
 )
@@ -11,6 +11,7 @@ from pgscatalog.calc.lib.cache.targetvariants import (
 )
 from pgscatalog.calc.lib.constants import (
     MISSING_GENOTYPE_TUPLE,
+    NO_ALLELE_SENTINEL_VALUE,
 )
 
 
@@ -18,6 +19,19 @@ from pgscatalog.calc.lib.constants import (
 def test_positions() -> list[tuple[str, int]]:
     """Some positions in tiny1000G"""
     return [("8", 116938529), ("1", 44465567), ("10", 97611390)]
+
+
+def test_region_sort_key_accepts_non_numeric_chromosomes():
+    """int("X") raised, so nothing downstream could run on a non-autosome"""
+    regions = [("X", 2, 2), ("10", 1, 1), ("MT", 1, 1), ("2", 9, 9), ("2", 1, 1)]
+
+    assert sorted(regions, key=region_sort_key) == [
+        ("2", 1, 1),
+        ("2", 9, 9),
+        ("10", 1, 1),
+        ("MT", 1, 1),
+        ("X", 2, 2),
+    ]
 
 
 # Test 1: vcf_get_sample_list
@@ -94,17 +108,39 @@ def test_vcf_buffer_variants_with_missing(
     assert np.all(missing_gts == MISSING_GENOTYPE_TUPLE)
 
 
-# Test 2.3: with X/Y haploid genotypes
-def test_vcf_buffer_sex_variants(
-    x_y_variants, vcf_path, vcf_index_path, tmp_path_factory, sampleset_name
+# Test 2.3: with haploid chrX genotypes
+def test_vcf_buffer_x_variants(
+    x_variants, vcf_path, vcf_index_path, tmp_path_factory, sampleset_name
 ):
-    """Haploid genotypes will cause this function to throw NotImplementedErrors"""
+    """Ploidy is read from the length of the GT field (ADR 0007).
+
+    1000G writes a man's non-pseudoautosomal X call as `1`, not `1/1`, so the
+    fixture holds 1599 hemizygous calls and 1603 diploid ones at every variant.
+    Before this the array was built with `np.fromiter(..., dtype=(np.uint8, 2))`,
+    which broadcasts `(1,)` to `[1, 1]` and quietly doubles every man's dosage.
+    """
     cache_dir = tmp_path_factory.mktemp("cache")
-    with pytest.raises(pysam.SamtoolsError):
-        _ = vcf_buffer_variants(
-            position_batch=x_y_variants,
-            target_path=vcf_path,
-            index_path=vcf_index_path,
-            cache_dir=cache_dir,
-            sampleset=sampleset_name,
-        )
+    variants = vcf_buffer_variants(
+        position_batch=x_variants,
+        target_path=vcf_path,
+        index_path=vcf_index_path,
+        cache_dir=cache_dir,
+        sampleset=sampleset_name,
+    )
+
+    assert set(variants.variant_metadata.chr_name) == {"X"}
+
+    ploidy = np.sum(variants.genotypes != NO_ALLELE_SENTINEL_VALUE, axis=2)
+    called = variants.genotypes[ploidy == 1]
+
+    # a hemizygous call keeps its one allele: nothing was duplicated into the
+    # slot the sample doesn't have
+    assert np.all(np.isin(called[:, 0], [0, 1]))
+    assert np.all(called[:, 1] == NO_ALLELE_SENTINEL_VALUE)
+
+    # every variant the target actually holds is called in the same mixture of
+    # men and women, which is why ploidy is a property of a call
+    genotyped = [ref is not None for ref in variants.variant_metadata.ref]
+    assert {tuple(np.bincount(row, minlength=3)[1:]) for row in ploidy[genotyped]} == {
+        (1599, 1603)
+    }

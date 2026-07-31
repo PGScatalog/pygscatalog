@@ -9,7 +9,8 @@ This module defines a lightweight container of variant information, including:
 - alternate allele
 
 Genotypes are stored in numpy unsigned 8-bit integer arrays (values between 0 - 255).
-Valid genotype values include 0, 1, and a sentinel value to represent missing data.
+Valid genotype values include 0, 1, a sentinel value to represent missing data, and a
+sentinel value for an allele slot the call doesn't have (a hemizygous call).
 
 The class exposes accessors for:
 
@@ -34,7 +35,10 @@ import zarr
 import zarr.errors
 
 from pgscatalog.calc.lib.config import config
-from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
+from pgscatalog.calc.lib.constants import (
+    MISSING_GENOTYPE_SENTINEL_VALUE,
+    NO_ALLELE_SENTINEL_VALUE,
+)
 
 from .genotypecache import meta_group_path
 from .zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
@@ -79,7 +83,10 @@ class TargetVariants:
 
         # check that the genotypes look sensible
         if not np.all(
-            np.isin(self._genotypes, [0, 1, MISSING_GENOTYPE_SENTINEL_VALUE])
+            np.isin(
+                self._genotypes,
+                [0, 1, MISSING_GENOTYPE_SENTINEL_VALUE, NO_ALLELE_SENTINEL_VALUE],
+            )
         ):
             raise ValueError("Genotypes contain invalid values")
 
@@ -249,6 +256,28 @@ class TargetVariants:
             )
 
 
+def collapse_mt_calls(
+    gts: npt.NDArray[np.uint8], pos: int, target_path: Pathish
+) -> None:
+    """Collapse diploid-coded MT calls to hemizygous, mutating in place.
+
+    MT is the one place ploidy isn't observed from the file (ADR 0007). Callers
+    write the same homoplasmic variant as `1` or as `1/1`, so honouring the file
+    would let a formatting convention change a score. `0/0` and `1/1` collapse
+    unambiguously; a call whose two alleles disagree does not.
+    """
+    diploid = gts[:, 1] != NO_ALLELE_SENTINEL_VALUE
+    if np.any(diploid & (gts[:, 0] != gts[:, 1])):
+        raise ValueError(
+            f"Heterozygous MT call at MT:{pos} in {target_path}. A diploid-coded MT "
+            "call collapses to hemizygous only when both alleles agree (`0/0`, "
+            "`1/1`); alleles that disagree are heteroplasmy, a within-sample "
+            "mixture with no defined dosage in a weighted sum, so this pipeline "
+            "refuses it rather than inventing one (ADR 0007)"
+        )
+    gts[diploid, 1] = NO_ALLELE_SENTINEL_VALUE
+
+
 def add_missing_positions_to_lists(
     *,
     chroms: list[str],
@@ -261,7 +290,10 @@ def add_missing_positions_to_lists(
     n_samples: int,
 ) -> None:
     """Mutates lists in place!"""
-    # represent missing genotypes with a sentinel value of the same shape
+    # represent missing genotypes with a sentinel value of the same shape. These rows
+    # are diploid-shaped on a haploid chromosome, which is harmless: they carry no
+    # alleles, and a padded position has no REF so it never becomes a match candidate
+    # (see update_match_table), so nothing downstream ever reads their ploidy
     missing_gts = np.full(
         shape=(n_samples, 2),
         fill_value=MISSING_GENOTYPE_SENTINEL_VALUE,

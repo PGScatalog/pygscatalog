@@ -73,6 +73,24 @@ def tiny_is_missing_zarr(tiny_is_missing_matrix):
 
 
 @pytest.fixture
+def tiny_ploidy_zarr(tiny_dosage_matrix):
+    """Everyone is diploid at every variant, like an autosome"""
+    store = zarr.storage.MemoryStore()
+    return zarr.create_array(
+        store=store, data=np.full(tiny_dosage_matrix.shape, 2, dtype=np.uint8)
+    )
+
+
+@pytest.fixture
+def tiny_hemizygous_ploidy_zarr(tiny_dosage_matrix):
+    """sample1 is hemizygous at every variant, the other two are diploid"""
+    ploidy = np.full(tiny_dosage_matrix.shape, 2, dtype=np.uint8)
+    ploidy[:, 0] = 1
+    store = zarr.storage.MemoryStore()
+    return zarr.create_array(store=store, data=ploidy)
+
+
+@pytest.fixture
 def tiny_sample_ids() -> list[str]:
     return ["sample1", "sample2", "sample3"]
 
@@ -207,6 +225,23 @@ def test_create_score_table():
     ]
 
 
+def test_an_average_over_no_alleles_is_null():
+    """A woman carries nothing at a chrY-only accession, so her average weighted
+    score is undefined rather than zero (ADR 0007)"""
+    with duckdb.connect(":memory:") as conn:
+        create_score_table(conn)
+        conn.sql("""
+        INSERT INTO score_table
+        VALUES ('test', 'PGS000001', 10, 'a', 0, 0.0, 0.0),
+               ('test', 'PGS000001', 10, 'b', 2, 1.0, 1.0)
+        """)
+        avg = conn.sql(
+            "SELECT score_avg FROM score_table ORDER BY sample_id"
+        ).fetchall()
+
+    assert avg == [(None,), (0.5,)]
+
+
 def test_tiny_calculate_effect_allele_dosage(tiny_dosage_zarr):
     """
     PGS000001
@@ -234,7 +269,7 @@ def test_tiny_calculate_effect_allele_dosage(tiny_dosage_zarr):
     assert np.array_equal(result, expected)
 
 
-def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missing_zarr):
+def test_calculate_nonmissing_allele_count_tiny(tiny_ploidy_zarr, tiny_is_missing_zarr):
     """
     missing:
     v0: [0, 1, np.na]
@@ -254,7 +289,7 @@ def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missin
 
     result = calculate_nonmissing_allele_count(
         is_missing_array=tiny_is_missing_zarr,
-        dosage_array=tiny_dosage_zarr,
+        ploidy_array=tiny_ploidy_zarr,
         accession_idx=accession_idx,
     )
 
@@ -262,9 +297,26 @@ def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missin
     assert np.array_equal(result, expected)
 
 
+def test_hemizygous_samples_count_one_allele_per_variant(
+    tiny_hemizygous_ploidy_zarr, tiny_is_missing_zarr
+):
+    """A sample's allele count follows its own ploidy, not its matched variant
+    count doubled (ADR 0007). sample1 has two non-missing calls here, so it
+    carries 2 alleles where a diploid sample carries 4.
+    """
+    result = calculate_nonmissing_allele_count(
+        is_missing_array=tiny_is_missing_zarr,
+        ploidy_array=tiny_hemizygous_ploidy_zarr,
+        accession_idx=np.array([0, 1, 2], dtype=np.int64),
+    )
+
+    assert np.array_equal(result, np.array([2, 4, 4], dtype=np.int64))
+
+
 def test_calculate_score_statistics_tiny(
     tiny_dosage_zarr,
     tiny_is_missing_zarr,
+    tiny_ploidy_zarr,
     tiny_sample_ids,
 ):
     # an in-memory connection is enough, so this test needs no database on disk
@@ -347,6 +399,7 @@ def test_calculate_score_statistics_tiny(
         accessions=accessions,
         dosage_array=tiny_dosage_zarr,
         is_missing_array=tiny_is_missing_zarr,
+        ploidy_array=tiny_ploidy_zarr,
         sampleset="test",
         score=scores,
         sample_ids=tiny_sample_ids,

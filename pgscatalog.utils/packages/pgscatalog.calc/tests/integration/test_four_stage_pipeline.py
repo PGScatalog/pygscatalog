@@ -48,8 +48,30 @@ def _assert_matches_golden(scores: pl.DataFrame, golden: pl.DataFrame) -> None:
 
 
 def test_unsplit_input(unsplit_target, scorefile, golden_scores, tmp_path, monkeypatch):
-    """Whole-genome input: one chromosome group (ALL), one shard"""
+    """Whole-genome input: one chromosome group (ALL), one shard.
+
+    One shard means one dot product in the same order the golden file was
+    generated with, so this shape compares exactly rather than approximately -
+    which is what pins autosomal scores while haploid support is added around
+    them (ADR 0007).
+    """
     scores = run_pipeline([unsplit_target], tmp_path, scorefile, monkeypatch)
+    _assert_matches_golden(scores, golden_scores)
+
+    scores, golden = scores.sort(KEY), golden_scores.sort(KEY)
+    for column in ("score", "dosage_sum", "score_avg"):
+        assert scores[column].to_list() == golden[column].to_list(), column
+
+
+def test_chr_prefixed_input(
+    chr_prefixed_target, scorefile, golden_scores, tmp_path, monkeypatch
+):
+    """A chr-prefixed VCF scores identically to an unprefixed one over the same data.
+
+    The VCF reader normalised nothing, so `bcftools view -R 1` returned no regions
+    and every variant was reported unmatched rather than failing (ADR 0008).
+    """
+    scores = run_pipeline([chr_prefixed_target], tmp_path, scorefile, monkeypatch)
     _assert_matches_golden(scores, golden_scores)
 
 

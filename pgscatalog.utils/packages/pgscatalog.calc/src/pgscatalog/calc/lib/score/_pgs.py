@@ -10,7 +10,6 @@ from dask import array as da
 from numpy import typing as npt
 
 from pgscatalog.calc.lib.config import config
-from pgscatalog.calc.lib.constants import ZARR_PLOIDY
 
 if TYPE_CHECKING:
     import duckdb
@@ -33,7 +32,6 @@ def create_score_table(conn: duckdb.DuckDBPyConnection) -> None:
         A writable connection to the score database
     """
     logger.info("Creating or replacing score table")
-    # allele_count * 2 will break when X / Y / MT added
     conn.sql("""
     CREATE OR REPLACE TABLE score_table (
         sampleset TEXT NOT NULL,
@@ -43,7 +41,9 @@ def create_score_table(conn: duckdb.DuckDBPyConnection) -> None:
         allele_count UINTEGER NOT NULL,
         score DOUBLE NOT NULL,
         dosage_sum DOUBLE NOT NULL,
-        score_avg GENERATED ALWAYS AS (score / allele_count) VIRTUAL,
+        -- a sample can carry no alleles at all for an accession (a woman and a
+        -- chrY-only score), and an average over nothing is undefined, not zero
+        score_avg GENERATED ALWAYS AS (score / NULLIF(allele_count, 0)) VIRTUAL,
         PRIMARY KEY (accession, sampleset, sample_id)
     );
     """)
@@ -160,6 +160,7 @@ def calculate_score_statistics(
     accessions: list[str],
     dosage_array: zarr.Array,
     is_missing_array: zarr.Array,
+    ploidy_array: zarr.Array,
     sampleset: str,
     score: npt.NDArray[np.float64],
     sample_ids: list[str],
@@ -172,7 +173,8 @@ def calculate_score_statistics(
       - Retrieves the number of matched variants from the allele match table
       - Selects variants with non-zero effect weights for that accession
       - Computes the sum of effect allele dosages across variants (per sample)
-      - Computes the number of non-missing calls across variants (per sample)
+      - Computes the number of alleles carried at non-missing calls (per sample),
+        which depends on each sample's own ploidy (ADR 0007)
 
     Parameters
     ----------
@@ -191,7 +193,7 @@ def calculate_score_statistics(
         DataFrame with the following columns:
           - accession: score identifier
           - dosage_sum: sum of effect allele dosages
-          - allele_count: number of variant sites with non-missing calls
+          - allele_count: number of alleles carried at non-missing calls
           - n_matched: number of matched variants (constant per accession)
           - sample_id: sample identifier
           - score: weighted sum of effect allele dosages
@@ -249,7 +251,7 @@ def calculate_score_statistics(
         )
         allele_count = calculate_nonmissing_allele_count(
             is_missing_array=is_missing_array,
-            dosage_array=dosage_array,
+            ploidy_array=ploidy_array,
             accession_idx=accession_idx,
         )
 
@@ -284,23 +286,22 @@ def calculate_effect_allele_dosage(
 
 def calculate_nonmissing_allele_count(
     is_missing_array: zarr.Array,
-    dosage_array: zarr.Array,
+    ploidy_array: zarr.Array,
     accession_idx: npt.NDArray[np.int64],
 ) -> npt.NDArray[np.int64]:
-    dosage_dask: da.Array = da.from_zarr(
-        dosage_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
+    ploidy_dask: da.Array = da.from_zarr(
+        ploidy_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
     )
     missing_dask: da.Array = da.from_zarr(
         is_missing_array, chunks=(config.ZARR_VARIANT_CHUNK_SIZE, None)
     )
 
-    # missing variants will have been imputed, so replace these positions with np.nan
-    missing_variants = da.where(~missing_dask, dosage_dask, np.nan)
+    # missing variants will have been imputed, so they count no alleles
+    counted_alleles = da.where(missing_dask, 0, ploidy_dask)
 
-    # return a per-sample sum of non-missing allele count in this accession
-    # think about X / Y / MT here too
+    # return a per-sample sum of non-missing allele count in this accession. A
+    # hemizygous sample carries one allele at this variant, not two (ADR 0007)
     per_sample_allele_count: npt.NDArray[np.int64] = (
-        da.sum(~da.isnan(missing_variants[accession_idx,]), axis=0).compute()
-        * ZARR_PLOIDY
+        da.sum(counted_alleles[accession_idx,], axis=0).astype(np.int64).compute()
     )
     return per_sample_allele_count

@@ -162,9 +162,10 @@ def positions_PGS003162():
 
 
 @pytest.fixture
-def x_y_variants(pgs001229):
+def x_variants(pgs001229):
+    """chrX scoring positions, where a man's call is hemizygous"""
     positions = Scorefiles(pgs001229).get_unique_positions()
-    return list(filter(lambda x: x[0] in {"X", "Y"}, positions))
+    return list(filter(lambda x: x[0] == "X", positions))
 
 
 @pytest.fixture
