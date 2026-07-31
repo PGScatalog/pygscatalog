@@ -34,7 +34,7 @@ A chromosome-level MATCH also has the whole chromosome in view, so the invariant
 - leaf-path uniqueness — samplesheet validation, before any work
 - per-chromosome sample disjointness — MATCH
 - ragged batches under `unobserved` semantics — MATCH (see [ADR 0004](0004-absence-semantics-is-declared.md))
-- cross-chromosome equality of the sample union — MATCH_COMBINE
+- cross-chromosome equality of the sample union — MATCH_COMBINE (relaxed to a subset for chrY by [ADR 0007](0007-ploidy-is-observed-per-call.md): Y is the only chromosome a person can wholly lack, so a male-only chrY leaf is legitimate)
 
 These are scoped to chromosomes **present in the cache**, not chromosomes named in the samplesheet: `cleanup_empty_zarr_group` deletes a group whose index query returned nothing, which happens legitimately whenever the scoring files cover no variants on a chromosome.
 
@@ -42,7 +42,9 @@ Batches are **emergent, not modelled**: a batch is simply one of the files under
 
 For alpha2 the sample axis is supported **only for rectangular batches** (every leaf under a chromosome holding the same variants). Ragged batches require homozygous-reference absence semantics, which is out of scope — see [ADR 0004](0004-absence-semantics-is-declared.md).
 
-Score combination is unchanged from ADR 0002: union each shard's `score_table` and reduce with `GROUP BY (sampleset, accession, sample_id)` and `SUM`. ADR 0002 justified this as "correct because every shard shares the same samples", which is narrower than the reduction actually is. The real invariant is that **every `(sample, variant)` pair appears in exactly one leaf**. Variant-axis shards contribute disjoint variants for a shared sample; sample-axis shards contribute disjoint samples. The reduction is agnostic to the shape of the tree, which is why SCORE_COMBINE needs no change to support batching.
+Score combination is unchanged from ADR 0002: union each shard's `score_table` and reduce with `GROUP BY (sampleset, accession, sample_id)` and `SUM`. ADR 0002 justified this as "correct because every shard shares the same samples", which is narrower than the reduction actually is. The real invariant is that **every `(sample, variant)` pair appears in at most one leaf**. Variant-axis shards contribute disjoint variants for a shared sample; sample-axis shards contribute disjoint samples. The reduction is agnostic to the shape of the tree, which is why SCORE_COMBINE needs no change to support batching.
+
+(This originally read "exactly one leaf". [ADR 0007](0007-ploidy-is-observed-per-call.md) weakened it: a woman and a chrY variant are a pair that appears in *no* leaf. The reduction was always this tolerant — she simply receives no chrY contribution and a correspondingly smaller `allele_count` — so only the wording was too strong.)
 
 ## Consequences
 
