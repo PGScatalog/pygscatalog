@@ -139,25 +139,6 @@ def DummyDosgaes_TwoPop(n_variants=10000, fraction_mafdiff=0.025,
 
 dd_ref, dd_target = DummyDosgaes_TwoPop()
 
-def standardize(X, mean=None, std=None):
-    assert np.issubdtype(X.dtype, np.floating)
-    p, n = X.shape
-    is_miss = np.isnan(X)
-    if (mean is None) or (std is None):
-        mean = np.zeros(p)
-        std = np.zeros(p)
-        for i in range(p):
-            row_nomiss = X[i,:][~is_miss[i,:]]
-            mean[i] = np.mean(row_nomiss)
-            std[i] = np.std(row_nomiss)
-        std[std == 0] = 1
-    mean = mean.reshape((-1, 1))
-    std = std.reshape((-1, 1))
-    X_std = (X - mean) / std
-    X_std[is_miss] = 0
-    return X_std, mean, std
-
-
 def svd_eigcov(XTX):
     ssq, V = np.linalg.eigh(XTX)
     V = np.squeeze(V)
@@ -273,62 +254,6 @@ def oadp(U, s, V, b, dim_ref=4, dim_stu=None, dim_online=None):
 
 
 
-
-def source_fraposa_pca(genotypes_ref: np.array, genotypes_target= None, dim_ref=10, method='oadp', dim_stu=None, dim_online=None):
-    # Setup the number of PCs we want to compute for difference methods
-    # Setup dimension requirements
-    assert method in ["oadp", "sp"]
-    if method == "oadp":
-        if dim_stu is None:
-            dim_stu = dim_ref * 2
-        assert dim_ref <= dim_stu
-
-        if dim_online is None:
-            dim_online = dim_stu * 2
-        assert dim_stu <= dim_online
-
-    # PCA: reference data
-    X, X_mean, X_std = standardize(genotypes_ref.astype(np.float64))
-    if method == 'oadp':
-        s, V = eig_ref(X)[:2]
-        V = V[:, :dim_online]
-        U = X @ (V / s[:dim_online])
-    elif method == 'sp':
-        s, V = eig_ref(X)[:2]
-        V = V[:, :dim_ref]
-        U = X @ (V / s[:dim_ref])
-    elif method == 'adp':
-        s, V, XTX = eig_ref(X)
-        V = V[:, :dim_ref]
-
-    print('PCA of REFERENCE samples...')
-    pcs_ref = V[:, :dim_ref] * s[:dim_ref]
-
-    # Process target samples
-    if (genotypes_target is not None) and (type(genotypes_target) in [np.ndarray, da.Array]):
-        print('Processing target samples...')
-        # ToDo ensure alignment of variants between reference and target
-        W = genotypes_target.astype(np.float64)
-        p_ref = len(X_mean)
-        p_stu, n_stu = W.shape
-        pcs_stu = np.zeros((n_stu, dim_ref))
-
-        for i in range(n_stu):
-            w = W[:, i].astype(np.float64).reshape((-1, 1))
-            w, _, _ = standardize(w, X_mean, X_std)
-            if method == 'oadp':
-                pcs_stu[i, :] = oadp(U, s, V, w, dim_ref, dim_stu, dim_online)
-            if method == 'sp':
-                pcs_stu[i, :] = w.T @ U[:, :dim_ref]
-        del W
-        return pcs_ref, pcs_stu
-    else:
-        return pcs_ref
-
-#pca_fraposa = source_fraposa_pca(genotypes_ref=dd_ref[1])
-pca_fraposa_ref, pca_fraposa_target = source_fraposa_pca(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='sp')
-_, oadp_fraposa_target = source_fraposa_pca(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp')
-#np.savetxt('test_pca.txt', r_pca)
 
 
 def standardize_dask(X, mean=None, std=None):
@@ -458,4 +383,3 @@ def fraposa_dask(
 
 pca_dask_ref, pca_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='sp')
 oadp_dask_ref, oadp_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp')
-_, oadp2_dask_target = fraposa_dask(genotypes_ref=dd_ref[1], genotypes_target=dd_target[1], method='oadp2')
