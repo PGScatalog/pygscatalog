@@ -1,52 +1,48 @@
-import polars as pl
 import numpy as np
 from scipy.sparse import csr_array
 from dask import array as da
+import duckdb
 
+# MakeLDmat.sh : Generate per-chromsome LD matricies (with MAF information) on QC'd SNPs from reference panel
+# Read in the LD matricies and MAF information and merge into a single database for use in PCA analysis
+def CreateLDdb(pathprefix, output:str):
+    """Function to merge plink LD outputs from the reference panel into a single database for use in PCA analysis.
+    Assumes that the LD matricies and LD are from unrelated individuals."""
 
-# Generate per-chromsome LD matricies (with MAF information) on QC'd SNPs from reference panel
+    con = duckdb.connect(output)
 
-# 1. PER CHROMOSOME SELECT variants to be included in PCA:
-# Choose variants that are matched (and have MAF information in the reference panel)
-ld_pairs = pl.read_csv('./test_ancestry/reference/ld_ref_21.vcor.zst',
-                       separator='\t',
-                       new_columns=["ID_A", "ID_B",
-                                    "UNPHASED_R2"])  # ToDo make the LD reading lazy so that it doesn't read variants that will just be filtered
-n_vars = 10000
-matched_var_maf = pl.DataFrame(
-    {"ID": ld_pairs['ID_B'].unique().sample(n_vars), "MAF": np.random.uniform(0, 0.5, size=n_vars)}).with_row_index(
-    name="index")
-
-# Filter LD matrix to matched variants
-ld_pairs_filt = ld_pairs.filter(pl.col("ID_A").is_in(matched_var_maf['ID']),
-                                pl.col("ID_B").is_in(matched_var_maf['ID']))
-ld_pairs_filt = (
-    ld_pairs_filt
-    # Join on ID_A to get the index for variant A
-    .join(
-        matched_var_maf.select(["index", "ID"]),
-        left_on="ID_A",
-        right_on="ID",
-        how="left"
+    ld_pairs = con.read_csv(
+        pathprefix + '*.vcor.zst',
+        sep='\t',
+        header=True, names=["ID_A", "ID_B", "UNPHASED_R2"]
     )
-    .rename({"index": "idx_A"})
-    # Join on ID_B to get the index for variant B
-    .join(
-        matched_var_maf.select(["index", "ID"]),
-        left_on="ID_B",
-        right_on="ID",
-        how="left"
+
+    ld_freq = con.read_csv(
+        pathprefix + '*.afreq.zst',
+        sep='\t',
+        header=True, names=["CHROM", "ID", "REF", "ALT", "ALT_FREQS"]
     )
-    .rename({"index": "idx_B"})
-    # Select and reorder columns as needed
-    .select(["idx_A", "idx_B", "UNPHASED_R2"])
-)
+    ld_freq = ld_freq.select("""
+        "CHROM",
+        ID,
+        LEAST(ALT_FREQS, 1.0 - ALT_FREQS) AS MAF,
+        CASE 
+            WHEN ALT_FREQS <= 0.5 THEN ALT 
+            ELSE REF 
+        END AS MINOR_ALLELE
+    """)
 
-# Convert to sparse LD matrix (symmetric)
-ld_matrix = csr_array((ld_pairs_filt["UNPHASED_R2"], (ld_pairs_filt["idx_A"], ld_pairs_filt["idx_B"])),
-                      shape=(n_vars, n_vars))
-ld_matrix = ld_matrix + ld_matrix.T
+    con.execute("CREATE OR REPLACE TABLE ld_pairs AS SELECT * FROM ld_pairs")
+    con.execute("CREATE OR REPLACE TABLE ld_freq AS SELECT * FROM ld_freq")
+    con.close()
 
+CreateLDdb('/Users/sl925/projects/calculator/pygscatalog/test_ancestry/reference/ldref_38_', 'GRCh38_ref_ld.db')
+CreateLDdb('/Users/sl925/projects/calculator/pygscatalog/test_ancestry/reference/ldref_37_', 'GRCh37_ref_ld.db')
+
+# Example PCA analysis
+ld_db = duckdb.connect('GRCh38_ref_ld.db') # Load LD db
+
+matched_vars = ld_db.execute("""SELECT * FROM ld_freq ORDER BY RANDOM() LIMIT 500000""").fetch_df() # these should be the real matched vairiants (ref v. target)
 
 # LD thin the matrix
 def ld_thinning_maf_ordered(r2_matrix: csr_array, mafs: np.ndarray, r2_threshold: float = 0.2) -> np.ndarray:
@@ -78,9 +74,35 @@ def ld_thinning_maf_ordered(r2_matrix: csr_array, mafs: np.ndarray, r2_threshold
     return keep_mask
 
 
-var_mask = ld_thinning_maf_ordered(ld_matrix, mafs=matched_var_maf['MAF'], r2_threshold=0.2)
-thinned_matrix = ld_matrix[var_mask, :][:, var_mask]
-selected_var_maf = matched_var_maf.filter(var_mask)
+# 1. PER CHROMOSOME SELECT variants to be included in PCA:
+vars_pca = list()
+for chrom, maf_chrom in matched_vars.groupby('CHROM'):
+    maf_chrom = maf_chrom.reset_index(drop=True).reset_index(names='IDX')
+
+    chrom_query = """
+        SELECT 
+            p.*, 
+            a.IDX AS IDX_A, 
+            b.IDX AS IDX_B
+        FROM ld_pairs p
+        JOIN maf_chrom a ON p.ID_A = a.ID
+        JOIN maf_chrom b ON p.ID_B = b.ID
+        """
+
+    ld_chrom = ld_db.execute(chrom_query).fetch_df()
+
+    # Convert to sparse LD matrix (symmetric)
+    ld_matrix = csr_array((ld_chrom["UNPHASED_R2"], (ld_chrom["IDX_A"], ld_chrom["IDX_B"])),
+                          shape=(maf_chrom.shape[0], maf_chrom.shape[0]))
+    ld_matrix = ld_matrix + ld_matrix.T
+
+    var_mask = ld_thinning_maf_ordered(ld_matrix, mafs=maf_chrom.MAF, r2_threshold=0.2)
+    # thinned_matrix = ld_matrix[var_mask, :][:, var_mask]
+    selected_var_maf = maf_chrom.loc[var_mask]
+    vars_pca += list(selected_var_maf.ID)
+    # print(chrom, selected_var_maf.shape[0], maf_chrom.shape[0])
+
+
 
 # 2. Assemble dosage array for the REFERENCE dataset and TARGET
 
