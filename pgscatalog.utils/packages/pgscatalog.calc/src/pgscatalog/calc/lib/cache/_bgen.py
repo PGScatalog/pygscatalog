@@ -34,8 +34,9 @@ Notes:
 
     Only SNP variants are supported, non-SNPs are ignored
     Missing genotypes are represented by a sentinel value defined in constants.py
-    Multiallelic variants are not yet supported but internal data structures expect
-    a list of alternate alleles
+    Multiallelic variants are refused, not skipped: a bgen holding one at a scoring
+    file position fails to load (ADR 0010). Internal data structures still expect a
+    list of alternate alleles, because VCF input does support them
 """
 
 from __future__ import annotations
@@ -250,8 +251,6 @@ def parse_target_variants(
     bgen_sample_path: Pathish,
     scoring_file_regions: list[tuple[str, int]],
     sampleset: str,
-    skip_multiallelic: bool = True,
-    ref_first: bool = True,
 ) -> TargetVariants:
     seen_positions = set()
     start = time.perf_counter()
@@ -279,12 +278,19 @@ def parse_target_variants(
                 logger.info(f"Skipping non-SNP {variant.alleles=}")
                 continue
 
-            is_multiallelic = len(variant.alleles) > 2
-            if is_multiallelic and skip_multiallelic:
-                logger.info(f"Skipping multiallelic variant {variant=}")
-                continue
-            if is_multiallelic and not skip_multiallelic:
-                raise NotImplementedError("Can't handle multiallelic variants")
+            if len(variant.alleles) > 2:
+                # skipping would pad the position as absent and log it as an
+                # ordinary unmatched variant, telling the user a variant wasn't
+                # found when it was found and discarded (ADR 0010)
+                raise NotImplementedError(
+                    f"Multiallelic variant {variant.rsid} (varid {variant.varid}, "
+                    f"alleles {variant.alleles}) at {variant.chrom}:{variant.pos} "
+                    f"in {target_path} can't be scored from a bgen: genotype "
+                    "probabilities for more than two alleles aren't decoded "
+                    "(ADR 0010). Convert the target to VCF, which does support "
+                    "multiallelic records, or split the record upstream with "
+                    "bcftools norm -m -any and re-impute."
+                )
 
             # the cache stores canonical names only (ADR 0008)
             fetched_chrom = canonicalise_chrom(variant.chrom)
@@ -294,9 +300,11 @@ def parse_target_variants(
                     f"so chromosome {fetched_chrom} can't be read from it (ADR 0007)"
                 )
             fetched_pos = variant.pos
-            ref: str = variant.alleles[0] if ref_first else variant.alleles[1]
-            # store as a list for future multiallelic support
-            alt: list[str] = [variant.alleles[1]] if ref_first else [variant.alleles[0]]
+            # bgen_to_hardcall returns argmax indices in the bgen's own allele
+            # order, so REF is allele 0 and nothing may relabel it (ADR 0010)
+            ref: str = variant.alleles[0]
+            # store as a list because the cache holds a list of alternate alleles
+            alt: list[str] = [variant.alleles[1]]
             seen_positions.add((fetched_chrom, fetched_pos))
 
             # convert probabilities to uint8 genotypes ASAP
@@ -353,8 +361,6 @@ def bgen_buffer_variants(
     sampleset: str,
     idx_path: Pathish,
     target_chroms: list[str],
-    skip_multiallelic: bool = True,
-    ref_first: bool = True,
 ) -> TargetVariants:
     if shutil.which("bgenix") is None:
         raise FileNotFoundError("Error: bgenix program not found in PATH")
@@ -397,8 +403,6 @@ def bgen_buffer_variants(
         return parse_target_variants(
             buffered_path=buffered_bgen_path,
             scoring_file_regions=position_batch,
-            skip_multiallelic=skip_multiallelic,
-            ref_first=ref_first,
             bgen_sample_path=sample_path,
             target_path=target_path,
             sampleset=sampleset,
