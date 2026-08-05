@@ -5,69 +5,55 @@ from pgscatalog.calc.lib.score._matchvariants import (
     MatchPriority,
     MatchResult,
     _setup_enums,
+    check_nucleotide_allele,
     classify_match,
     create_allele_match_table,
     exclude_match_collisions,
     get_variant_match_priority,
-    is_biallelic_variant_ambiguous,
     match_variant,
     update_match_table,
 )
 from pgscatalog.calc.lib.scorefile import load_scoring_files
 
 # Test functions of: update_match_table, _setup_enums, match_variant,
-# get_variant_match_priority, is_biallelic_variant_ambiguous,
+# get_variant_match_priority, check_nucleotide_allele,
 # classify_match (complement, complement_table)
 
 
 @pytest.mark.parametrize(
-    "ref, alt, result",
-    [
-        ("A", "T", True),
-        ("C", "G", True),
-        ("A", "C", False),
-        ("G", "T", False),
-        ("AT", "TA", False),
-        ("A", "TA", False),
-    ],
+    "allele",
+    ["N", "X", "AN"],
     ids=[
-        "A/T is ambiguous",
-        "C/G is ambiguous",
-        "A/C is not ambiguous",
-        "G/T is not ambiguous",
-        "AT/TA is not ambiguous",
-        "A/TA is not ambiguous",
+        "N raises ValueError",
+        "X raises ValueError",
+        "AN raises ValueError",
     ],
 )
-def test_match_variant_ambiguous(ref: str, alt: str, result: bool) -> None:
-    assert is_biallelic_variant_ambiguous(ref, alt) == result
-
-
-@pytest.mark.parametrize(
-    "ref, alt",
-    [("N", "T"), ("X", "A"), ("A", "N")],
-    ids=[
-        "N/T raises ValueError",
-        "X/A raises ValueError",
-        "A/N raises ValueError",
-    ],
-)
-def test_bad_ambiguous(ref: str, alt: str) -> None:
+def test_check_nucleotide_allele(allele: str) -> None:
+    """Unmatchable alleles are skipped before this, so what's left is corrupt"""
     with pytest.raises(ValueError):
-        is_biallelic_variant_ambiguous(ref, alt)
+        check_nucleotide_allele(allele)
+
+
+@pytest.mark.parametrize("allele", ["A", "GATC"], ids=["one base", "many bases"])
+def test_check_nucleotide_allele_accepts_sequences(allele: str) -> None:
+    assert check_nucleotide_allele(allele) is None
 
 
 @pytest.mark.parametrize(
     "effect_allele, other_allele, target_ref, target_alt, result",
     [
-        # result: (MatchPriority, effect allele index which is 0 or 1 for bialleles)
-        ("A", "C", "A", "C", (MatchPriority.REFALT, 0)),
-        ("A", "C", "C", "A", (MatchPriority.ALTREF, 1)),
-        ("A", "C", "T", "G", (MatchPriority.REFALT_FLIP, 0)),
-        ("A", "C", "G", "T", (MatchPriority.ALTREF_FLIP, 1)),
-        ("A", None, "A", "T", (MatchPriority.REF_NO_OA, 0)),
-        ("A", None, "T", "A", (MatchPriority.ALT_NO_OA, 1)),
-        ("A", "C", "C", "G", (MatchPriority.NO_MATCH, None)),
+        # result: (MatchPriority, effect allele index, matched as written,
+        # matched complemented)
+        ("A", "C", "A", "C", (MatchPriority.REFALT, 0, True, False)),
+        ("A", "C", "C", "A", (MatchPriority.ALTREF, 1, True, False)),
+        ("A", "C", "T", "G", (MatchPriority.REFALT_FLIP, 0, False, True)),
+        ("A", "C", "G", "T", (MatchPriority.ALTREF_FLIP, 1, False, True)),
+        ("A", None, "A", "T", (MatchPriority.REF_NO_OA, 0, True, True)),
+        ("A", None, "T", "A", (MatchPriority.ALT_NO_OA, 1, True, True)),
+        ("A", None, "C", "T", (MatchPriority.NO_MATCH, None, False, True)),
+        ("A", "T", "A", "T", (MatchPriority.REFALT, 0, True, True)),
+        ("A", "C", "C", "G", (MatchPriority.NO_MATCH, None, False, False)),
     ],
     ids=[
         "match ref alt",
@@ -76,6 +62,13 @@ def test_bad_ambiguous(ref: str, alt: str) -> None:
         "match alt ref flipped",
         "match ref missing other allele",
         "match alt missing other allele",
+        # no flipped no-OA match type exists, so this reading only counts towards
+        # ambiguity - and here nothing else at the site matched, so it stays a
+        # non-match rather than becoming one
+        "complemented match missing other allele",
+        # both readings match: the score variant as written wins the priority, and
+        # the caller is told a second reading matched
+        "palindrome matches both ways round",
         "no match",
     ],
 )
@@ -84,7 +77,7 @@ def test_classify_match(
     other_allele: str | None,
     target_ref: str,
     target_alt: str,
-    result: MatchResult,
+    result: tuple,
     alt_allele_idx: int = 1,
 ) -> None:
     """Test standard matching scenarios"""
@@ -100,8 +93,132 @@ def test_classify_match(
     )
 
 
+def _best_match(
+    effect_allele: str,
+    other_allele: str | None,
+    ref: str,
+    alts: list[str],
+    match_ambiguous: bool = False,
+) -> MatchResult:
+    """The match a score variant gets at a target variant, as match_variant picks it"""
+    return max(
+        get_variant_match_priority(
+            effect_allele=effect_allele,
+            other_allele=other_allele,
+            ref=ref,
+            alts=alts,
+            match_ambiguous=match_ambiguous,
+        ),
+        key=lambda match: match.match_priority.value,
+    )
+
+
 @pytest.mark.parametrize(
-    "effect_allele, other_allele, ref, alts, match_ambiguous, match_result",
+    "ref, alts, effect_allele, other_allele, match_type, effect_allele_idx",
+    [
+        ("A", ["T"], "A", "T", MatchPriority.EXCLUDED, None),
+        ("C", ["G"], "C", "G", MatchPriority.EXCLUDED, None),
+        ("A", ["C"], "A", "C", MatchPriority.REFALT, 0),
+        ("A", ["C"], "C", None, MatchPriority.ALT_NO_OA, 1),
+        ("A", ["C", "G"], "C", None, MatchPriority.EXCLUDED, None),
+        ("A", ["C", "T"], "A", None, MatchPriority.EXCLUDED, None),
+        ("A", ["T", "C"], "C", "A", MatchPriority.ALTREF, 2),
+        ("A", ["C"], "T", "G", MatchPriority.REFALT_FLIP, 0),
+        ("A", ["T"], "G", "C", MatchPriority.NO_MATCH, None),
+        ("A", ["TA"], "A", "TA", MatchPriority.REFALT, 0),
+        ("AT", ["TA"], "AT", "TA", MatchPriority.EXCLUDED, None),
+    ],
+    ids=[
+        # docs/adr/0010: ambiguity is a property of the pairing of a score variant
+        # with a target variant, never of a pair of alleles
+        "A/T at a palindromic target is ambiguous, as before",
+        "C/G at a palindromic target is ambiguous, as before",
+        "A/C is resolvable",
+        "a no-OA score variant is resolvable when only one reading matches",
+        "a no-OA score variant is ambiguous when the target carries the complement",
+        "a no-OA reference match is ambiguous when the target carries the complement",
+        "a palindromic pair at the target leaves other score variants resolvable",
+        "a resolved strand flip is not ambiguity: only one reading matched",
+        # this one used to be EXCLUDED, because ambiguity was computed from the
+        # target's alleles before anyone asked whether the score variant matched
+        "a score variant that matches nothing at a palindromic target is unmatched",
+        "A/TA is resolvable",
+        # complementing without reversing is what the flipped match types already
+        # do, so a score variant that matches its own complement is unresolvable
+        # however long its alleles are
+        "AT/TA matches both ways round, so it's ambiguous",
+    ],
+)
+def test_ambiguity_is_a_property_of_the_pairing(
+    ref: str,
+    alts: list[str],
+    effect_allele: str,
+    other_allele: str | None,
+    match_type: MatchPriority,
+    effect_allele_idx: int | None,
+) -> None:
+    match = _best_match(effect_allele, other_allele, ref, alts)
+
+    assert match.match_priority == match_type
+    assert match.effect_allele_idx == effect_allele_idx
+    assert match.is_ambiguous == (match_type == MatchPriority.EXCLUDED)
+
+
+@pytest.mark.parametrize(
+    "effect_allele, other_allele, match_type, effect_allele_idx",
+    [
+        ("A", "C", MatchPriority.REFALT, 0),
+        ("A", "G", MatchPriority.REFALT, 0),
+        ("C", "A", MatchPriority.ALTREF, 1),
+        ("G", "A", MatchPriority.ALTREF, 2),
+    ],
+    ids=[
+        "effect A other C matches the reference allele",
+        "effect A other G matches the reference allele",
+        "effect C other A matches alternative allele 1",
+        "effect G other A matches alternative allele 2",
+    ],
+)
+def test_every_alternative_allele_is_a_match_candidate(
+    effect_allele: str,
+    other_allele: str,
+    match_type: MatchPriority,
+    effect_allele_idx: int,
+) -> None:
+    """REF=A ALTS=[C,G]: matching used to stop after the first alternative allele,
+    so the two score variants pairing with G were reported unmatched."""
+    match = _best_match(effect_allele, other_allele, "A", ["C", "G"])
+
+    assert match.match_priority == match_type
+    assert match.effect_allele_idx == effect_allele_idx
+    assert match.is_multiallelic is True
+
+
+def test_alternative_allele_order_doesnt_change_the_answer() -> None:
+    """ALT column order carries no meaning, so neither may the result.
+
+    A/T at REF=A ALTS=[C,T] used to report unmatched, because alt C yielded
+    NO_MATCH and matching then stopped. Written ALTS=[T,C] the same target reported
+    excluded, because the ambiguous branch skipped past the break.
+    """
+    assert _best_match("A", "T", "A", ["C", "T"]) == _best_match(
+        "A", "T", "A", ["T", "C"]
+    )
+    assert _best_match("A", "T", "A", ["C", "T"]).match_priority is (
+        MatchPriority.EXCLUDED
+    )
+
+
+def test_unmatchable_allele_keeps_its_index() -> None:
+    """Alleles are positional, so * is skipped where it stands (docs/adr/0010)"""
+    match = _best_match("G", "A", "A", ["*", "G"])
+
+    assert match.match_priority is MatchPriority.ALTREF
+    assert match.effect_allele_idx == 2
+
+
+@pytest.mark.parametrize(
+    "effect_allele, other_allele, ref, alts, match_ambiguous, match_results",
     [
         (
             "A",
@@ -109,12 +226,14 @@ def test_classify_match(
             "A",
             ["T"],
             True,
-            MatchResult(
-                MatchPriority.REFALT,
-                effect_allele_idx=0,
-                is_ambiguous=True,
-                is_multiallelic=False,
-            ),
+            [
+                MatchResult(
+                    MatchPriority.REFALT,
+                    effect_allele_idx=0,
+                    is_ambiguous=True,
+                    is_multiallelic=False,
+                )
+            ],
         ),
         (
             "T",
@@ -122,12 +241,14 @@ def test_classify_match(
             "A",
             ["T"],
             True,
-            MatchResult(
-                MatchPriority.ALTREF,
-                effect_allele_idx=1,
-                is_ambiguous=True,
-                is_multiallelic=False,
-            ),
+            [
+                MatchResult(
+                    MatchPriority.ALTREF,
+                    effect_allele_idx=1,
+                    is_ambiguous=True,
+                    is_multiallelic=False,
+                )
+            ],
         ),
         (
             "A",
@@ -135,12 +256,35 @@ def test_classify_match(
             "A",
             ["C", "T"],
             False,
-            MatchResult(
-                MatchPriority.REFALT,
-                effect_allele_idx=0,
-                is_ambiguous=False,
-                is_multiallelic=True,
-            ),
+            [
+                MatchResult(
+                    MatchPriority.REFALT,
+                    effect_allele_idx=0,
+                    is_ambiguous=False,
+                    is_multiallelic=True,
+                ),
+                MatchResult(
+                    MatchPriority.NO_MATCH,
+                    effect_allele_idx=None,
+                    is_ambiguous=False,
+                    is_multiallelic=True,
+                ),
+            ],
+        ),
+        (
+            "A",
+            "T",
+            "A",
+            ["C", "T"],
+            False,
+            [
+                MatchResult(
+                    MatchPriority.EXCLUDED,
+                    effect_allele_idx=None,
+                    is_ambiguous=True,
+                    is_multiallelic=True,
+                )
+            ],
         ),
         (
             "A",
@@ -148,12 +292,14 @@ def test_classify_match(
             "A",
             ["C"],
             False,
-            MatchResult(
-                MatchPriority.REFALT,
-                effect_allele_idx=0,
-                is_ambiguous=False,
-                is_multiallelic=False,
-            ),
+            [
+                MatchResult(
+                    MatchPriority.REFALT,
+                    effect_allele_idx=0,
+                    is_ambiguous=False,
+                    is_multiallelic=False,
+                )
+            ],
         ),
         (
             "C",
@@ -161,18 +307,21 @@ def test_classify_match(
             "A",
             ["C"],
             False,
-            MatchResult(
-                MatchPriority.ALTREF,
-                effect_allele_idx=1,
-                is_ambiguous=False,
-                is_multiallelic=False,
-            ),
+            [
+                MatchResult(
+                    MatchPriority.ALTREF,
+                    effect_allele_idx=1,
+                    is_ambiguous=False,
+                    is_multiallelic=False,
+                )
+            ],
         ),
     ],
     ids=[
         "match ambiguous refalt",
         "match ambiguous altref",
         "match multiallelic refalt",
+        "excluded ambiguous multiallelic",
         "match refalt",
         "match altref",
     ],
@@ -183,9 +332,14 @@ def test_match_priority(
     ref: str,
     alts: list[str],
     match_ambiguous: bool,
-    match_result: MatchResult,
+    match_results: list[MatchResult],
 ) -> None:
-    """Test more complicated matching scenarios"""
+    """Test more complicated matching scenarios.
+
+    One result per alternative allele, so a multiallelic variant yields several and
+    the caller keeps the best. An excluded score variant is the exception: the
+    decision is about the pairing rather than about one allele, so it's made once.
+    """
     result: list[MatchResult] = list(
         get_variant_match_priority(
             effect_allele=effect_allele,
@@ -196,10 +350,7 @@ def test_match_priority(
         )
     )
 
-    # when implemented, multiallelic variants will return one match result for each
-    # alternate allele. currently only the first alternate allele is matched
-    assert len(result) == 1
-    assert result[0] == match_result
+    assert result == match_results
 
 
 @pytest.mark.parametrize(
@@ -859,8 +1010,8 @@ def _match_table_with_rows(rows: list[tuple]) -> duckdb.DuckDBPyConnection:
 
 def test_different_alternative_alleles_are_not_a_collision() -> None:
     """Two score variants matching alternative alleles 1 and 2 of one multiallelic
-    variant. Not reachable through matching yet - only alts[0] is examined - but the
-    collision key has to be right for it when it lands (ADR 0010)."""
+    variant. Two alleles of one variant, so two variants found: they take different
+    dosages and nothing has to be guessed (ADR 0010)."""
     conn = _match_table_with_rows(
         [
             ("PGS000001", 0, 1, 7, COLLISION_SHARD),
