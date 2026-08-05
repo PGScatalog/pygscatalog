@@ -438,6 +438,40 @@ def test_match_variant_udf(match_dict: dict, result: dict) -> None:
     assert match_variant(**match_dict) == result
 
 
+@pytest.mark.parametrize(
+    "alts",
+    [["*"], ["<NON_REF>"]],
+    ids=[
+        "spanning deletion is unmatched, not an error",
+        "symbolic allele is unmatched, not an error",
+    ],
+)
+def test_match_variant_unmatchable_allele(alts: list[str]) -> None:
+    """Legal VCF alleles that name no sequence yield NO_MATCH instead of raising"""
+    assert match_variant(
+        False,  # match_ambiguous
+        False,  # match_multiallelic
+        "A",  # effect_allele
+        "T",  # other_allele
+        "A",  # ref
+        alts,
+    ) == {
+        "effect_allele_idx": None,
+        "match_priority": 0,
+        "match_type": "NO_MATCH",
+        "match_summary": "unmatched",
+        "is_ambiguous": False,
+        "is_matched": False,
+        "is_multiallelic": False,
+    }
+
+
+def test_match_variant_corrupt_allele() -> None:
+    """A corrupt allele string isn't unmatchable, it's wrong, and still raises"""
+    with pytest.raises(ValueError):
+        match_variant(False, False, "A", "T", "A", ["XYZ"])
+
+
 def test_setup_enums() -> None:
     conn = duckdb.connect(":memory:")
     _setup_enums(conn)
@@ -456,7 +490,9 @@ def test_setup_enums() -> None:
     assert type_values == [e.name for e in MatchPriority]
 
 
-def _make_test_conn(pgs000001) -> duckdb.DuckDBPyConnection:
+def _make_test_conn(
+    pgs000001, alts: list[str] | None = None
+) -> duckdb.DuckDBPyConnection:
     # nothing here needs the database on disk
     conn = duckdb.connect(":memory:")
 
@@ -483,10 +519,47 @@ def _make_test_conn(pgs000001) -> duckdb.DuckDBPyConnection:
         (geno_index, chr_name, chr_pos, ref, alts, zarr_group, sampleset)
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """,
-        [10, "11", 69516650, "T", ["C"], "test/ALL/file.bgen", "test"],
+        [
+            10,
+            "11",
+            69516650,
+            "T",
+            alts if alts is not None else ["C"],
+            "test/ALL/file.bgen",
+            "test",
+        ],
     )
 
     return conn
+
+
+def test_update_match_table_spanning_deletion(pgs000001) -> None:
+    """A target record holding a spanning deletion at a scoring file position.
+
+    The raise used to happen inside the match_variant UDF, so it surfaced as an
+    opaque duckdb query error. The record is now reported unmatched instead.
+    """
+    conn = _make_test_conn(pgs000001, alts=["*"])
+
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=False,
+        sampleset="test",
+    )
+
+    rows = conn.execute(
+        """
+        SELECT
+            match_result.effect_allele_idx AS effect_allele_idx,
+            match_result.match_type        AS match_type,
+            match_result.match_summary     AS match_summary,
+            match_result.is_matched        AS is_matched
+        FROM allele_match_table;
+        """
+    ).fetchall()
+
+    assert rows == [(None, "NO_MATCH", "unmatched", False)]
 
 
 def test_update_match_table(pgs000001) -> None:

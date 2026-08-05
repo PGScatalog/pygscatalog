@@ -324,6 +324,18 @@ def get_variant_match_priority(
     for alt_allele_idx, (target_ref, target_alt) in enumerate(
         itertools.product([ref], alts), start=1
     ):
+        if is_unmatchable_allele(target_alt):
+            # legal VCF, but there's no sequence here to compare a score variant
+            # with, so no ambiguity check and no comparison: the allele keeps its
+            # index in the variant and yields NO_MATCH (docs/adr/0010)
+            yield MatchResult(
+                match_priority=MatchPriority.NO_MATCH,
+                effect_allele_idx=None,
+                is_ambiguous=False,
+                is_multiallelic=is_multiallelic,
+            )
+            continue
+
         is_ambiguous = is_biallelic_variant_ambiguous(ref=target_ref, alt=target_alt)
         effect_allele_idx: int | None
         priority: MatchPriority
@@ -357,6 +369,37 @@ def get_variant_match_priority(
             break
 
 
+# characters that can't appear in a plain base sequence, and so mark out the VCF
+# alleles that name no sequence at all: the spanning deletion (*), symbolic alleles
+# (<NON_REF>, <DEL>, ...), breakends (]13:123]T, T[2:456[, .TAGT) and the missing
+# allele (.). This is what separates a legal allele no score can match from a corrupt
+# one: XYZ contains none of these, so it stays a ValueError.
+_NON_SEQUENCE_CHARACTERS: frozenset[str] = frozenset("*<>[].")
+
+
+@cache
+def is_unmatchable_allele(allele: str) -> bool:
+    """Is this a legal VCF allele that names no sequence to match against?
+
+    Such alleles are kept in place and skipped at match time, never filtered away:
+    a genotype call names its alleles by index, so dropping one renames every allele
+    after it (docs/adr/0010).
+
+    >>> is_unmatchable_allele("*")  # spanning deletion
+    True
+    >>> is_unmatchable_allele("<NON_REF>")  # symbolic allele
+    True
+    >>> is_unmatchable_allele("A"), is_unmatchable_allele("GATC")
+    (False, False)
+
+    Corrupt allele strings aren't unmatchable, they're wrong, and are left to raise:
+
+    >>> is_unmatchable_allele("XYZ")
+    False
+    """
+    return not _NON_SEQUENCE_CHARACTERS.isdisjoint(allele)
+
+
 @cache
 def is_biallelic_variant_ambiguous(ref: str, alt: str) -> bool:
     """
@@ -365,6 +408,10 @@ def is_biallelic_variant_ambiguous(ref: str, alt: str) -> bool:
     Often scores and genotypes will be on different builds and including these SNPs
     would involve tallying incorrect dosages if there has been a strand-flip across
     builds. Even on the same build you can get improperly strand-oriented data.
+
+    Raises ValueError on anything outside ACGT. Callers must skip unmatchable
+    alleles first (see is_unmatchable_allele), so what's left to raise on is a
+    corrupt allele string.
     """
     valid = frozenset({"A", "C", "T", "G"})
 
