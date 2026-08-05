@@ -6,18 +6,14 @@ Derived from ADRs 0001, 0003, 0004, and 0007–0010. Read `CONTEXT.md` and those
 
 ## Open
 
-X, Y and MT support (0019–0025) has landed, along with 0026, the ploidy bug it uncovered; 0027 is the other one and is still open. Multiallelic handling (ADR 0010) adds 0028–0032.
+X, Y and MT support (0019–0025) has landed, along with 0026, the ploidy bug it uncovered. Multiallelic handling (ADR 0010) adds 0028–0032; 0027, 0028, 0029 and 0032 have landed.
 
 | # | Ticket | Depends on |
 |---|---|---|
-| 0027 | [Two scoring variants at one canonical position silently lose a weight](0027-duplicate-canonical-position-loses-a-weight.md) | — |
-| 0028 | [A spanning deletion or symbolic allele crashes MATCH](0028-non-acgt-alleles-crash-the-matcher.md) | — |
-| 0029 | [Multiallelic VCF records never reach the cache](0029-ingest-multiallelic-vcf-records.md) | 0028 |
-| 0030 | [Only the first alternative allele can match](0030-match-every-alternative-allele.md) | 0029 |
-| 0031 | [`EXCLUDED` means three different things](0031-every-exclusion-names-its-reason.md) | 0027, 0030 |
-| 0032 | [A multiallelic bgen record is skipped silently](0032-bgen-refuses-multiallelic-records.md) | — |
+| 0030 | [Only the first alternative allele can match](0030-match-every-alternative-allele.md) | 0029 ✅ |
+| 0031 | [`EXCLUDED` means three different things](0031-every-exclusion-names-its-reason.md) | 0027 ✅, 0030 |
 
-0028 is a crash on `main` today and does not need the rest. 0027 is the collision work ADR 0010 refers to; its acceptance criteria are unchanged, but the key it proposes is superseded — see the note on the ticket. 0029 and 0030 are the pair that has to ship together to be observable: 0029 caches records nothing can match yet, 0030 matches records that aren't cached yet.
+0029 and 0030 are the pair that has to ship together to be observable: 0029 caches records nothing can match yet, 0030 matches records that aren't cached yet.
 
 ## Not in this repo
 

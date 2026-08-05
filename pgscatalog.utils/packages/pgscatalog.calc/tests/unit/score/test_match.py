@@ -6,6 +6,8 @@ from pgscatalog.calc.lib.score._matchvariants import (
     MatchResult,
     _setup_enums,
     classify_match,
+    create_allele_match_table,
+    exclude_match_collisions,
     get_variant_match_priority,
     is_biallelic_variant_ambiguous,
     match_variant,
@@ -610,3 +612,333 @@ def test_update_match_table(pgs000001) -> None:
             "test/ALL/file.bgen",  # zarr_group
         )
     ]
+
+
+# --- match collisions (docs/adr/0010)
+#
+# Two score variants of one accession resolving to the same allele of the same target
+# variant. Both carry a weight for one dosage, so both are excluded: picking one is
+# guessing what the score's author meant.
+
+COLLISION_SHARD = "test/X/x.vcf.gz"
+
+# a scoring file processed by pgscatalog-format, as load_scoring_files loads it
+_SCORE_ROW_COLUMNS = 9
+
+
+def _make_collision_conn(
+    score_rows: list[tuple], target_rows: list[tuple]
+) -> duckdb.DuckDBPyConnection:
+    """A connection holding hand-written score and target variants.
+
+    Collisions need two scoring file rows at one position, which no test scoring
+    file carries, so these are written directly into the tables update_match_table
+    reads.
+    """
+    conn = duckdb.connect(":memory:")
+    conn.execute("""
+        CREATE TABLE score_variant_table (
+            chr_name VARCHAR,
+            chr_position UINTEGER,
+            effect_allele VARCHAR,
+            other_allele VARCHAR,
+            effect_weight DOUBLE,
+            effect_type VARCHAR,
+            is_duplicated BOOLEAN,
+            accession VARCHAR,
+            row_nr UINTEGER,
+            PRIMARY KEY(row_nr, accession)
+        );
+    """)
+    placeholders = ", ".join("?" * _SCORE_ROW_COLUMNS)
+    conn.executemany(
+        f"INSERT INTO score_variant_table VALUES ({placeholders});", score_rows
+    )
+    conn.execute("""
+        CREATE TABLE targetvariants (
+            geno_index UINTEGER,
+            chr_name TEXT,
+            chr_pos UINTEGER,
+            ref TEXT,
+            alts TEXT[],
+            zarr_group TEXT,
+            sampleset TEXT
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO targetvariants VALUES (?, ?, ?, ?, ?, ?, ?);", target_rows
+    )
+    return conn
+
+
+# a scoring file with a genuine XY and X variant at one position. Chromosome names
+# are canonicalised on the way into score_variant_table (ADR 0008), so XY has already
+# become X here: two rows, one canonical position, two different weights, and
+# is_duplicated False on both because the flag was computed upstream on the allele
+# pair and these are not duplicates by that definition
+XY_AND_X_SCORE_ROWS = [
+    ("X", 100, "A", "C", 0.1, "additive", False, "PGS000001", 0),
+    ("X", 100, "A", "C", 0.2, "additive", False, "PGS000001", 1),
+]
+XY_AND_X_TARGET_ROWS = [(5, "X", 100, "A", ["C"], COLLISION_SHARD, "test")]
+
+
+def _xy_and_x_conn(score_rows: list[tuple] | None = None) -> duckdb.DuckDBPyConnection:
+    return _make_collision_conn(
+        score_rows=XY_AND_X_SCORE_ROWS if score_rows is None else score_rows,
+        target_rows=XY_AND_X_TARGET_ROWS,
+    )
+
+
+def _match_outcomes(conn: duckdb.DuckDBPyConnection) -> list[tuple]:
+    return conn.execute("""
+        SELECT accession,
+               row_nr,
+               match_result.effect_allele_idx AS effect_allele_idx,
+               match_result.match_type        AS match_type,
+               match_result.match_summary     AS match_summary,
+               match_result.is_matched        AS is_matched
+        FROM allele_match_table
+        ORDER BY accession, row_nr;
+    """).fetchall()
+
+
+def test_collision_excludes_both_score_variants() -> None:
+    """Neither weight is chosen, because choosing is guessing.
+
+    Both rows used to survive matching, and the weight matrix pivot then kept one of
+    them with any_value - an unspecified choice between two weights for one dosage.
+    """
+    conn = _xy_and_x_conn()
+
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=False,
+        sampleset="test",
+    )
+
+    assert _match_outcomes(conn) == [
+        ("PGS000001", 0, None, "EXCLUDED", "excluded", False),
+        ("PGS000001", 1, None, "EXCLUDED", "excluded", False),
+    ]
+
+    # with no effect allele index there's no weight to pivot: create_wide_weights_table
+    # drops both rows, so neither weight can reach the score
+    (weighted,) = conn.execute("""
+        SELECT count(*) FROM allele_match_table
+        WHERE match_result.effect_allele_idx IS NOT NULL;
+    """).fetchone()
+    assert weighted == 0
+
+
+def test_collision_outcome_is_the_same_on_every_run() -> None:
+    """The bug was that it wasn't: both rows tied on every ordering the pipeline
+    applied, so which weight survived was up to the query engine."""
+    outcomes = []
+    # the two rows are loaded in the opposite order the second time round: nothing
+    # about the outcome may depend on which one the engine happens to see first
+    for score_rows in (XY_AND_X_SCORE_ROWS, list(reversed(XY_AND_X_SCORE_ROWS))):
+        conn = _xy_and_x_conn(score_rows)
+        update_match_table(
+            conn=conn,
+            match_ambiguous=False,
+            match_multiallelic=False,
+            sampleset="test",
+        )
+        outcomes.append(_match_outcomes(conn))
+
+    assert outcomes[0] == outcomes[1]
+    assert {row[4] for row in outcomes[0]} == {"excluded"}
+
+
+def test_two_score_variants_at_one_position_are_not_always_a_collision() -> None:
+    """One score variant matches the reference allele, the other the alternative.
+
+    Two alleles of one variant, two variants found: they take different dosages, so
+    there's nothing to guess and both are scored.
+    """
+    conn = _make_collision_conn(
+        score_rows=[
+            ("X", 100, "A", "C", 0.1, "additive", False, "PGS000001", 0),
+            ("X", 100, "C", "A", 0.2, "additive", False, "PGS000001", 1),
+        ],
+        target_rows=[(5, "X", 100, "A", ["C"], COLLISION_SHARD, "test")],
+    )
+
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=False,
+        sampleset="test",
+    )
+
+    assert _match_outcomes(conn) == [
+        ("PGS000001", 0, 0, "REFALT", "matched", True),
+        ("PGS000001", 1, 1, "ALTREF", "matched", True),
+    ]
+
+
+def test_match_rate_counts_a_target_allele_once() -> None:
+    """The min_overlap numerator counts rows with match_summary 'matched'.
+
+    Nothing dedups the match table - its primary key is per scoring variant - so a
+    colliding pair used to put two matched rows on one target allele and count one
+    locus twice. Excluding collisions is what removes that: no second mechanism
+    needed (ADR 0010). Two score variants on two *different* alleles of one variant
+    stay two matched rows, because they are two variants found.
+    """
+    conn = _make_collision_conn(
+        score_rows=[
+            # collide on the reference allele of target row 5
+            ("X", 100, "A", "C", 0.1, "additive", False, "PGS000001", 0),
+            ("X", 100, "A", "C", 0.2, "additive", False, "PGS000001", 1),
+            # a clean match at another locus
+            ("X", 200, "G", "T", 0.3, "additive", False, "PGS000001", 2),
+        ],
+        target_rows=[
+            (5, "X", 100, "A", ["C"], COLLISION_SHARD, "test"),
+            (6, "X", 200, "G", ["T"], COLLISION_SHARD, "test"),
+        ],
+    )
+
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=False,
+        sampleset="test",
+    )
+
+    numerator = conn.execute("""
+        SELECT target_row_nr, count(*)
+        FROM allele_match_table
+        WHERE match_result.match_summary = 'matched'
+        GROUP BY accession, zarr_group, target_row_nr,
+                 match_result.effect_allele_idx
+        ORDER BY target_row_nr;
+    """).fetchall()
+
+    # the colliding locus contributes nothing, and the locus that did match counts
+    # exactly once
+    assert numerator == [(6, 1)]
+
+
+def _match_table_with_rows(rows: list[tuple]) -> duckdb.DuckDBPyConnection:
+    """A match table filled directly, to exercise the collision pass on its own.
+
+    (accession, row_nr, effect_allele_idx, target_row_nr, zarr_group)
+    """
+    conn = duckdb.connect(":memory:")
+    _setup_enums(conn)
+    create_allele_match_table(conn, target_alleles=True)
+    conn.executemany(
+        """
+        INSERT INTO allele_match_table VALUES (
+            'test',
+            ?,
+            ?,
+            struct_pack(
+                effect_allele_idx := ?::UINT8,
+                is_multiallelic := FALSE,
+                is_ambiguous := FALSE,
+                is_matched := TRUE,
+                match_priority := 7::UINT8,
+                match_type := 'REFALT'::match_type_enum,
+                match_summary := 'matched'::match_summary_enum
+            ),
+            ?,
+            ?,
+            'A',
+            ['C']
+        );
+        """,
+        rows,
+    )
+    return conn
+
+
+def test_different_alternative_alleles_are_not_a_collision() -> None:
+    """Two score variants matching alternative alleles 1 and 2 of one multiallelic
+    variant. Not reachable through matching yet - only alts[0] is examined - but the
+    collision key has to be right for it when it lands (ADR 0010)."""
+    conn = _match_table_with_rows(
+        [
+            ("PGS000001", 0, 1, 7, COLLISION_SHARD),
+            ("PGS000001", 1, 2, 7, COLLISION_SHARD),
+        ]
+    )
+
+    assert exclude_match_collisions(conn) == 0
+    assert [row[2] for row in _match_outcomes(conn)] == [1, 2]
+
+
+def test_one_target_row_nr_in_two_shards_is_two_variants() -> None:
+    """target_row_nr is a shard-local geno_index, so the same number in two shards
+    names two different variants and can't collide."""
+    conn = _match_table_with_rows(
+        [
+            ("PGS000001", 0, 0, 7, COLLISION_SHARD),
+            ("PGS000001", 1, 0, 7, "test/X/other.vcf.gz"),
+        ]
+    )
+
+    assert exclude_match_collisions(conn) == 0
+    assert [row[5] for row in _match_outcomes(conn)] == [True, True]
+
+
+def test_two_accessions_on_one_target_allele_are_not_a_collision() -> None:
+    """Each accession gets its own weight matrix column, so there's no competition"""
+    conn = _match_table_with_rows(
+        [
+            ("PGS000001", 0, 0, 7, COLLISION_SHARD),
+            ("PGS000002", 0, 0, 7, COLLISION_SHARD),
+        ]
+    )
+
+    assert exclude_match_collisions(conn) == 0
+    assert [row[5] for row in _match_outcomes(conn)] == [True, True]
+
+
+def test_collision_keeps_the_target_variant_flags() -> None:
+    """is_ambiguous and is_multiallelic describe the target variant, not the
+    decision, so exclusion leaves them alone (a reason column comes later)."""
+    conn = _match_table_with_rows(
+        [
+            ("PGS000001", 0, 0, 7, COLLISION_SHARD),
+            ("PGS000001", 1, 0, 7, COLLISION_SHARD),
+        ]
+    )
+    conn.execute("""
+        UPDATE allele_match_table
+        SET match_result = struct_pack(
+            effect_allele_idx := match_result.effect_allele_idx,
+            is_multiallelic := TRUE,
+            is_ambiguous := FALSE,
+            is_matched := match_result.is_matched,
+            match_priority := match_result.match_priority,
+            match_type := match_result.match_type,
+            match_summary := match_result.match_summary
+        );
+    """)
+
+    assert exclude_match_collisions(conn) == 2
+
+    flags = conn.execute("""
+        SELECT match_result.is_multiallelic, match_result.is_ambiguous,
+               match_result.match_priority
+        FROM allele_match_table;
+    """).fetchall()
+    assert flags == [(True, False, MatchPriority.EXCLUDED.value)] * 2
+
+
+def test_unmatched_rows_never_collide() -> None:
+    """Every unmatched row at one locus has a NULL effect allele index. They aren't
+    two weights competing for one dosage - they're no weights at all."""
+    conn = _match_table_with_rows(
+        [
+            ("PGS000001", 0, None, 7, COLLISION_SHARD),
+            ("PGS000001", 1, None, 7, COLLISION_SHARD),
+        ]
+    )
+
+    assert exclude_match_collisions(conn) == 0

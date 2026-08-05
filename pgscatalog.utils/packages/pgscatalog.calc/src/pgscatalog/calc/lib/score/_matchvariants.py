@@ -127,6 +127,88 @@ def update_match_table(
         ORDER BY accession, row_nr, zarr_group;
         """)
 
+    exclude_match_collisions(conn)
+
+
+def exclude_match_collisions(conn: duckdb.DuckDBPyConnection) -> int:
+    """Exclude score variants that resolved to the same target allele.
+
+    A match collision is two score variants of one accession whose best matches land
+    on the same allele of the same target variant, so two weights compete for one
+    dosage. Choosing between them means guessing what the score's author meant, so
+    both are excluded instead (docs/adr/0010). Splitting multiallelics upstream of a
+    GWAS, chromosome canonicalisation (docs/adr/0008) and build remapping all produce
+    them, and the scoring file looks perfectly well formed: the rows differ in their
+    alleles, so `is_duplicated` rightly says they aren't duplicates.
+
+    This runs after matching because a collision isn't a property of a score variant.
+    It's only visible across rows, once every score variant has its best match, so
+    the earliest place it can be seen is here - which also means the match table this
+    stage exports is collision-free everywhere downstream.
+
+    Best-match selection can't do this job, and the two look alike. Best match runs
+    many candidate matches -> one score variant, and both mechanisms above (the
+    `max()` in the UDF, the ranking window) collapse candidates that way. A collision
+    runs the other way, many score variants -> one target allele, and each colliding
+    row already *is* the best match for its own score variant.
+
+    The key is (accession, target_row_nr, effect_allele_idx), qualified with the
+    sampleset and the shard because target_row_nr is a shard-local geno_index: the
+    same number in two shards is two different variants. Two score variants matching
+    two *different* alternative alleles of one multiallelic variant differ in
+    effect_allele_idx, so they aren't a collision - they're two variants found.
+
+    Returns the number of excluded rows.
+    """
+    logger.info("Excluding score variants that collide on one target allele")
+    conn.execute("""
+        CREATE OR REPLACE TEMP TABLE match_collision_table AS
+        SELECT sampleset,
+               accession,
+               zarr_group,
+               target_row_nr,
+               match_result.effect_allele_idx AS effect_allele_idx
+        FROM allele_match_table
+        -- an unmatched or already excluded row has no allele to collide on
+        WHERE match_result.effect_allele_idx IS NOT NULL
+        GROUP BY ALL
+        HAVING count(*) > 1;
+    """)
+
+    # the struct is rebuilt in the column's declared field order. is_ambiguous and
+    # is_multiallelic describe the target variant and stay as matching found them;
+    # only the decision changes. When exclusions grow a reason column, this is where
+    # a collision names itself.
+    excluded: int = conn.execute(
+        f"""
+        UPDATE allele_match_table AS m
+        SET match_result = struct_pack(
+            effect_allele_idx := NULL::UINT8,
+            is_multiallelic := m.match_result.is_multiallelic,
+            is_ambiguous := m.match_result.is_ambiguous,
+            is_matched := FALSE,
+            match_priority := {MatchPriority.EXCLUDED.value}::UINT8,
+            match_type := '{MatchPriority.EXCLUDED.name}'::match_type_enum,
+            match_summary := 'excluded'::match_summary_enum
+        )
+        FROM match_collision_table AS c
+        WHERE m.sampleset = c.sampleset
+          AND m.accession = c.accession
+          AND m.zarr_group = c.zarr_group
+          AND m.target_row_nr = c.target_row_nr
+          AND m.match_result.effect_allele_idx = c.effect_allele_idx;
+        """
+    ).fetchone()[0]  # type: ignore[index]
+
+    if excluded:
+        logger.warning(
+            f"{excluded} score variants excluded: two or more scoring file variants "
+            "of one accession matched the same target allele, so their weights "
+            "can't be told apart"
+        )
+
+    return excluded
+
 
 def create_allele_match_table(
     conn: duckdb.DuckDBPyConnection, *, target_alleles: bool
