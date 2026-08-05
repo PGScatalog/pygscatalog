@@ -1,24 +1,131 @@
 import numpy as np
+import pysam
 import pytest
 
 from pgscatalog.calc.lib.cache._vcf import (
     region_sort_key,
     vcf_buffer_variants,
+    vcf_get_genotypes,
     vcf_get_sample_list,
 )
 from pgscatalog.calc.lib.cache.targetvariants import (
     TargetVariants,
 )
 from pgscatalog.calc.lib.constants import (
+    MISSING_GENOTYPE_SENTINEL_VALUE,
     MISSING_GENOTYPE_TUPLE,
     NO_ALLELE_SENTINEL_VALUE,
 )
+
+HEMIZYGOUS_NO_CALL = (MISSING_GENOTYPE_SENTINEL_VALUE, NO_ALLELE_SENTINEL_VALUE)
+
+VCF_HEADER = """##fileformat=VCFv4.2
+##contig=<ID=1,length=1000000>
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t{samples}
+"""
+
+
+def one_variant(tmp_path, calls: list[str]) -> pysam.VariantRecord:
+    """A single-variant VCF written as text, so the GT spellings under test are
+    exactly what a writer would have emitted"""
+    path = tmp_path / "one.vcf"
+    samples = "\t".join(f"sample{i}" for i in range(len(calls)))
+    with path.open("w") as f:
+        f.write(VCF_HEADER.format(samples=samples))
+        f.write("1\t100\t.\tA\tG\t.\t.\t.\tGT\t" + "\t".join(calls) + "\n")
+
+    with pysam.VariantFile(str(path)) as vcf:
+        return next(iter(vcf))
 
 
 @pytest.fixture
 def test_positions() -> list[tuple[str, int]]:
     """Some positions in tiny1000G"""
     return [("8", 116938529), ("1", 44465567), ("10", 97611390)]
+
+
+def test_a_haploid_no_call_is_stored_hemizygous(tmp_path):
+    """`.` is a call of ploidy one that says nothing about which allele, so it is
+    a hemizygous no-call - the [255, 254] row of ADR 0007's encoding table. It used
+    to be flattened to a diploid missing call and imputed at twice the dosage.
+    """
+    record = one_variant(tmp_path, ["0", "1", "."])
+
+    assert vcf_get_genotypes(record) == [
+        (0, NO_ALLELE_SENTINEL_VALUE),
+        (1, NO_ALLELE_SENTINEL_VALUE),
+        HEMIZYGOUS_NO_CALL,
+    ]
+
+
+def test_a_diploid_no_call_is_stored_diploid(tmp_path):
+    """`./.` is two alleles, neither of them known"""
+    record = one_variant(tmp_path, ["0/1", "./."])
+
+    assert vcf_get_genotypes(record) == [(0, 1), MISSING_GENOTYPE_TUPLE]
+
+
+def test_a_variant_nobody_called_has_nothing_to_compare_against(tmp_path):
+    """Every call is `.`, so there is no diploid call to contradict it and the
+    length is taken at face value"""
+    record = one_variant(tmp_path, [".", ".", "."])
+
+    assert vcf_get_genotypes(record) == [HEMIZYGOUS_NO_CALL] * 3
+
+
+def test_a_dot_where_every_other_call_is_diploid_is_rejected(tmp_path):
+    """Reading ploidy from the GT length means trusting the writer, so the trust is
+    checked: nothing at this variant is hemizygous, so a `.` has no reading here
+    and can only be a writer that dropped an allele. Imputing those samples at half
+    the dosage they can carry is the same class of error as the one this fixes, so
+    the variant is named rather than guessed at.
+    """
+    record = one_variant(tmp_path, ["0/1", "1/1", "."])
+
+    with pytest.raises(ValueError) as excinfo:
+        vcf_get_genotypes(record)
+
+    message = str(excinfo.value)
+    assert "1:100" in message
+    assert "Non-conformant VCF" in message
+
+
+def test_a_dot_is_trusted_where_some_call_is_hemizygous(tmp_path):
+    """A mixed-sex chrX variant: a hemizygous call sits right there, so hemizygosity
+    is real at this position and a `.` is a plausible reading of it. Refusing this
+    would refuse ordinary conformant output for most chrX data.
+
+    The cost is stated in ADR 0007 rather than fixed: a diploid sample's no-call
+    miswritten `.` passes here and is imputed at half its ploidy. Separating the two
+    needs a declared sample sex, which ADR 0007 refuses.
+    """
+    record = one_variant(tmp_path, ["0/1", "1", "."])
+
+    assert vcf_get_genotypes(record) == [
+        (0, 1),
+        (1, NO_ALLELE_SENTINEL_VALUE),
+        HEMIZYGOUS_NO_CALL,
+    ]
+
+
+def test_a_partially_missing_call_keeps_its_known_allele(tmp_path):
+    """`./1` is diploid and half known: the known allele survives"""
+    record = one_variant(tmp_path, ["0/1", "./1"])
+
+    assert vcf_get_genotypes(record) == [
+        (0, 1),
+        (MISSING_GENOTYPE_SENTINEL_VALUE, 1),
+    ]
+
+
+def test_a_call_wider_than_the_ploidy_axis_is_rejected(tmp_path):
+    """Keeping the first two alleles would turn a call the cache can't hold into a
+    plausible score (ADR 0007)"""
+    record = one_variant(tmp_path, ["0/1/1"])
+
+    with pytest.raises(ValueError, match="Ploidy 3"):
+        vcf_get_genotypes(record)
 
 
 def test_region_sort_key_accepts_non_numeric_chromosomes():

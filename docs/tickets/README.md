@@ -6,11 +6,10 @@ Derived from ADRs 0001, 0003, 0004, and 0007–0009. Read `CONTEXT.md` and those
 
 ## Open
 
-X, Y and MT support (0019–0025) has landed. What's left are two bugs it uncovered, both independent of each other.
+X, Y and MT support (0019–0025) has landed, along with 0026, the ploidy bug it uncovered. What's left is the other one.
 
 | # | Ticket | Depends on |
 |---|---|---|
-| 0026 | [A hemizygous no-call is stored as diploid missing](0026-hemizygous-no-call-stored-as-diploid.md) | — |
 | 0027 | [Two scoring variants at one canonical position silently lose a weight](0027-duplicate-canonical-position-loses-a-weight.md) | — |
 
 ## Not in this repo

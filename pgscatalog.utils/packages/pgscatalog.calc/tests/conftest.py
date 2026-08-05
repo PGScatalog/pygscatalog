@@ -176,7 +176,13 @@ def pgs001229_autosome(pgs001229):
 
 @pytest.fixture(scope="session")
 def target_with_missingness(vcf_path, tmp_path_factory, missing_prob):
-    """A VCF where ~30% of samples have randomly missing genotypes in each variant"""
+    """A VCF where ~30% of samples have randomly missing genotypes in each variant
+
+    A no-call keeps the ploidy of the call it replaces, so a diploid sample is
+    blanked to `./.` and a hemizygous one to `.` - which is what a conformant writer
+    emits, and what the reader now reads ploidy from (ADR 0007). Writing `None` here
+    made pysam emit `.` for every call, hemizygous or not.
+    """
     cache = tmp_path_factory.mktemp("missing")
     missing_vcf = cache / "missing.vcf.gz"
     missing_prob = missing_prob
@@ -188,7 +194,8 @@ def target_with_missingness(vcf_path, tmp_path_factory, missing_prob):
         for rec in vcf.fetch():
             gts = [s["GT"] for s in rec.samples.values()]
             missing_gts = [
-                None if random.random() < missing_prob else tup for tup in gts
+                (None,) * len(tup) if random.random() < missing_prob else tup
+                for tup in gts
             ]
 
             for i, sample in enumerate(rec.samples.values()):

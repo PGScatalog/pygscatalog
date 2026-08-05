@@ -275,8 +275,11 @@ def test_a_mixed_sex_chry_vcf_is_rejected(
         header = vcf.header.copy()
         records = list(vcf.fetch("Y"))
 
+    # `.`, spelled as pysam wants it: a call of ploidy one with no allele in it.
+    # In a male-only file that is a hemizygous no-call, but nothing in a chrY file
+    # says whether the sample has a Y at all
     for call in list(records[0].samples.values())[:10]:
-        call["GT"] = None
+        call["GT"] = (None,)
 
     path = tmp_path / "mixed_sex_chrY.vcf.gz"
     _write_vcf(path, header, records)

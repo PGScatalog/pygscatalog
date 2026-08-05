@@ -27,7 +27,7 @@ from .targetvariants import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable, Sequence
+    from collections.abc import Iterable, Sequence
     from typing import IO
 
     from numpy import typing as npt
@@ -37,34 +37,67 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def vcf_get_genotypes(
-    record_samples: pysam.VariantRecordSamples,
-) -> Generator[tuple[int, ...]]:
+def vcf_get_genotypes(variant: pysam.VariantRecord) -> list[tuple[int, ...]]:
     """Read ploidy from the length of the GT field, padding to the width of the
     widest call (ADR 0007).
 
     A hemizygous call keeps its one allele and fills the slot it doesn't have with
-    the no-allele sentinel. A wholly missing call is stored as a missing diploid
-    call whatever its GT length, so on a haploid chromosome it is imputed and
-    counted at ploidy 2 rather than 1. That is the one place this reader departs
-    from ADR 0007's encoding table, which gives a hemizygous no-call [255, 254].
+    the no-allele sentinel. A wholly missing call is read the same way, because
+    pysam distinguishes the two spellings: `.` is `(None,)` and stored as a
+    hemizygous no-call [255, 254], `./.` is `(None, None)` and stored as a diploid
+    one [255, 255].
+
+    Trusting the length means trusting the writer, so it is checked against the rest
+    of the variant. If any call there is genuinely hemizygous, hemizygosity is real
+    at this position and a `.` is a plausible reading of it, so the length is taken
+    at face value. Only where no call in evidence is hemizygous - every non-missing
+    call is diploid - does a `.` have no legitimate explanation, and the variant is
+    rejected rather than read at half the ploidy the sample can carry.
+
+    The residual risk that buys: at a mixed-sex chrX variant, a woman's no-call
+    miswritten `.` by a non-conformant writer passes this check and is imputed at
+    half the dosage she can carry. Telling it from a man's `.` needs a declared
+    sample sex, which ADR 0007 refuses on principle, so it is accepted rather than
+    detected.
     """
-    for sample in record_samples.values():
+    calls: list[tuple[int, ...]] = []
+    min_called_ploidy = ZARR_MAX_PLOIDY + 1
+    haploid_no_call = False
+
+    for sample in variant.samples.values():
         gt: tuple[int | None, ...] | None = sample.get("GT", None)
-        if gt is None or all(allele is None for allele in gt):
-            yield MISSING_GENOTYPE_TUPLE
-        elif len(gt) > ZARR_MAX_PLOIDY:
+        if not gt:
+            # no GT at all: nothing here says how many alleles the sample carries
+            calls.append(MISSING_GENOTYPE_TUPLE)
+            continue
+
+        if len(gt) > ZARR_MAX_PLOIDY:
             # keeping the first two alleles would turn a call the cache can't hold
             # into a plausible score
             raise ValueError(f"Ploidy {len(gt)} is greater than {ZARR_MAX_PLOIDY=}")
+
+        if all(allele is None for allele in gt):
+            haploid_no_call = haploid_no_call or len(gt) == 1
         else:
-            alleles = tuple(
-                MISSING_GENOTYPE_SENTINEL_VALUE if allele is None else allele
-                for allele in gt
-            )
-            yield alleles + (NO_ALLELE_SENTINEL_VALUE,) * (
-                ZARR_MAX_PLOIDY - len(alleles)
-            )
+            min_called_ploidy = min(min_called_ploidy, len(gt))
+
+        alleles = tuple(
+            MISSING_GENOTYPE_SENTINEL_VALUE if allele is None else allele
+            for allele in gt
+        )
+        calls.append(
+            alleles + (NO_ALLELE_SENTINEL_VALUE,) * (ZARR_MAX_PLOIDY - len(alleles))
+        )
+
+    if haploid_no_call and 1 < min_called_ploidy <= ZARR_MAX_PLOIDY:
+        raise ValueError(
+            f"Non-conformant VCF: a `.` genotype at {variant.chrom}:{variant.pos} "
+            "where every call that isn't missing is diploid. Nothing at this "
+            "position is hemizygous, so a `.` has no reading here: a conformant "
+            "writer spells a diploid no-call `./.` (ADR 0007)"
+        )
+
+    return calls
 
 
 def vcf_get_sample_list(target_path: Pathish) -> list[str]:
@@ -164,7 +197,7 @@ def parse_target_variants(
             seen_positions.add((chrom, variant.pos))
             # every call is padded to the same width, so the array stays rectangular
             gts: npt.NDArray[np.uint8] = np.fromiter(
-                vcf_get_genotypes(variant.samples),
+                vcf_get_genotypes(variant),
                 dtype=(np.uint8, ZARR_MAX_PLOIDY),
             )
 
