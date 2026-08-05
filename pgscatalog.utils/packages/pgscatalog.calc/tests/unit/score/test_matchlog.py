@@ -323,6 +323,7 @@ def _make_conn_from_rows(n_variants, match_rows) -> duckdb.DuckDBPyConnection:
             match_result STRUCT(is_matched BOOLEAN,
                                 match_type match_type_enum,
                                 match_summary match_summary_enum,
+                                exclusion_reason exclusion_reason_enum,
                                 is_ambiguous BOOLEAN,
                                 is_multiallelic BOOLEAN,
                                 match_priority UINTEGER),
@@ -337,6 +338,7 @@ def _make_conn_from_rows(n_variants, match_rows) -> duckdb.DuckDBPyConnection:
         INSERT INTO allele_match_table VALUES
         ('test', 'test', ?,
          {'is_matched': TRUE, 'match_type': ?, 'match_summary': 'matched',
+          'exclusion_reason': NULL,
           'is_ambiguous': ?, 'is_multiallelic': ?, 'match_priority': 6},
          0, 'test/ALL/file.vcf.gz', 'A', ['C']);
         """,
@@ -365,6 +367,110 @@ def test_match_rate_sums_unrounded_fractions():
     assert match_rate.as_tuple().exponent == -2
 
     conn.close()
+
+
+# the summary log is where "217 variants excluded" has to become counts a user can
+# act on: raise --keep_multiallelic, raise --keep_ambiguous, or look at the scoring
+# file (docs/adr/0010)
+
+_SHARD = "test/X/x.vcf.gz"
+_REASON_SCORE_ROWS = [
+    # two score variants resolving to the reference allele of target row 5
+    ("X", 100, "A", "C", 0.1, "additive", False, "PGS000001", 0),
+    ("X", 100, "A", "C", 0.2, "additive", False, "PGS000001", 1),
+    # a palindromic pairing, then a target carrying two alternative alleles
+    ("X", 200, "A", "T", 0.3, "additive", False, "PGS000001", 2),
+    ("X", 300, "A", "C", 0.4, "additive", False, "PGS000001", 3),
+    # a clean match, and a score variant that matches nothing
+    ("X", 400, "G", "T", 0.5, "additive", False, "PGS000001", 4),
+    ("X", 500, "A", "G", 0.6, "additive", False, "PGS000001", 5),
+]
+_REASON_TARGET_ROWS = [
+    (5, "X", 100, "A", ["C"], _SHARD, "test"),
+    (6, "X", 200, "A", ["T"], _SHARD, "test"),
+    (7, "X", 300, "A", ["C", "G"], _SHARD, "test"),
+    (8, "X", 400, "G", ["T"], _SHARD, "test"),
+    (9, "X", 500, "G", ["T"], _SHARD, "test"),
+]
+
+
+def _summary_of_every_reason(*, match_multiallelic: bool) -> list[tuple]:
+    """Match a scoring file that hits all three exclusion reasons, and summarise it"""
+    conn = duckdb.connect(":memory:")
+    conn.execute("""
+        CREATE TABLE score_variant_table (
+            chr_name VARCHAR,
+            chr_position UINTEGER,
+            effect_allele VARCHAR,
+            other_allele VARCHAR,
+            effect_weight DOUBLE,
+            effect_type VARCHAR,
+            is_duplicated BOOLEAN,
+            accession VARCHAR,
+            row_nr UINTEGER,
+            PRIMARY KEY(row_nr, accession)
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO score_variant_table VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        _REASON_SCORE_ROWS,
+    )
+    conn.execute("""
+        CREATE TABLE targetvariants (
+            geno_index UINTEGER,
+            chr_name TEXT,
+            chr_pos UINTEGER,
+            ref TEXT,
+            alts TEXT[],
+            zarr_group TEXT,
+            sampleset TEXT
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO targetvariants VALUES (?, ?, ?, ?, ?, ?, ?);",
+        _REASON_TARGET_ROWS,
+    )
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=match_multiallelic,
+        sampleset="test",
+    )
+    add_match_log(conn, sampleset="test", min_overlap=0.1)
+
+    # cast to sort alphabetically: both columns are enums, so their natural order is
+    # the order they were declared in
+    summary = conn.execute("""
+        SELECT match_summary, exclusion_reason, is_multiallelic, count
+        FROM summary_log_table
+        ORDER BY match_summary::VARCHAR, exclusion_reason::VARCHAR, is_multiallelic;
+    """).fetchall()
+    conn.close()
+    return summary
+
+
+def test_summary_log_splits_exclusions_by_reason():
+    """One 'excluded' count is three decisions, and each has a different fix"""
+    assert _summary_of_every_reason(match_multiallelic=False) == [
+        ("excluded", "ambiguous", False, 1),
+        ("excluded", "collision", False, 2),
+        ("excluded", "multiallelic", True, 1),
+        ("matched", None, False, 1),
+        ("unmatched", None, False, 1),
+    ]
+
+
+def test_keeping_multiallelics_leaves_the_other_reasons_alone():
+    """Raising the flag empties one reason's count without touching the others, and
+    the variant stays flagged multiallelic now that it's matched: the flag describes
+    the target variant, the reason describes the decision."""
+    assert _summary_of_every_reason(match_multiallelic=True) == [
+        ("excluded", "ambiguous", False, 1),
+        ("excluded", "collision", False, 2),
+        ("matched", None, False, 1),
+        ("matched", None, True, 1),
+        ("unmatched", None, False, 1),
+    ]
 
 
 def test_match_flipped_counts_strand_flips():

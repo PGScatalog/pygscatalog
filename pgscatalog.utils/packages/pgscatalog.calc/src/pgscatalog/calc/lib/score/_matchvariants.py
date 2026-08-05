@@ -28,6 +28,10 @@ def _setup_enums(conn: duckdb.DuckDBPyConnection) -> None:
         CREATE TYPE IF NOT EXISTS match_type_enum AS
         ENUM{tuple(e.name for e in MatchPriority)}
     """)
+    conn.execute(f"""
+        CREATE TYPE IF NOT EXISTS exclusion_reason_enum AS
+        ENUM{tuple(e.value for e in ExclusionReason)}
+    """)
 
 
 def update_match_table(
@@ -178,8 +182,9 @@ def exclude_match_collisions(conn: duckdb.DuckDBPyConnection) -> int:
 
     # the struct is rebuilt in the column's declared field order. is_ambiguous and
     # is_multiallelic describe the target variant and stay as matching found them;
-    # only the decision changes. When exclusions grow a reason column, this is where
-    # a collision names itself.
+    # only the decision changes, and exclusion_reason is where it names itself. This
+    # is the second of the two writers of that column: match_variant knows its own
+    # reason, but a collision is only visible across rows, never inside a UDF call.
     excluded: int = conn.execute(
         f"""
         UPDATE allele_match_table AS m
@@ -190,7 +195,9 @@ def exclude_match_collisions(conn: duckdb.DuckDBPyConnection) -> int:
             is_matched := FALSE,
             match_priority := {MatchPriority.EXCLUDED.value}::UINT8,
             match_type := '{MatchPriority.EXCLUDED.name}'::match_type_enum,
-            match_summary := 'excluded'::match_summary_enum
+            match_summary := 'excluded'::match_summary_enum,
+            exclusion_reason :=
+                '{ExclusionReason.COLLISION.value}'::exclusion_reason_enum
         )
         FROM match_collision_table AS c
         WHERE m.sampleset = c.sampleset
@@ -245,7 +252,11 @@ def create_allele_match_table(
                 is_matched BOOLEAN,
                 match_priority UINT8,
                 match_type match_type_enum,
-                match_summary match_summary_enum) NOT NULL,
+                match_summary match_summary_enum,
+                -- which decision excluded this score variant. NULL unless
+                -- match_summary is 'excluded': the flags above describe the target
+                -- variant, this describes what was done about it
+                exclusion_reason exclusion_reason_enum) NOT NULL,
             target_row_nr UINTEGER NOT NULL,
             zarr_group TEXT NOT NULL,
             {target_allele_columns}
@@ -271,11 +282,14 @@ def match_variant(
         is_multiallelic = True
 
     if is_multiallelic and not match_multiallelic:
+        # tested before any allele is compared, which is what makes multiallelic
+        # take precedence over ambiguous when both apply (docs/adr/0010)
         best_match = MatchResult(
             match_priority=MatchPriority.EXCLUDED,
             effect_allele_idx=None,
             is_ambiguous=None,
             is_multiallelic=is_multiallelic,
+            exclusion_reason=ExclusionReason.MULTIALLELIC,
         )
     else:
         # the generator yields one result for each alternative allele the target
@@ -293,6 +307,26 @@ def match_variant(
         best_match = max(matches, key=lambda x: x.match_priority.value)
 
     return best_match.to_dict()
+
+
+class ExclusionReason(enum.StrEnum):
+    """Why a score variant was excluded, for a reader of the match log.
+
+    match_summary 'excluded' covers three unrelated decisions and the target variant
+    flags can't tell them apart: is_multiallelic on a matched row is a fact about the
+    target, on an excluded row it is the cause, and a collision has no flag at all.
+    Each reason names its own fix - raise --keep_multiallelic, raise --keep_ambiguous,
+    or go and look at the scoring file (docs/adr/0010).
+
+    Not folded into match_type_enum: match_type comes from MatchPriority.name, and
+    MatchPriority is an ordering consumed by max() and by the ranking window, so
+    three exclusion members would need three priority values whose relative order
+    means nothing.
+    """
+
+    MULTIALLELIC = "multiallelic"
+    AMBIGUOUS = "ambiguous"
+    COLLISION = "collision"
 
 
 class MatchPriority(enum.Enum):
@@ -317,6 +351,7 @@ class MatchResult:
             "match_priority": UINTEGER,
             "match_type": VARCHAR,
             "match_summary": VARCHAR,
+            "exclusion_reason": VARCHAR,
         }
     )
 
@@ -324,6 +359,19 @@ class MatchResult:
     effect_allele_idx: int | None
     is_ambiguous: bool | None
     is_multiallelic: bool | None
+    # NULL unless this variant was excluded, and required when it was: the whole
+    # point of the column is that 'excluded' never has to be interpreted
+    exclusion_reason: ExclusionReason | None = None
+
+    def __post_init__(self) -> None:
+        excluded: bool = self.match_priority is MatchPriority.EXCLUDED
+        if excluded and self.exclusion_reason is None:
+            raise ValueError("an excluded match must name its exclusion_reason")
+        if not excluded and self.exclusion_reason is not None:
+            raise ValueError(
+                f"{self.match_priority.name} isn't excluded, so it has no "
+                f"exclusion_reason (got {self.exclusion_reason})"
+            )
 
     @property
     def is_matched(self) -> bool:
@@ -352,6 +400,11 @@ class MatchResult:
             "is_matched": self.is_matched,
             "is_multiallelic": self.is_multiallelic,
             "match_summary": self.match_summary,
+            "exclusion_reason": (
+                self.exclusion_reason.value
+                if self.exclusion_reason is not None
+                else None
+            ),
         }
 
 
@@ -533,6 +586,7 @@ def get_variant_match_priority(
             effect_allele_idx=None,
             is_ambiguous=True,
             is_multiallelic=is_multiallelic,
+            exclusion_reason=ExclusionReason.AMBIGUOUS,
         )
         return
 

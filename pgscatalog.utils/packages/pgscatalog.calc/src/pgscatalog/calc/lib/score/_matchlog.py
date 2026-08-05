@@ -46,6 +46,11 @@ def add_match_log(
         is_matched BOOLEAN NOT NULL,
         match_type match_type_enum NOT NULL,
         match_summary match_summary_enum NOT NULL,
+        -- which decision excluded this variant, NULL unless match_summary is
+        -- 'excluded'. is_ambiguous and is_multiallelic describe the target variant
+        -- and stay descriptive: a matched multiallelic variant still reports
+        -- is_multiallelic = true (docs/adr/0010)
+        exclusion_reason exclusion_reason_enum,
         is_ambiguous BOOLEAN,
         is_multiallelic BOOLEAN,
         target_row_nr UINTEGER,
@@ -72,6 +77,7 @@ def add_match_log(
          COALESCE(matches.match_result.is_matched, FALSE) AS is_matched,
          COALESCE(matches.match_result.match_type, 'NO_MATCH') AS match_type,
          COALESCE(matches.match_result.match_summary, 'unmatched') AS match_summary,
+         matches.match_result.exclusion_reason,
          matches.match_result.is_ambiguous,
          matches.match_result.is_multiallelic,
          matches.target_row_nr,
@@ -104,6 +110,9 @@ def add_match_log(
             SELECT sampleset,
                    accession,
                    match_summary,
+                   -- grouped alongside the flags, not instead of them: this splits
+                   -- one "217 variants excluded" into counts that each name a fix
+                   exclusion_reason,
                    is_ambiguous,
                    is_multiallelic,
                    COUNT(match_summary) AS count,
@@ -114,6 +123,7 @@ def add_match_log(
             GROUP BY sampleset,
                      accession,
                      match_summary,
+                     exclusion_reason,
                      is_ambiguous,
                      is_multiallelic
         )
@@ -148,6 +158,7 @@ def add_match_log(
             sampleset,
             accession,
             match_summary,
+            exclusion_reason,
             is_ambiguous,
             is_multiallelic,
             match_flipped,

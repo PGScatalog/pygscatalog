@@ -2,6 +2,7 @@ import duckdb
 import pytest
 
 from pgscatalog.calc.lib.score._matchvariants import (
+    ExclusionReason,
     MatchPriority,
     MatchResult,
     _setup_enums,
@@ -283,6 +284,7 @@ def test_unmatchable_allele_keeps_its_index() -> None:
                     effect_allele_idx=None,
                     is_ambiguous=True,
                     is_multiallelic=True,
+                    exclusion_reason=ExclusionReason.AMBIGUOUS,
                 )
             ],
         ),
@@ -395,6 +397,7 @@ def test_match_priority(
                 "match_priority": MatchPriority.EXCLUDED,
                 "is_ambiguous": True,
                 "is_multiallelic": False,
+                "exclusion_reason": ExclusionReason.AMBIGUOUS,
             },
             False,
             "EXCLUDED",
@@ -435,6 +438,7 @@ def test_matchresult(
         "is_ambiguous",
         "is_multiallelic",
         "is_matched",
+        "exclusion_reason",
     }
     assert result.to_dict()["match_priority"] == match_priority
 
@@ -459,6 +463,7 @@ def test_matchresult(
                 "is_ambiguous": False,
                 "is_matched": True,
                 "is_multiallelic": False,
+                "exclusion_reason": None,
             },
         ),
         (
@@ -478,6 +483,7 @@ def test_matchresult(
                 "is_ambiguous": False,
                 "is_matched": True,
                 "is_multiallelic": False,
+                "exclusion_reason": None,
             },
         ),
         (
@@ -497,6 +503,7 @@ def test_matchresult(
                 "is_ambiguous": True,
                 "is_matched": True,
                 "is_multiallelic": False,
+                "exclusion_reason": None,
             },
         ),
         (
@@ -516,6 +523,7 @@ def test_matchresult(
                 "is_ambiguous": True,
                 "is_matched": False,
                 "is_multiallelic": False,
+                "exclusion_reason": "ambiguous",
             },
         ),
         (
@@ -535,6 +543,7 @@ def test_matchresult(
                 "is_ambiguous": None,
                 "is_matched": False,
                 "is_multiallelic": True,
+                "exclusion_reason": "multiallelic",
             },
         ),
         (
@@ -554,6 +563,7 @@ def test_matchresult(
                 "is_ambiguous": False,
                 "is_matched": True,
                 "is_multiallelic": True,
+                "exclusion_reason": None,
             },
         ),
         (
@@ -573,6 +583,7 @@ def test_matchresult(
                 "is_ambiguous": False,
                 "is_matched": False,
                 "is_multiallelic": False,
+                "exclusion_reason": None,
             },
         ),
     ],
@@ -616,6 +627,7 @@ def test_match_variant_unmatchable_allele(alts: list[str]) -> None:
         "is_ambiguous": False,
         "is_matched": False,
         "is_multiallelic": False,
+        "exclusion_reason": None,
     }
 
 
@@ -623,6 +635,49 @@ def test_match_variant_corrupt_allele() -> None:
     """A corrupt allele string isn't unmatchable, it's wrong, and still raises"""
     with pytest.raises(ValueError):
         match_variant(False, False, "A", "T", "A", ["XYZ"])
+
+
+def test_multiallelic_takes_precedence_over_ambiguous() -> None:
+    """Both reasons apply and only one column is available to say so.
+
+    REF=A ALTS=[T,C] carries a palindromic pair, so the score variant A/T is
+    ambiguous there as well as multiallelic. match_variant tests multiallelic before
+    comparing any allele, so that's the reason reported (docs/adr/0010).
+    """
+    result = match_variant(
+        False,  # match_ambiguous
+        False,  # match_multiallelic
+        "A",  # effect_allele
+        "T",  # other_allele
+        "A",  # ref
+        ["T", "C"],
+    )
+
+    assert result["match_summary"] == "excluded"
+    assert result["exclusion_reason"] == "multiallelic"
+
+
+def test_matchresult_excluded_without_a_reason_raises() -> None:
+    """An excluded row a reader can't interpret is the bug this column fixes"""
+    with pytest.raises(ValueError, match="exclusion_reason"):
+        MatchResult(
+            MatchPriority.EXCLUDED,
+            effect_allele_idx=None,
+            is_ambiguous=True,
+            is_multiallelic=False,
+        )
+
+
+def test_matchresult_reason_without_an_exclusion_raises() -> None:
+    """A reason on a matched row would say a decision was taken that wasn't"""
+    with pytest.raises(ValueError, match="exclusion_reason"):
+        MatchResult(
+            MatchPriority.REFALT,
+            effect_allele_idx=0,
+            is_ambiguous=False,
+            is_multiallelic=False,
+            exclusion_reason=ExclusionReason.AMBIGUOUS,
+        )
 
 
 def test_setup_enums() -> None:
@@ -641,6 +696,12 @@ def test_setup_enums() -> None:
     # Check that match_type_enum has the same labels as MatchPriority
     (type_values,) = conn.execute("SELECT enum_range(NULL::match_type_enum)").fetchone()
     assert type_values == [e.name for e in MatchPriority]
+
+    # every exclusion names its reason, and the reasons are enumerable
+    (reason_values,) = conn.execute(
+        "SELECT enum_range(NULL::exclusion_reason_enum)"
+    ).fetchone()
+    assert reason_values == ["multiallelic", "ambiguous", "collision"]
 
 
 def _make_test_conn(
@@ -995,7 +1056,8 @@ def _match_table_with_rows(rows: list[tuple]) -> duckdb.DuckDBPyConnection:
                 is_matched := TRUE,
                 match_priority := 7::UINT8,
                 match_type := 'REFALT'::match_type_enum,
-                match_summary := 'matched'::match_summary_enum
+                match_summary := 'matched'::match_summary_enum,
+                exclusion_reason := NULL::exclusion_reason_enum
             ),
             ?,
             ?,
@@ -1052,7 +1114,7 @@ def test_two_accessions_on_one_target_allele_are_not_a_collision() -> None:
 
 def test_collision_keeps_the_target_variant_flags() -> None:
     """is_ambiguous and is_multiallelic describe the target variant, not the
-    decision, so exclusion leaves them alone (a reason column comes later)."""
+    decision, so exclusion leaves them alone and names itself in exclusion_reason."""
     conn = _match_table_with_rows(
         [
             ("PGS000001", 0, 0, 7, COLLISION_SHARD),
@@ -1068,7 +1130,8 @@ def test_collision_keeps_the_target_variant_flags() -> None:
             is_matched := match_result.is_matched,
             match_priority := match_result.match_priority,
             match_type := match_result.match_type,
-            match_summary := match_result.match_summary
+            match_summary := match_result.match_summary,
+            exclusion_reason := match_result.exclusion_reason
         );
     """)
 
@@ -1076,10 +1139,98 @@ def test_collision_keeps_the_target_variant_flags() -> None:
 
     flags = conn.execute("""
         SELECT match_result.is_multiallelic, match_result.is_ambiguous,
-               match_result.match_priority
+               match_result.match_priority, match_result.exclusion_reason
         FROM allele_match_table;
     """).fetchall()
-    assert flags == [(True, False, MatchPriority.EXCLUDED.value)] * 2
+    # a multiallelic target that collided reports the collision, not the flag: the
+    # flag was already true when the row matched
+    assert flags == [(True, False, MatchPriority.EXCLUDED.value, "collision")] * 2
+
+
+# every reason, in one match table, written by both writers: match_variant sets the
+# first two from inside the UDF, the collision pass sets the third across rows
+
+_EVERY_REASON_SCORE_ROWS = [
+    # two score variants resolving to the reference allele of target row 5
+    ("X", 100, "A", "C", 0.1, "additive", False, "PGS000001", 0),
+    ("X", 100, "A", "C", 0.2, "additive", False, "PGS000001", 1),
+    # a palindromic pairing: both readings match target row 6
+    ("X", 200, "A", "T", 0.3, "additive", False, "PGS000001", 2),
+    # target row 7 carries two alternative alleles
+    ("X", 300, "A", "C", 0.4, "additive", False, "PGS000001", 3),
+    # a clean match, and a score variant that matches nothing at target row 9
+    ("X", 400, "G", "T", 0.5, "additive", False, "PGS000001", 4),
+    ("X", 500, "A", "G", 0.6, "additive", False, "PGS000001", 5),
+]
+_EVERY_REASON_TARGET_ROWS = [
+    (5, "X", 100, "A", ["C"], COLLISION_SHARD, "test"),
+    (6, "X", 200, "A", ["T"], COLLISION_SHARD, "test"),
+    (7, "X", 300, "A", ["C", "G"], COLLISION_SHARD, "test"),
+    (8, "X", 400, "G", ["T"], COLLISION_SHARD, "test"),
+    (9, "X", 500, "G", ["T"], COLLISION_SHARD, "test"),
+]
+
+
+def _reasons(conn: duckdb.DuckDBPyConnection) -> list[tuple]:
+    return conn.execute("""
+        SELECT row_nr,
+               match_result.match_summary    AS match_summary,
+               match_result.exclusion_reason AS exclusion_reason
+        FROM allele_match_table
+        ORDER BY row_nr;
+    """).fetchall()
+
+
+def test_every_exclusion_names_its_reason() -> None:
+    """All three reasons at once: excluded rows name one, everything else is NULL"""
+    conn = _make_collision_conn(
+        score_rows=_EVERY_REASON_SCORE_ROWS,
+        target_rows=_EVERY_REASON_TARGET_ROWS,
+    )
+
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=False,
+        sampleset="test",
+    )
+
+    assert _reasons(conn) == [
+        (0, "excluded", "collision"),
+        (1, "excluded", "collision"),
+        (2, "excluded", "ambiguous"),
+        (3, "excluded", "multiallelic"),
+        (4, "matched", None),
+        (5, "unmatched", None),
+    ]
+
+
+def test_keeping_multiallelics_leaves_the_other_reasons_alone() -> None:
+    """--keep_multiallelic empties one reason and doesn't touch the other two"""
+    conn = _make_collision_conn(
+        score_rows=_EVERY_REASON_SCORE_ROWS,
+        target_rows=_EVERY_REASON_TARGET_ROWS,
+    )
+
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=True,
+        sampleset="test",
+    )
+
+    assert _reasons(conn) == [
+        (0, "excluded", "collision"),
+        (1, "excluded", "collision"),
+        (2, "excluded", "ambiguous"),
+        # the multiallelic target is matched now, and still flagged multiallelic
+        (3, "matched", None),
+        (4, "matched", None),
+        (5, "unmatched", None),
+    ]
+    assert conn.execute("""
+        SELECT match_result.is_multiallelic FROM allele_match_table WHERE row_nr = 3;
+    """).fetchone() == (True,)
 
 
 def test_unmatched_rows_never_collide() -> None:
