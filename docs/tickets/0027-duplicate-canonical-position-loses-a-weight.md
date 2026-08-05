@@ -3,6 +3,16 @@
 **Refs:** ADR 0008. Found while implementing 0019, whose last acceptance criterion asked
 only that this be recorded.
 
+> **Superseded in part by [ADR 0010](../adr/0010-multiallelic-matched-per-alt-bgen-stays-biallelic.md).**
+> The acceptance criteria below stand. The **Scope** section's proposed
+> `(accession, chr_name, chr_position)` uniqueness check on `score_variant_table` does
+> not: once multiallelic variants are matched per alternative allele, an accession
+> legitimately holds two rows at one position (`A/C` and `A/G` match different
+> alternative alleles), and that key would reject valid scoring files. The check belongs
+> after matching, keyed on `(accession, target_row_nr, effect_allele_idx)`. ADR 0010 also
+> narrows the inflated-match-rate wrong: two score variants matching two different
+> alleles of one variant are two variants found, not one locus counted twice.
+
 ## Why
 
 0019 collapses `XY` into `X`, so a scoring file carrying an `XY` variant and an `X`
