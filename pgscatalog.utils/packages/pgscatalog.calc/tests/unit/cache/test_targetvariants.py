@@ -90,6 +90,8 @@ def test_variant_bad_construction(valid_args: dict):
 
 # error 2: invalid values in genotypes
 def test_variant_invalid_genotypes_construction(valid_args: dict):
+    """The second variant declares one alternative allele, so a `2` names an allele
+    the record doesn't have"""
     invalid_gts_args = valid_args.copy()
     # introduce an invalid genotype value 2
     invalid_gts = [
@@ -100,6 +102,25 @@ def test_variant_invalid_genotypes_construction(valid_args: dict):
 
     with pytest.raises(ValueError, match="Genotypes contain invalid values"):
         TargetVariants(**invalid_gts_args)
+
+
+def test_a_call_naming_a_later_alternative_allele_is_accepted(valid_args: dict):
+    """A call names its allele by index, and a multiallelic record has indices past
+    1 (ADR 0010). The check used to be pinned at `[0, 1]`, which made every
+    multiallelic call invalid by construction; the ceiling is now the number of
+    alleles the record itself declares.
+    """
+    multiallelic_args = valid_args.copy()
+    multiallelic_args["alts"] = [["G"], ["A", "T"]]
+    multiallelic_args["gts"] = [
+        valid_args["gts"][0],
+        np.array([[0, 0], [1, 2], [2, 2]], dtype=np.uint8),
+    ]
+
+    variants = TargetVariants(**multiallelic_args)
+
+    np.testing.assert_array_equal(variants.genotypes[1], [[0, 0], [1, 2], [2, 2]])
+    assert variants.variant_ids[1] == "21:46366609:C:A/T"
 
 
 def test_hemizygous_calls_without_missingness_are_accepted(valid_args: dict):

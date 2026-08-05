@@ -1,6 +1,10 @@
+import pathlib
+
 import numpy as np
 import pysam
 import pytest
+import zarr
+import zarr.storage
 
 from pgscatalog.calc.lib.cache._vcf import (
     region_sort_key,
@@ -8,6 +12,8 @@ from pgscatalog.calc.lib.cache._vcf import (
     vcf_get_genotypes,
     vcf_get_sample_list,
 )
+from pgscatalog.calc.lib.cache.genotypecache import meta_group_path
+from pgscatalog.calc.lib.cache.targetgenome import TargetGenome
 from pgscatalog.calc.lib.cache.targetvariants import (
     TargetVariants,
 )
@@ -37,6 +43,24 @@ def one_variant(tmp_path, calls: list[str]) -> pysam.VariantRecord:
 
     with pysam.VariantFile(str(path)) as vcf:
         return next(iter(vcf))
+
+
+def multiallelic_target(
+    tmp_path, calls: list[str]
+) -> tuple[pathlib.Path, pathlib.Path]:
+    """An indexed one-variant target holding `A -> C,G` at 1:100
+
+    Written as text and indexed, so bcftools sees exactly the record a writer would
+    have emitted and the filters under test get a chance to drop it.
+    """
+    path = tmp_path / "multiallelic.vcf"
+    samples = "\t".join(f"sample{i}" for i in range(len(calls)))
+    with path.open("w") as f:
+        f.write(VCF_HEADER.format(samples=samples))
+        f.write("1\t100\t.\tA\tC,G\t.\t.\t.\tGT\t" + "\t".join(calls) + "\n")
+
+    compressed = pathlib.Path(pysam.tabix_index(str(path), preset="vcf", force=True))
+    return compressed, pathlib.Path(str(compressed) + ".tbi")
 
 
 @pytest.fixture
@@ -251,3 +275,89 @@ def test_vcf_buffer_x_variants(
     assert {tuple(np.bincount(row, minlength=3)[1:]) for row in ploidy[genotyped]} == {
         (1599, 1603)
     }
+
+
+# Test 2.4: multiallelic records (ADR 0010)
+def test_a_multiallelic_record_reaches_the_cache(
+    tmp_path, tmp_path_factory, sampleset_name
+):
+    """`--max-alleles 2` dropped the record before the cache existed, which made
+    `--keep_multiallelic` unreachable code (ADR 0010).
+
+    Alleles are positional - a call names the allele it carries by index - so the
+    whole ALT column is kept in the order the record declared it, and a `2` still
+    means the second alternative allele.
+    """
+    target, index = multiallelic_target(tmp_path, ["0/0", "0/1", "1/2", "2/2"])
+
+    variants = vcf_buffer_variants(
+        position_batch=[("1", 100)],
+        target_path=target,
+        index_path=index,
+        cache_dir=tmp_path_factory.mktemp("cache"),
+        sampleset=sampleset_name,
+    )
+
+    assert len(variants) == 1
+    assert variants.variant_metadata.ref == ["A"]
+    assert variants.variant_metadata.alts == [["C", "G"]]
+    assert variants.variant_ids == ["1:100:A:C/G"]
+    np.testing.assert_array_equal(
+        variants.genotypes[0], [[0, 0], [0, 1], [1, 2], [2, 2]]
+    )
+
+
+def test_a_multiallelic_position_is_not_padded_absent(
+    tmp_path, tmp_path_factory, sampleset_name
+):
+    """A filtered record never entered `seen_positions`, so it was padded with
+    `ref=None` - and `update_match_table`'s `WHERE target.ref IS NOT NULL` then
+    dropped it, telling the user a variant wasn't found in data that held it.
+
+    A position genuinely absent from the target is still padded, which is the row
+    this has to be told apart from.
+    """
+    target, index = multiallelic_target(tmp_path, ["0/1", "1/2"])
+
+    variants = vcf_buffer_variants(
+        position_batch=[("1", 100), ("1", 200)],
+        target_path=target,
+        index_path=index,
+        cache_dir=tmp_path_factory.mktemp("cache"),
+        sampleset=sampleset_name,
+    )
+
+    metadata = variants.variant_metadata
+    assessed = metadata.chr_pos.index(100)
+    absent = metadata.chr_pos.index(200)
+
+    assert metadata.ref[assessed] == "A"
+    assert metadata.alts[assessed] == ["C", "G"]
+    assert metadata.ref[absent] is None
+    assert metadata.alts[absent] is None
+
+
+def test_a_multiallelic_call_round_trips_through_the_cache(
+    tmp_path, tmp_path_factory, sampleset_name
+):
+    """A `1/2` call has to survive the write to zarr and the read back out of it:
+    dosage counts calls equal to an allele index, so an index that shifts on the way
+    through would count a different allele"""
+    target, index = multiallelic_target(tmp_path, ["0/0", "1/2"])
+    cache_dir = tmp_path_factory.mktemp("cache")
+
+    genome = TargetGenome(
+        target_path=target,
+        target_index_path=index,
+        cache_dir=cache_dir,
+        sampleset=sampleset_name,
+    )
+    genome.cache_variants([("1", 100)])
+
+    store = zarr.storage.LocalStore(cache_dir / "genotypes.zarr")
+    group = zarr.open_group(store=store, path=f"{sampleset_name}/ALL/{target.name}")
+    meta = zarr.open_group(store=store, path=meta_group_path(group.path))
+
+    alts = [x.decode() if isinstance(x, bytes) else x for x in meta["alts"][...]]
+    assert alts == ["C/G"]
+    np.testing.assert_array_equal(group["genotypes"][...], [[[0, 0], [1, 2]]])

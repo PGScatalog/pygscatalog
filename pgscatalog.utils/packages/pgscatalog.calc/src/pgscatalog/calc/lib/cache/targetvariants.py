@@ -81,13 +81,21 @@ class TargetVariants:
         if len(lengths) != 1:
             raise ValueError(f"Input lists have different lengths: {lengths=}")
 
-        # check that the genotypes look sensible
-        if not np.all(
-            np.isin(
-                self._genotypes,
-                [0, 1, MISSING_GENOTYPE_SENTINEL_VALUE, NO_ALLELE_SENTINEL_VALUE],
-            )
-        ):
+        # check that the genotypes look sensible. A call is either a sentinel or an
+        # index into this variant's own allele list - 0 is REF and 1..len(alts) the
+        # alternative alleles - so the ceiling moves with the record instead of being
+        # pinned at 1 (ADR 0010). A padded-absent row declares no alleles at all, and
+        # carries nothing but missing sentinels
+        n_alts = np.array(
+            [0 if alt is None else len(alt) for alt in self._alts], dtype=np.uint16
+        )
+        is_sentinel = np.isin(
+            self._genotypes,
+            [MISSING_GENOTYPE_SENTINEL_VALUE, NO_ALLELE_SENTINEL_VALUE],
+        )
+        names_an_allele = self._genotypes <= n_alts[:, np.newaxis, np.newaxis]
+
+        if not np.all(is_sentinel | names_an_allele):
             raise ValueError("Genotypes contain invalid values")
 
     def __len__(self) -> int:
