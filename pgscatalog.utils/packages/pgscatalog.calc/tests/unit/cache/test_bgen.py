@@ -188,7 +188,7 @@ def test_bgen_no_index(test_positions, phased_bgen_path, bgen_sample, tmp_path_f
     # doesn't exist
     new_bgen_idx = new_bgen_path + ".bgi"
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         _ = bgen_buffer_variants(
             target_path=new_bgen_path,
             position_batch=test_positions,

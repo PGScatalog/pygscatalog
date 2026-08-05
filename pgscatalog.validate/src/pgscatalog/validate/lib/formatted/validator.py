@@ -1,8 +1,28 @@
 import gzip
 import re
-from pandas_schema import Schema
-from ..schemas import *
-from ..validator_base import *
+from ..common_constants import (
+    BP_DSET,
+    CHR_DSET,
+    HR_DSET,
+    OR_DSET,
+    SNP_DSET,
+)
+from ..schemas import (
+    CHR_COLS_VAR_FORMATTED,
+    FORMATTED_META_GENERIC,
+    FORMATTED_VALIDATORS,
+    FORMATTED_VALIDATORS_HR,
+    FORMATTED_VALIDATORS_OR,
+    FORMATTED_VALIDATORS_POS,
+    FORMATTED_VALIDATORS_SNP,
+    FORMATTED_VALIDATORS_SNP_EMPTY,
+    SNP_COLS_VAR_FORMATTED,
+    STD_COLS_EFFECT_FORMATTED,
+    STD_COLS_VAR_FORMATTED,
+    VALID_COLS_FORMATTED,
+    VALID_TYPE_FORMATTED,
+)
+from ..validator_base import ValidatorBase
 
 '''
 PGS Catalog Harmonized file validator

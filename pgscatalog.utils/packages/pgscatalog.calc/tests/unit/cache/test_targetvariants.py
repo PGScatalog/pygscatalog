@@ -102,8 +102,7 @@ def test_variant_invalid_genotypes_construction(valid_args: dict):
 # Test 3: test_write_zarr_writes_expected_structure
 def _make_memory_group() -> zarr.Group:
     """Create an in-memory zarr root group for testing."""
-    root = zarr.group()
-    return root
+    return zarr.group()
 
 
 # Zarr 1. build the zarr
