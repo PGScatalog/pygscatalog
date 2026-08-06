@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Constrains [ticket 0027](../tickets/0027-duplicate-canonical-position-loses-a-weight.md).
+Accepted. Its definition of a complemented reading is refined by [ADR 0011](0011-a-strand-flip-is-a-reverse-complement-and-indels-decline-it.md).
 
 ## Context
 
@@ -44,7 +44,7 @@ v2's key for that check is `(accession, ID)` over exploded biallelic variants, a
 |---|---|---|
 | `A/C` and `A/G` → both index 0 | ❌ excluded | ❌ excluded — one dosage, two weights |
 | `C/A` and `G/A` → index 1 and index 2 | ❌ excluded | ✅ both scored — two real alleles of one variant |
-| `XY` and `X` canonicalised together → both index 0 | ❌ excluded | ❌ excluded — [ticket 0027](../tickets/0027-duplicate-canonical-position-loses-a-weight.md) |
+| `XY` and `X` canonicalised together → both index 0 | ❌ excluded | ❌ excluded — one dosage, two weights, reached by canonicalisation ([ADR 0008](0008-canonical-chromosome-names.md)) |
 
 The middle row is the state multiallelic support creates and an exploded representation cannot reach, because there two alleles of one site are two IDs.
 
@@ -89,7 +89,7 @@ The `NotImplementedError` at `lib/cache/_bgen.py:286-287` therefore fires on the
 
 ## Consequences
 
-- **[Ticket 0027](../tickets/0027-duplicate-canonical-position-loses-a-weight.md)'s proposed fix becomes wrong.** It suggests a `(accession, chr_name, chr_position)` uniqueness check on `score_variant_table`. That key rejects valid scoring files once multiallelics land, and it sits on the wrong table — a collision is a post-match property, invisible while the scoring file is being read. 0027's acceptance criteria stand unchanged; its proposed key is superseded by the collision key above.
+- **The fix first proposed for a duplicate canonical position becomes wrong.** It suggested a `(accession, chr_name, chr_position)` uniqueness check on `score_variant_table`. That key rejects valid scoring files once multiallelics land, and it sits on the wrong table — a collision is a post-match property, invisible while the scoring file is being read. What that fix had to achieve is unchanged; the key it proposed is superseded by the collision key above.
 - **0027's second wrong is narrower than it looks.** It reports the `min_overlap` numerator counting one locus twice. Two score variants matching two *different* alleles of one multiallelic variant are two variants found, not one locus double-counted, so the inflation is real only for same-index collisions — which excluding collisions already removes.
 - **The excluded/unmatched split in every match log shifts.** Ambiguity is currently computed from `(ref, alt)` before anyone checks whether the score variant matched, so a score variant of `G/C` at a palindromic `A/T` site — matching nothing — is logged `EXCLUDED` today and becomes `NO_MATCH` under the new definition. No score changes: `match_rate` sums only `matched` (`lib/score/_matchlog.py:137`). Anyone diffing v3 logs against v2 will see it.
 - **The `A/*` crash is fixed as a side effect**, not as separate work. It is a pre-existing bug on `main`, reachable without any multiallelic record present.
