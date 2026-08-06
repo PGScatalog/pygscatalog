@@ -3,7 +3,7 @@ import polars as pl
 import pytest
 
 from pgscatalog.calc.lib.cache.zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
-from pgscatalog.calc.lib.constants import NUMPY_STRING_DTYPE
+from pgscatalog.calc.lib.constants import NUMPY_STRING_DTYPE, is_unmatchable_allele
 
 
 # Test 1: invalid allele, validator should raise ValueError
@@ -15,6 +15,47 @@ def test_variant_metadata_invalid_ref_allele_raises():
             ref=["N"],  # invalid allele
             alts=["A"],
             variant_id=["v1"],
+        )
+
+
+# Test 1.1: alleles no score can match are stored, not refused (ADR 0010)
+@pytest.mark.parametrize(
+    "alt",
+    ["*", "<NON_REF>", ".", "T[2:456["],
+    ids=["spanning deletion", "symbolic allele", "missing allele", "breakend"],
+)
+def test_an_unmatchable_allele_is_cached_as_written(alt: str):
+    """A legal VCF allele that names no sequence is kept in place and skipped at
+    match time, never filtered: a call names its allele by index, so dropping one
+    renumbers every allele after it (ADR 0010). The cache and the matcher share
+    `is_unmatchable_allele`, so they can't disagree about which those are.
+    """
+    assert is_unmatchable_allele(alt)
+
+    metadata = ZarrVariantMetadata(
+        chr_name=["1"],
+        chr_pos=[100],
+        ref=["A"],
+        alts=[["C", alt]],
+        variant_id=[f"1:100:A:C/{alt}"],
+    )
+
+    # in position: allele 2 is still the unmatchable one, not renumbered onto C
+    assert metadata.alts == [["C", alt]]
+
+
+def test_a_corrupt_allele_is_still_refused_at_cache_write():
+    """`XYZ` carries no character that rules out a base sequence, so it isn't an
+    allele nothing can match - it's a wrong one, and cache write still says so"""
+    assert not is_unmatchable_allele("XYZ")
+
+    with pytest.raises(ValueError, match="Invalid allele: XYZ"):
+        ZarrVariantMetadata(
+            chr_name=["1"],
+            chr_pos=[100],
+            ref=["A"],
+            alts=[["XYZ"]],
+            variant_id=["1:100:A:XYZ"],
         )
 
 
