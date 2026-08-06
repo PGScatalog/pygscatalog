@@ -10,6 +10,7 @@ import duckdb
 import polars as pl
 import zarr
 import zarr.errors
+from duckdb.sqltypes import VARCHAR
 
 from .cache.genotypecache import meta_group_path
 from .constants import VALID_CHROMOSOMES, canonicalise_chrom
@@ -33,9 +34,7 @@ def register_canonicalise_chrom(conn: duckdb.DuckDBPyConnection) -> None:
     with contextlib.suppress(duckdb.InvalidInputException):
         conn.remove_function("canonicalise_chrom")
 
-    conn.create_function(
-        "canonicalise_chrom", canonicalise_chrom, ["VARCHAR"], "VARCHAR"
-    )
+    conn.create_function("canonicalise_chrom", canonicalise_chrom, [VARCHAR], VARCHAR)
 
 
 class Scorefiles:

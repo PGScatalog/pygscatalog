@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cache
-from typing import Literal
+from typing import Literal, overload
 
 from numpy.dtypes import StringDType
 
@@ -33,6 +33,14 @@ VALID_CHROMOSOMES = {str(x) for x in range(1, 23)}.union({"X", "Y", "MT", None})
 # because pseudoautosomal variants are ordinary X variants (ADR 0008), and 23-26 are
 # plink's numeric codes
 _CHROM_ALIASES = {"XY": "X", "M": "MT", "23": "X", "24": "Y", "25": "X", "26": "MT"}
+
+
+@overload
+def canonicalise_chrom(chrom: str | int) -> str: ...
+
+
+@overload
+def canonicalise_chrom(chrom: None) -> None: ...
 
 
 @cache
