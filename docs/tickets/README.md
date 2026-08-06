@@ -2,20 +2,13 @@
 
 Open work only. A ticket is deleted when it lands — the commit that closes it is its record, and `git log -- docs/tickets/` finds the ones that are gone. Decisions that outlive the work belong in `docs/adr/`, not here.
 
-Derived from ADRs 0001, 0003, 0004, and 0007–0010. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
+Derived from ADRs 0001, 0003, 0004, and 0007–0011. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
 
 ## Open
 
-X, Y and MT support (0019–0025) has landed, along with 0026, the ploidy bug it uncovered. Multiallelic handling (ADR 0010) adds 0028–0032; 0027, 0028, 0029, 0032 and 0033 have landed.
+None. X, Y and MT support (0019–0025) landed first, leaving two bugs it uncovered (0026, 0027); multiallelic handling (ADR 0010) added 0028–0032; and implementing those uncovered two more (0033, 0034), both crashes or wrong answers on `main` independently of multiallelic support.
 
-| # | Ticket | Depends on |
-|---|---|---|
-| 0030 | [Only the first alternative allele can match](0030-match-every-alternative-allele.md) | 0029 ✅ |
-| 0031 | [`EXCLUDED` means three different things](0031-every-exclusion-names-its-reason.md) | 0027 ✅, 0030 |
-
-0029 and 0030 are the pair that has to ship together to be observable: 0029 caches records nothing can match yet, 0030 matches records that aren't cached yet.
-
-0033 was why 0028 was not finished in practice: 0028 made the matcher skip `*` and symbolic alleles, but the cache writer refused those records first, so the criterion was only ever met by driving the matcher directly. It was a crash on `main` independently of multiallelic support.
+Two decisions taken while closing them are recorded rather than lost: a wholly missing VCF call keeps the ploidy its `GT` declares, guarded where nothing at the variant is hemizygous ([ADR 0007](../adr/0007-ploidy-is-observed-per-call.md)), and a strand flip is a reverse complement that an indel declines ([ADR 0011](../adr/0011-a-strand-flip-is-a-reverse-complement-and-indels-decline-it.md)).
 
 ## Not in this repo
 

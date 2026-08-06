@@ -55,6 +55,13 @@ def test_check_nucleotide_allele_accepts_sequences(allele: str) -> None:
         ("A", None, "C", "T", (MatchPriority.NO_MATCH, None, False, True)),
         ("A", "T", "A", "T", (MatchPriority.REFALT, 0, True, True)),
         ("A", "C", "C", "G", (MatchPriority.NO_MATCH, None, False, False)),
+        # docs/adr/0011: the other strand carries the *reverse* complement
+        ("AC", "CC", "GT", "GG", (MatchPriority.REFALT_FLIP, 0, False, True)),
+        ("AC", "CC", "GG", "GT", (MatchPriority.ALTREF_FLIP, 1, False, True)),
+        ("AC", "CC", "TG", "GG", (MatchPriority.NO_MATCH, None, False, False)),
+        ("A", "AT", "A", "AT", (MatchPriority.REFALT, 0, True, False)),
+        ("A", "AT", "T", "TA", (MatchPriority.NO_MATCH, None, False, False)),
+        ("AT", None, "A", "AT", (MatchPriority.ALT_NO_OA, 1, True, False)),
     ],
     ids=[
         "match ref alt",
@@ -71,6 +78,16 @@ def test_check_nucleotide_allele_accepts_sequences(allele: str) -> None:
         # the caller is told a second reading matched
         "palindrome matches both ways round",
         "no match",
+        # AC read on the other strand is GT, not TG: a plain complement matches the
+        # sequences a strand flip doesn't produce and misses the ones it does
+        "a multi-base strand flip matches the reference allele",
+        "a multi-base strand flip matches the alternative allele",
+        "a plain complement of a multi-base target doesn't match",
+        # an indel's anchor base is positional, so the strand-flipped record sits
+        # somewhere else entirely and no complemented reading is attempted
+        "an indel matches forward",
+        "an indel never matches on a complemented reading",
+        "an indel that is its own reverse complement still isn't read complemented",
     ],
 )
 def test_classify_match(
@@ -128,6 +145,10 @@ def _best_match(
         ("A", ["T"], "G", "C", MatchPriority.NO_MATCH, None),
         ("A", ["TA"], "A", "TA", MatchPriority.REFALT, 0),
         ("AT", ["TA"], "AT", "TA", MatchPriority.EXCLUDED, None),
+        ("GT", ["GG"], "AC", "CC", MatchPriority.REFALT_FLIP, 0),
+        ("TG", ["GG"], "AC", "CC", MatchPriority.NO_MATCH, None),
+        ("T", ["TA"], "A", "AT", MatchPriority.NO_MATCH, None),
+        ("A", ["AT"], "AT", None, MatchPriority.ALT_NO_OA, 1),
     ],
     ids=[
         # docs/adr/0010: ambiguity is a property of the pairing of a score variant
@@ -144,10 +165,17 @@ def _best_match(
         # target's alleles before anyone asked whether the score variant matched
         "a score variant that matches nothing at a palindromic target is unmatched",
         "A/TA is resolvable",
-        # complementing without reversing is what the flipped match types already
-        # do, so a score variant that matches its own complement is unresolvable
-        # however long its alleles are
+        # AT and TA are each their own reverse complement, so this pair really is
+        # palindromic - it stays ambiguous under docs/adr/0011, for the right reason
+        # rather than the accidental one
         "AT/TA matches both ways round, so it's ambiguous",
+        # docs/adr/0011: revcomp(AC) = GT, not TG
+        "a multi-base strand flip resolves",
+        "a plain complement of a multi-base target isn't a strand flip",
+        "an indel is never read complemented, so it can't flip-match",
+        # under a naive reverse complement this would be ambiguous: revcomp(AT) = AT
+        # is the alternative allele the score variant already matched forward
+        "an indel is never read complemented, so it's never ambiguous",
     ],
 )
 def test_ambiguity_is_a_property_of_the_pairing(
@@ -216,6 +244,33 @@ def test_unmatchable_allele_keeps_its_index() -> None:
 
     assert match.match_priority is MatchPriority.ALTREF
     assert match.effect_allele_idx == 2
+
+
+def test_an_indel_is_never_excluded_as_ambiguous() -> None:
+    """The whole decision an indel gets, through the UDF the database calls.
+
+    A VCF indel's shared anchor base is positional - it stays leftmost on whichever
+    strand the record is read - so the strand-flipped record sits at a different
+    position with different alleles, and no string operation on these two recovers
+    it. No complemented reading is attempted, so the score variant matches forward
+    and there is no second reading to be ambiguous against (docs/adr/0011).
+
+    Reverse-complementing the indel anyway would exclude this: revcomp(AT) is AT, the
+    alternative allele it already matched as written.
+    """
+    result = match_variant(
+        False,  # match_ambiguous
+        False,  # match_multiallelic
+        "AT",  # effect_allele
+        None,  # other_allele
+        "A",  # ref
+        ["AT"],
+    )
+
+    assert result["match_type"] == "ALT_NO_OA"
+    assert result["effect_allele_idx"] == 1
+    assert result["is_ambiguous"] is False
+    assert result["exclusion_reason"] is None
 
 
 @pytest.mark.parametrize(

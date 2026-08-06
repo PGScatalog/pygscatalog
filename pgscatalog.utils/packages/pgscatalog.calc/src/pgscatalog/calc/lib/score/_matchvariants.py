@@ -480,6 +480,10 @@ def classify_match(
     complemented, and then nothing says which strand it was written on. That case
     needs the whole allele list to see, so the caller decides what a second matching
     reading means (docs/adr/0010) - this only reports that there was one.
+
+    It is attempted only where a strand flip is a string operation at all, which
+    rules out indels: no complemented reading is tried against an indel, so an indel
+    can match forward and is never ambiguous (docs/adr/0011).
     """
     forward_priority, forward_idx = _read_alleles(
         effect_allele=effect_allele,
@@ -488,13 +492,38 @@ def classify_match(
         target_alt=target_alt,
         alt_allele_index=alt_allele_index,
     )
-    complemented_priority, complemented_idx = _read_alleles(
-        effect_allele=complement(effect_allele),
-        other_allele=complement(other_allele) if other_allele is not None else None,
-        target_ref=target_ref,
-        target_alt=target_alt,
-        alt_allele_index=alt_allele_index,
-    )
+
+    # "the two alleles are the same length" is a property of the *pairing* being read,
+    # never of one allele on its own - A says nothing about whether the site is an
+    # indel, and a no-OA score variant has no second allele of its own to compare
+    # with. The pairing that is always available, biallelic or multiallelic and with
+    # an other allele or without, is the target's reference allele and the one
+    # alternative allele this call is reading, so that is the comparison. Gating the
+    # whole complemented reading on it applies the rule to all four combinations
+    # _read_alleles tries, rather than to one branch of them.
+    #
+    # It also covers the combinations that do have a score-side pair, because a
+    # reverse complement preserves length: a complemented match against an
+    # equal-length target pair forces the score alleles to be equal-length too.
+    lengths_agree: bool = target_alt is not None and len(target_ref) == len(target_alt)
+
+    if lengths_agree:
+        complemented_priority, complemented_idx = _read_alleles(
+            effect_allele=reverse_complement(effect_allele),
+            other_allele=(
+                reverse_complement(other_allele) if other_allele is not None else None
+            ),
+            target_ref=target_ref,
+            target_alt=target_alt,
+            alt_allele_index=alt_allele_index,
+        )
+    else:
+        # a VCF indel carries a shared anchor base at the start, and the anchor is
+        # positional: it stays leftmost on whichever strand the record is read, so the
+        # strand-flipped record sits at a different position with different alleles
+        # and no string operation recovers it. Reverse-complementing it anyway would
+        # produce something plausible-looking and wrong (docs/adr/0011)
+        complemented_priority, complemented_idx = MatchPriority.NO_MATCH, None
 
     matched_forward: bool = forward_priority is not MatchPriority.NO_MATCH
     matched_complemented: bool = complemented_priority is not MatchPriority.NO_MATCH
@@ -526,8 +555,9 @@ def get_variant_match_priority(
     One MatchResult is yielded per alternative allele and the caller keeps the best
     priority. No tie-break policy is needed, because at most one alternative allele
     can match a given score variant: with an other allele, a forward match on alt_i
-    and a complemented match on alt_j both require alt_i = complement(ref) = alt_j;
-    without one, the effect allele equals exactly one distinct alternative allele.
+    and a complemented match on alt_j both require
+    alt_i = reverse_complement(ref) = alt_j; without one, the effect allele equals
+    exactly one distinct alternative allele.
     max() therefore never arbitrates between two real matches (docs/adr/0010).
 
     Ambiguity is a property of the pairing rather than of a pair of alleles: the
@@ -619,5 +649,18 @@ def complement_table() -> dict[int, int]:
 
 
 @cache
-def complement(allele: str) -> str:
-    return allele.translate(complement_table())
+def reverse_complement(allele: str) -> str:
+    """The sequence the other strand carries where this allele sits.
+
+    A sequence is read 5'->3' on both strands, so flipping strand reverses the order
+    of the bases as well as complementing each one. For a single base the reversal is
+    invisible, which is why a plain complement went unnoticed here for so long: it
+    agrees with this function on every SNP and disagrees on everything else
+    (docs/adr/0011).
+
+    Case-sensitive on purpose, and it has to be: every allele comparison in this
+    module is, and check_nucleotide_allele refuses a target allele that isn't
+    uppercase ACGT. Upper-casing here would produce a sequence the matcher never
+    compared. The SQL macro in _matchlog.py mirrors this exactly.
+    """
+    return allele.translate(complement_table())[::-1]

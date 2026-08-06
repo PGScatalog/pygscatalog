@@ -18,7 +18,7 @@ def add_match_log(
     These logs can get huge - so create a view
     """
     logger.info("Adding score_log_table to database")
-    add_complement_macro(conn)
+    add_reverse_complement_macro(conn)
 
     conn.execute("""
     CREATE TABLE IF NOT EXISTS score_log_table(
@@ -28,6 +28,12 @@ def add_match_log(
         chr_name VARCHAR,
         chr_position UINTEGER,
         effect_allele VARCHAR NOT NULL,
+        -- the allele of the target variant this score variant resolved to. Matched
+        -- as written it's the effect allele itself; matched on a complemented
+        -- reading it's the reverse complement of the effect allele, which is what
+        -- both flipped match types resolved to - ALTREF_FLIP differs from
+        -- REFALT_FLIP in *which* target allele that is, not in which score allele
+        -- was read (docs/adr/0011)
         matched_effect_allele VARCHAR
             GENERATED ALWAYS AS (
             CASE match_type
@@ -35,8 +41,8 @@ def add_match_log(
                 WHEN 'REF_NO_OA'    THEN effect_allele
                 WHEN 'ALTREF'       THEN effect_allele
                 WHEN 'ALT_NO_OA'    THEN effect_allele
-                WHEN 'REFALT_FLIP'  THEN complement(effect_allele)
-                WHEN 'ALTREF_FLIP'  THEN complement(other_allele)
+                WHEN 'REFALT_FLIP'  THEN reverse_complement(effect_allele)
+                WHEN 'ALTREF_FLIP'  THEN reverse_complement(effect_allele)
                 ELSE NULL
             END
         ),
@@ -208,9 +214,21 @@ def get_ok_accessions(conn: duckdb.DuckDBPyConnection, sampleset: str) -> list[s
     return [x[0] for x in passed]
 
 
-def add_complement_macro(conn: duckdb.DuckDBPyConnection) -> None:
+def add_reverse_complement_macro(conn: duckdb.DuckDBPyConnection) -> None:
+    """The SQL twin of _matchvariants.reverse_complement, and it has to stay one.
+
+    matched_effect_allele is derived with this macro for the flipped match types, so
+    if the two disagree the log names a different allele from the match that produced
+    it (docs/adr/0011).
+
+    The reverse() is the point: a strand flip reverses the order of the bases as well
+    as complementing each one. The upper() this macro used to carry is gone with it -
+    the matcher compares alleles case-sensitively, so an allele that isn't uppercase
+    ACGT can never reach a flipped match type, and upper-casing here could only ever
+    print a sequence the matcher never compared.
+    """
     conn.sql("""
-    CREATE MACRO IF NOT EXISTS complement(allele) AS (
-        translate(upper(allele), 'ATCG', 'TAGC')
+    CREATE MACRO IF NOT EXISTS reverse_complement(allele) AS (
+        reverse(translate(allele, 'ATCG', 'TAGC'))
     );
     """)
