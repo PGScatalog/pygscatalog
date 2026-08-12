@@ -2,11 +2,21 @@
 
 Open work only. A ticket is deleted when it lands — the commit that closes it is its record, and `git log -- docs/tickets/` finds the ones that are gone. Decisions that outlive the work belong in `docs/adr/`, not here.
 
-Derived from ADRs 0001, 0003, 0004, and 0007–0011. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
+Derived from ADRs 0001, 0003, 0004, and 0007–0013. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
 
 ## Open
 
-None. X, Y and MT support (0019–0025) landed first, leaving two bugs it uncovered
+- [0036](0036-serial-run-subcommand.md) — `pgsc_calc run`: execute the four stages in sequence
+- [0037](0037-delete-run-pipeline-from-the-tests.md) — delete `run_pipeline`; the tests drive `pgsc_calc run`
+- [0038](0038-serial-run-peak-memory-is-max-not-sum.md) — a serial run's peak memory is the max over stages
+
+A Serial run (ADR 0013) is a convenience entry point for environments where Nextflow
+cannot run, not a second scaling mechanism — `pgsc_calc` remains the supported path.
+0036 builds it, 0037 makes it the thing the integration tests exercise (which is the
+dogfooding argument for having built it), and 0038 measures the property that makes it
+usable on real data.
+
+Everything before it has landed. X, Y and MT support (0019–0025) landed first, leaving two bugs it uncovered
 (0026, 0027); multiallelic handling (ADR 0010) added 0028–0032; implementing those
 uncovered two more (0033, 0034), both crashes or wrong answers on `main`
 independently of multiallelic support; and 0035 ported v2's `--ignore_strand_flips`.
