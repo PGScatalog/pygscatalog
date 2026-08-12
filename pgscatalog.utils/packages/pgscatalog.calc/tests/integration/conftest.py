@@ -273,17 +273,72 @@ def load_targets(
     """LOAD every shard into its own cache, one task each"""
     zips = []
     for i, target in enumerate(targets):
-        if isinstance(target, tuple):
-            path, chrom = target
-            spec = f"{path}:{chrom}"
-        else:
-            spec = str(target)
         zips.append(
             load_target(
-                spec, cache_dir / f"cache{i}", scorefile, monkeypatch, fmt, sample_file
+                target_spec(target),
+                cache_dir / f"cache{i}",
+                scorefile,
+                monkeypatch,
+                fmt,
+                sample_file,
             )
         )
     return zips
+
+
+def target_spec(target) -> str:
+    """PATH or PATH:CHROM, however the fixture spells a target genome"""
+    if isinstance(target, tuple):
+        path, chrom = target
+        return f"{path}:{chrom}"
+    return str(target)
+
+
+def run_serial(
+    targets: list,
+    out_dir: pathlib.Path,
+    scorefile,
+    monkeypatch,
+    min_overlap: str = "0.75",
+    score_paths: list | None = None,
+    max_memory_gb: str = "16",
+    threads: str = "1",
+    fmt: str = "vcf",
+    sample_file=None,
+) -> pl.DataFrame:
+    """Drive `pgsc_calc run`: LOAD every target, then the four scoring stages
+
+    One command line, not a stage sequence of the tests' own. The shipped
+    subcommand is the only definition of the stage graph in this repo, and driving
+    it here is what dogfoods it (ADR 0013). Stage output lands under
+    ``out_dir/stages/``, where the tests that assert on it look.
+    """
+    run_cli(
+        [
+            "pgsc_calc",
+            "run",
+            "--target_genomes",
+            *[target_spec(x) for x in targets],
+            "--sampleset",
+            SAMPLESET,
+            "--format",
+            fmt,
+            "--score_paths",
+            *[str(p) for p in (score_paths or [scorefile])],
+            "--min_overlap",
+            min_overlap,
+            "--out_dir",
+            str(out_dir),
+            "--max_memory_gb",
+            max_memory_gb,
+            "--threads",
+            threads,
+            *(["--bgen_sample_file", str(sample_file)] if sample_file else []),
+        ],
+        monkeypatch,
+    )
+
+    return pl.read_csv(out_dir / "scores.txt.gz")
 
 
 def run_pipeline(

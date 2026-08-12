@@ -25,11 +25,72 @@ from pgscatalog.calc import (
     Scorefiles,
     TargetGenome,
 )
+from pgscatalog.calc.cli._utils import absence_semantics, check_positive
 from pgscatalog.calc.lib.cache.genotypecache import leaf_group_path
 from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import canonicalise_chrom
 
 logger = logging.getLogger(__name__)
+
+
+def add_load_input_args(parser: argparse.ArgumentParser) -> None:
+    """The target genomes and scoring files to load, and how to read them
+
+    Shared with `pgsc_calc run`, which LOADs every target itself before running
+    the scoring stages over them (ADR 0013).
+    """
+    parser.add_argument(
+        "--target_genomes",
+        type=str,
+        nargs="+",
+        help="Target genomes to load in the format PATH:CHROM",
+        required=True,
+    )
+    parser.add_argument(
+        "--sampleset",
+        type=str,
+        help="Human label for the target genomes (e.g. UKBiobank)",
+        required=True,
+    )
+    parser.add_argument(
+        "--format",
+        type=GenomeFileType,
+        choices=[x.value for x in GenomeFileType],
+        help="Target genome format",
+        required=True,
+    )
+    parser.add_argument(
+        "--score_paths",
+        type=pathlib.Path,
+        nargs="+",
+        help="PGS Catalog scoring file paths",
+        required=True,
+    )
+    parser.add_argument(
+        "--absence_semantics",
+        type=absence_semantics,
+        default="unobserved",
+        help="""
+            What it means for a variant to be absent from a target genome file:
+            'unobserved' (never assessed, the default and the only mode implemented)
+            or 'homref' (assessed, and every sample here is homozygous reference).
+            The two produce identical files so this can only be declared. bgen is
+            dense - every bgen shard records every variant it assessed - so this
+            declaration cannot change how bgen input behaves.
+        """,
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=check_positive,
+        default=5_000,
+        help="Number of variants to buffer before writing to zarr",
+    )
+    parser.add_argument(
+        "--bgen_sample_file",
+        type=pathlib.Path,
+        help="Path to a BGEN sample file",
+        required=False,
+    )
 
 
 @dataclass(frozen=True)

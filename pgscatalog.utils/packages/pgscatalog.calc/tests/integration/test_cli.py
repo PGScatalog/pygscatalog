@@ -17,6 +17,7 @@ from pgscatalog.calc.cli.main import main
         ),
         (["pgsc_calc", "score", "--help"], ["usage: pgsc_calc score [-h]"]),
         (["pgsc_calc", "combine", "--help"], ["usage: pgsc_calc combine [-h]"]),
+        (["pgsc_calc", "run", "--help"], ["usage: pgsc_calc run [-h]"]),
     ],
 )
 def test_cli_help(capsys, monkeypatch, argv, expected_text):

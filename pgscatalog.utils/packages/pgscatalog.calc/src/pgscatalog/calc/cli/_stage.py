@@ -57,14 +57,23 @@ def add_score_paths_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def setup_stage(args: argparse.Namespace) -> pathlib.Path:
-    """Configure logging and prepare an empty output directory"""
+def configure_logging(verbose: bool) -> None:
+    """Set up rich logging, if nothing has set it up already
+
+    basicConfig is a no-op once handlers exist, so in a serial run the first
+    caller wins and every stage after it inherits that verbosity.
+    """
     logging.basicConfig(
-        level="INFO" if args.verbose else "WARNING",
+        level="INFO" if verbose else "WARNING",
         format="%(message)s",
         datefmt="[%X]",
         handlers=[RichHandler(rich_tracebacks=True)],
     )
+
+
+def setup_stage(args: argparse.Namespace) -> pathlib.Path:
+    """Configure logging and prepare an empty output directory"""
+    configure_logging(args.verbose)
 
     out_dir: pathlib.Path = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
