@@ -22,7 +22,7 @@ import pytest
 from bgen import BgenWriter
 from polars.testing import assert_frame_equal
 
-from .conftest import _is_ambiguous, _write_vcf, load_targets, run_pipeline
+from .conftest import _is_ambiguous, _write_vcf, load_targets, run_serial
 
 # enough MT variants to be worth a sum, few enough to keep four pipeline runs quick
 N_MT_VARIANTS = 10
@@ -171,7 +171,7 @@ def test_the_same_homoplasmic_mt_variant_scores_the_same_however_its_written(
 
     scores = {}
     for i, (label, (path, fmt, sample_file)) in enumerate(mt_targets.items()):
-        scores[label] = run_pipeline(
+        scores[label] = run_serial(
             [(path, "MT")],
             tmp_path / f"run{i}",
             mt_scorefile,

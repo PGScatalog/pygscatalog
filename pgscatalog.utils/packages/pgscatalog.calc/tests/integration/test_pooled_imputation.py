@@ -37,7 +37,7 @@ from .conftest import (
     _write_vcf,
     load_target,
     load_targets,
-    run_pipeline,
+    run_serial,
 )
 
 # how many samples lose their call at the imputed variant, which has to clear
@@ -181,7 +181,7 @@ def test_a_mixed_sex_chrx_vcf_with_missing_calls_scores(
 ):
     """The frequency isn't halved by the hemizygous samples: it is computed here by
     hand over the same calls, not read back out of the implementation"""
-    scores = run_pipeline(
+    scores = run_serial(
         [(imputed_chrx["target"], "X")],
         tmp_path,
         imputed_chrx["scorefile"],
@@ -286,7 +286,7 @@ def test_a_mans_missing_chrx_call_imputes_at_ploidy_one(
     The male-only file is the unambiguous case: nothing in it is diploid, so there
     is nothing a `.` could be but a hemizygous no-call.
     """
-    scores = run_pipeline(
+    scores = run_serial(
         [(hemizygous_chrx["target"], "X")],
         tmp_path,
         hemizygous_chrx["scorefile"],

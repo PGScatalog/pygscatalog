@@ -8,7 +8,7 @@ this file is it.
 Every target genome shape in `tests/integration/conftest.py` holds the same
 (sample, variant) pairs, so all of them must reproduce these numbers.
 
-To regenerate, run `pgsc_calc load` on the `unsplit_target` fixture followed by the
-four-stage pipeline (`tests/integration/test_four_stage_pipeline.py::run_pipeline`),
-and copy the resulting `scores.txt.gz` here. Only do this if the change to the
-numbers is intended and understood.
+To regenerate, run `pgsc_calc run` on the `unsplit_target` fixture (see
+`run_serial` in `tests/integration/conftest.py`) and copy the resulting
+`scores.txt.gz` here. Only do this if the change to the numbers is intended and
+understood.

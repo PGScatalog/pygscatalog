@@ -29,7 +29,7 @@ from .conftest import (
     _write_vcf,
     load_targets,
     run_cli,
-    run_pipeline,
+    run_serial,
 )
 
 KEY = ["sampleset", "accession", "sample_id"]
@@ -55,7 +55,7 @@ def test_unsplit_input(unsplit_target, scorefile, golden_scores, tmp_path, monke
     which is what pins autosomal scores while haploid support is added around
     them (ADR 0007).
     """
-    scores = run_pipeline([unsplit_target], tmp_path, scorefile, monkeypatch)
+    scores = run_serial([unsplit_target], tmp_path, scorefile, monkeypatch)
     _assert_matches_golden(scores, golden_scores)
 
     scores, golden = scores.sort(KEY), golden_scores.sort(KEY)
@@ -71,7 +71,7 @@ def test_chr_prefixed_input(
     The VCF reader normalised nothing, so `bcftools view -R 1` returned no regions
     and every variant was reported unmatched rather than failing (ADR 0008).
     """
-    scores = run_pipeline([chr_prefixed_target], tmp_path, scorefile, monkeypatch)
+    scores = run_serial([chr_prefixed_target], tmp_path, scorefile, monkeypatch)
     _assert_matches_golden(scores, golden_scores)
 
 
@@ -79,7 +79,7 @@ def test_variant_axis_only(
     chromosome_targets, scorefile, golden_scores, tmp_path, monkeypatch
 ):
     """One file per chromosome"""
-    scores = run_pipeline(chromosome_targets, tmp_path, scorefile, monkeypatch)
+    scores = run_serial(chromosome_targets, tmp_path, scorefile, monkeypatch)
     _assert_matches_golden(scores, golden_scores)
 
 
@@ -93,7 +93,7 @@ def test_sample_axis_only(
     would leave one batch with no weight matrix row, and its samples would vanish
     from the output with nothing logged.
     """
-    scores = run_pipeline(sample_batch_targets, tmp_path, scorefile, monkeypatch)
+    scores = run_serial(sample_batch_targets, tmp_path, scorefile, monkeypatch)
     _assert_matches_golden(scores, golden_scores)
 
 
@@ -101,7 +101,7 @@ def test_chromosome_by_sample_batch_grid(
     grid_targets, scorefile, golden_scores, tmp_path, monkeypatch
 ):
     """Both axes at once: 2 chromosomes x 2 sample batches"""
-    scores = run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
+    scores = run_serial(grid_targets, tmp_path, scorefile, monkeypatch)
     _assert_matches_golden(scores, golden_scores)
 
 
@@ -110,7 +110,7 @@ def test_n_matched_is_genome_wide(
 ):
     """n_matched is a count of scoring variants, never a per-shard count summed
     four times"""
-    scores = run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
+    scores = run_serial(grid_targets, tmp_path, scorefile, monkeypatch)
 
     assert scores["n_matched"].unique().to_list() == [n_score_variants]
     assert scores.shape[0] == 3202  # every sample scored exactly once
@@ -145,7 +145,7 @@ def test_two_accessions_over_disjoint_variants(
                 )
         chrom_scorefiles.append((accession, path, len(records)))
 
-    scores = run_pipeline(
+    scores = run_serial(
         chromosome_targets,
         tmp_path / "work",
         scorefile,
@@ -274,7 +274,7 @@ def test_accession_below_min_overlap_is_rejected_genome_wide(
             row_nr += 1
 
     with pytest.raises(ValueError, match="No scores passed matching threshold"):
-        run_pipeline(
+        run_serial(
             chromosome_targets,
             tmp_path / "work",
             path,
@@ -302,7 +302,7 @@ def test_sparse_scoring_file_does_not_trip_the_union_check(
             )
 
     # only chromosome 1 gets loaded, because chromosome 8 has nothing to cache
-    scores = run_pipeline([chromosome_targets[0]], tmp_path / "work", path, monkeypatch)
+    scores = run_serial([chromosome_targets[0]], tmp_path / "work", path, monkeypatch)
 
     assert scores["accession"].unique().to_list() == ["PGS999996"]
     assert scores.shape[0] == 3202
@@ -314,9 +314,9 @@ def test_partial_scores_are_written_per_shard(
 ):
     """Each SCORE task emits its own shard's contribution, covering only that
     shard's samples"""
-    run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
+    run_serial(grid_targets, tmp_path, scorefile, monkeypatch)
 
-    partials = sorted((tmp_path / "score").glob("*/partial_scores.parquet"))
+    partials = sorted((tmp_path / "stages" / "score").glob("*/partial_scores.parquet"))
     assert len(partials) == len(grid_targets)
 
     shards = []
@@ -340,8 +340,8 @@ def test_a_shard_reaching_combine_twice_is_rejected(
     its contribution. Parquet carries no keys, so SCORE_COMBINE has to re-assert
     the constraint the score_table primary key can't express across files.
     """
-    run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
-    partials = sorted((tmp_path / "score").glob("*/partial_scores.parquet"))
+    run_serial(grid_targets, tmp_path, scorefile, monkeypatch)
+    partials = sorted((tmp_path / "stages" / "score").glob("*/partial_scores.parquet"))
 
     with pytest.raises(ValueError, match="reached SCORE_COMBINE more than once"):
         run_cli(
@@ -366,10 +366,10 @@ def test_dosage_array_is_sized_to_one_shard(
     The mechanism is the dosage array's shape: it is allocated as (variants in this
     shard, samples in this shard), not (all variants, whole cohort).
     """
-    run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
+    run_serial(grid_targets, tmp_path, scorefile, monkeypatch)
 
     shapes = []
-    for score_dir in sorted((tmp_path / "score").iterdir()):
+    for score_dir in sorted((tmp_path / "stages" / "score").iterdir()):
         # the dosage array is scratch, not output
         store = zarr.storage.LocalStore(score_dir / "scratch")
         dosage = zarr.open_group(store=store, mode="r")[f"pgs/{SAMPLESET}"]["dosage"]
@@ -527,15 +527,18 @@ def test_published_outputs_are_enumerable_without_the_scratch(
     The score database, the unzipped cache and SCORE's dosage arrays all go under
     `scratch`, so the top level of a task's directory is exactly what it publishes.
     """
-    run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
+    run_serial(grid_targets, tmp_path, scorefile, monkeypatch)
 
+    # a serial run gives each stage its own directory under stages/, and ADR 0005
+    # keeps governing what's inside one of them
+    stages = tmp_path / "stages"
     published = {
-        tmp_path / "match" / "1": {"matches.parquet", "samples.parquet"},
-        tmp_path / "match" / "8": {"matches.parquet", "samples.parquet"},
-        tmp_path / "match_combine": {"match_table.parquet", "logs"},
-        tmp_path / "combine": {"scores.txt.gz"},
+        stages / "match" / "1": {"matches.parquet", "samples.parquet"},
+        stages / "match" / "8": {"matches.parquet", "samples.parquet"},
+        stages / "match_combine": {"match_table.parquet", "logs"},
+        stages / "combine": {"scores.txt.gz"},
         # 2 chromosomes x 2 sample batches
-        **{tmp_path / "score" / str(i): {"partial_scores.parquet"} for i in range(4)},
+        **{stages / "score" / str(i): {"partial_scores.parquet"} for i in range(4)},
     }
 
     for out_dir, artefacts in published.items():
@@ -543,15 +546,15 @@ def test_published_outputs_are_enumerable_without_the_scratch(
 
     # and the scratch is where the unpublished things actually went, so the
     # assertions above aren't passing because nothing was written
-    scratch = {path.name for path in (tmp_path / "score" / "0" / "scratch").iterdir()}
+    scratch = {path.name for path in (stages / "score" / "0" / "scratch").iterdir()}
     assert {"genotypes.zarr", "pgs.db", "pgs"} <= scratch
 
 
 def test_match_logs_are_written(grid_targets, scorefile, tmp_path, monkeypatch):
     """MATCH_COMBINE owns the match logs now that MATCH doesn't compute rates"""
-    run_pipeline(grid_targets, tmp_path, scorefile, monkeypatch)
+    run_serial(grid_targets, tmp_path, scorefile, monkeypatch)
 
-    logs = tmp_path / "match_combine" / "logs"
+    logs = tmp_path / "stages" / "match_combine" / "logs"
     summary = pl.read_csv(logs / "summary.csv")
 
     assert summary["is_match_rate_ok"].unique().to_list() == [True]

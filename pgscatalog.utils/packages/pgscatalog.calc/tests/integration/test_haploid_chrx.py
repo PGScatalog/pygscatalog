@@ -20,7 +20,7 @@ import zarr.storage
 from pgscatalog.calc.cli.load import unzip_zarr
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
-from .conftest import SAMPLESET, _is_ambiguous, _write_vcf, load_target, run_pipeline
+from .conftest import SAMPLESET, _is_ambiguous, _write_vcf, load_target, run_serial
 
 # GRCh38 PAR1 ends here, which is only used to place a variant the caller wrote as
 # diploid for everyone. Nothing in the pipeline reads it
@@ -115,7 +115,7 @@ def test_mixed_sex_chrx_scores_end_to_end(
     _, par, records = chrx_records
     expected_dosage, expected_alleles = _observed([par, *records])
 
-    scores = run_pipeline([(chrx_target, "X")], tmp_path, chrx_scorefile, monkeypatch)
+    scores = run_serial([(chrx_target, "X")], tmp_path, chrx_scorefile, monkeypatch)
 
     assert scores.shape[0] == 3202
     # the padded position can't match, so it counts against the match rate and
@@ -154,7 +154,7 @@ def test_a_pseudoautosomal_variant_is_diploid_for_every_sample(
     scorefile = tmp_path / "PGS999994.txt.gz"
     _write_scorefile(scorefile, [par])
 
-    scores = run_pipeline([(chrx_target, "X")], tmp_path, scorefile, monkeypatch)
+    scores = run_serial([(chrx_target, "X")], tmp_path, scorefile, monkeypatch)
 
     assert scores["allele_count"].unique().to_list() == [2]
     assert scores["dosage_sum"].max() == 2

@@ -12,7 +12,7 @@ import duckdb
 
 from pgscatalog.calc.lib.score.scoredb import ScoreDatabase
 
-from .conftest import run_pipeline
+from .conftest import run_serial
 
 MAX_MEMORY_GB = "3"
 THREADS = "2"
@@ -42,7 +42,7 @@ def test_every_connection_carries_the_resource_policy(
 
     monkeypatch.setattr(ScoreDatabase, "_connect", spy)
 
-    run_pipeline(
+    run_serial(
         grid_targets,
         tmp_path,
         scorefile,

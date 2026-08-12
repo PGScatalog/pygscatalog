@@ -23,7 +23,7 @@ from .conftest import (
     _write_vcf,
     load_targets,
     run_cli,
-    run_pipeline,
+    run_serial,
 )
 
 # enough chrY variants to be worth a sum, few enough to keep the fixture quick
@@ -138,7 +138,7 @@ def test_a_male_only_chry_passes_match_combine_and_scores(
     chr1_dosage, chr1_alleles = _observed(by_chrom["1"])
     y_dosage, y_alleles = _observed(chry_records)
 
-    scores = run_pipeline(
+    scores = run_serial(
         [chromosome_targets[0], (chry_target, "Y")],
         tmp_path,
         autosome_and_chry_scorefile,
@@ -194,7 +194,7 @@ def test_a_truncated_chry_is_accepted_like_a_male_only_one(
 
     truncated = _subset_samples(chry_target, tmp_path / "truncated_chrY.vcf.gz", kept)
 
-    scores = run_pipeline(
+    scores = run_serial(
         [chromosome_targets[0], (truncated, "Y")],
         tmp_path,
         autosome_and_chry_scorefile,
