@@ -6,15 +6,13 @@ Derived from ADRs 0001, 0003, 0004, and 0007–0013. Read `CONTEXT.md` and those
 
 ## Open
 
-- [0038](0038-serial-run-peak-memory-is-max-not-sum.md) — a serial run's peak memory is the max over stages
-
-A Serial run (ADR 0013) is a convenience entry point for environments where Nextflow
-cannot run, not a second scaling mechanism — `pgsc_calc` remains the supported path.
-0036 built `pgsc_calc run` and 0037 made it the thing the integration tests exercise
-(which is the dogfooding argument for having built it), leaving 0038 to measure the
+None. A Serial run (ADR 0013) landed last: a convenience entry point for environments
+where Nextflow cannot run, not a second scaling mechanism — `pgsc_calc` remains the
+supported path. 0036 built `pgsc_calc run`, 0037 made it the thing the integration tests
+exercise (which is the dogfooding argument for having built it), and 0038 measured the
 property that makes it usable on real data.
 
-Everything before it has landed. X, Y and MT support (0019–0025) landed first, leaving two bugs it uncovered
+Before it, X, Y and MT support (0019–0025) landed, leaving two bugs it uncovered
 (0026, 0027); multiallelic handling (ADR 0010) added 0028–0032; implementing those
 uncovered two more (0033, 0034), both crashes or wrong answers on `main`
 independently of multiallelic support; and 0035 ported v2's `--ignore_strand_flips`.
