@@ -100,6 +100,7 @@ def test_add_match_log_with_one_mapped_variants(sampleset_name, pgs000001):
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
 
@@ -385,8 +386,8 @@ def test_match_rate_sums_unrounded_fractions():
 
 
 # the summary log is where "217 variants excluded" has to become counts a user can
-# act on: raise --keep_multiallelic, raise --keep_ambiguous, or look at the scoring
-# file (docs/adr/0010)
+# act on: raise --keep_multiallelic, raise --keep_ambiguous, drop
+# --ignore_strand_flips, or look at the scoring file (docs/adr/0010)
 
 _SHARD = "test/X/x.vcf.gz"
 _REASON_SCORE_ROWS = [
@@ -399,6 +400,8 @@ _REASON_SCORE_ROWS = [
     # a clean match, and a score variant that matches nothing
     ("X", 400, "G", "T", 0.5, "additive", False, "PGS000001", 4),
     ("X", 500, "A", "G", 0.6, "additive", False, "PGS000001", 5),
+    # matches target row 10 only when read complemented: revcomp(T/G) is A/C
+    ("X", 600, "T", "G", 0.7, "additive", False, "PGS000001", 6),
 ]
 _REASON_TARGET_ROWS = [
     (5, "X", 100, "A", ["C"], _SHARD, "test"),
@@ -406,11 +409,14 @@ _REASON_TARGET_ROWS = [
     (7, "X", 300, "A", ["C", "G"], _SHARD, "test"),
     (8, "X", 400, "G", ["T"], _SHARD, "test"),
     (9, "X", 500, "G", ["T"], _SHARD, "test"),
+    (10, "X", 600, "A", ["C"], _SHARD, "test"),
 ]
 
 
-def _summary_of_every_reason(*, match_multiallelic: bool) -> list[tuple]:
-    """Match a scoring file that hits all three exclusion reasons, and summarise it"""
+def _summary_of_every_reason(
+    *, match_multiallelic: bool, match_flipped: bool = True
+) -> list[tuple]:
+    """Match a scoring file that hits all four exclusion reasons, and summarise it"""
     conn = duckdb.connect(":memory:")
     conn.execute("""
         CREATE TABLE score_variant_table (
@@ -449,6 +455,7 @@ def _summary_of_every_reason(*, match_multiallelic: bool) -> list[tuple]:
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=match_multiallelic,
+        match_flipped=match_flipped,
         sampleset="test",
     )
     add_match_log(conn, sampleset="test", min_overlap=0.1)
@@ -465,11 +472,25 @@ def _summary_of_every_reason(*, match_multiallelic: bool) -> list[tuple]:
 
 
 def test_summary_log_splits_exclusions_by_reason():
-    """One 'excluded' count is three decisions, and each has a different fix"""
+    """One 'excluded' count is several decisions, and each has a different fix"""
     assert _summary_of_every_reason(match_multiallelic=False) == [
         ("excluded", "ambiguous", False, 1),
         ("excluded", "collision", False, 2),
         ("excluded", "multiallelic", True, 1),
+        ("matched", None, False, 2),
+        ("unmatched", None, False, 1),
+    ]
+
+
+def test_ignoring_strand_flips_adds_a_reason_of_its_own():
+    """A flipped match becomes an excluded row that names the flag that dropped it,
+    not an unmatched row: the variant was found, and policy discarded it
+    (docs/adr/0011)."""
+    assert _summary_of_every_reason(match_multiallelic=False, match_flipped=False) == [
+        ("excluded", "ambiguous", False, 1),
+        ("excluded", "collision", False, 2),
+        ("excluded", "multiallelic", True, 1),
+        ("excluded", "strand_flip", False, 1),
         ("matched", None, False, 1),
         ("unmatched", None, False, 1),
     ]
@@ -482,7 +503,7 @@ def test_keeping_multiallelics_leaves_the_other_reasons_alone():
     assert _summary_of_every_reason(match_multiallelic=True) == [
         ("excluded", "ambiguous", False, 1),
         ("excluded", "collision", False, 2),
-        ("matched", None, False, 1),
+        ("matched", None, False, 2),
         ("matched", None, True, 1),
         ("unmatched", None, False, 1),
     ]
@@ -566,6 +587,7 @@ def test_matched_effect_allele_names_the_allele_the_match_resolved_to():
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
     add_match_log(conn, sampleset="test", min_overlap=0.1)

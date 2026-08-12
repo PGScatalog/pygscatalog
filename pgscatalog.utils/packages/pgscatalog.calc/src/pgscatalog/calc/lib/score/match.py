@@ -164,6 +164,7 @@ class MatchStage:
         self,
         match_ambiguous: bool = False,
         match_multiallelic: bool = False,
+        match_flipped: bool = True,
     ) -> str:
         """Match scoring file variants against one chromosome's shards.
 
@@ -190,6 +191,7 @@ class MatchStage:
                 conn=conn,
                 match_ambiguous=match_ambiguous,
                 match_multiallelic=match_multiallelic,
+                match_flipped=match_flipped,
                 sampleset=self._cache.sampleset,
             )
             return chromosome

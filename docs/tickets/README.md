@@ -6,9 +6,12 @@ Derived from ADRs 0001, 0003, 0004, and 0007–0011. Read `CONTEXT.md` and those
 
 ## Open
 
-None. X, Y and MT support (0019–0025) landed first, leaving two bugs it uncovered (0026, 0027); multiallelic handling (ADR 0010) added 0028–0032; and implementing those uncovered two more (0033, 0034), both crashes or wrong answers on `main` independently of multiallelic support.
+None. X, Y and MT support (0019–0025) landed first, leaving two bugs it uncovered
+(0026, 0027); multiallelic handling (ADR 0010) added 0028–0032; implementing those
+uncovered two more (0033, 0034), both crashes or wrong answers on `main`
+independently of multiallelic support; and 0035 ported v2's `--ignore_strand_flips`.
 
-Two decisions taken while closing them are recorded rather than lost: a wholly missing VCF call keeps the ploidy its `GT` declares, guarded where nothing at the variant is hemizygous ([ADR 0007](../adr/0007-ploidy-is-observed-per-call.md)), and a strand flip is a reverse complement that an indel declines ([ADR 0011](../adr/0011-a-strand-flip-is-a-reverse-complement-and-indels-decline-it.md)).
+Two decisions taken while closing them are recorded rather than lost: a wholly missing VCF call keeps the ploidy its `GT` declares, guarded where nothing at the variant is hemizygous ([ADR 0007](../adr/0007-ploidy-is-observed-per-call.md)), and a strand flip is a reverse complement that an indel declines ([ADR 0011](../adr/0011-strand-flips-are-reverse-complements-and-optional.md)).
 
 ## Not in this repo
 

@@ -117,6 +117,7 @@ def _best_match(
     ref: str,
     alts: list[str],
     match_ambiguous: bool = False,
+    match_flipped: bool = True,
 ) -> MatchResult:
     """The match a score variant gets at a target variant, as match_variant picks it"""
     return max(
@@ -126,6 +127,7 @@ def _best_match(
             ref=ref,
             alts=alts,
             match_ambiguous=match_ambiguous,
+            match_flipped=match_flipped,
         ),
         key=lambda match: match.match_priority.value,
     )
@@ -261,6 +263,7 @@ def test_an_indel_is_never_excluded_as_ambiguous() -> None:
     result = match_variant(
         False,  # match_ambiguous
         False,  # match_multiallelic
+        True,  # match_flipped
         "AT",  # effect_allele
         None,  # other_allele
         "A",  # ref
@@ -404,6 +407,7 @@ def test_match_priority(
             ref=ref,
             alts=alts,
             match_ambiguous=match_ambiguous,
+            match_flipped=True,
         )
     )
 
@@ -505,6 +509,7 @@ def test_matchresult(
             {
                 "match_ambiguous": False,
                 "match_multiallelic": False,
+                "match_flipped": True,
                 "effect_allele": "A",
                 "other_allele": "G",
                 "ref": "A",
@@ -525,6 +530,7 @@ def test_matchresult(
             {
                 "match_ambiguous": False,
                 "match_multiallelic": False,
+                "match_flipped": True,
                 "effect_allele": "G",
                 "other_allele": "A",
                 "ref": "A",
@@ -545,6 +551,7 @@ def test_matchresult(
             {
                 "match_ambiguous": True,
                 "match_multiallelic": False,
+                "match_flipped": True,
                 "effect_allele": "A",
                 "other_allele": "T",
                 "ref": "A",
@@ -565,6 +572,7 @@ def test_matchresult(
             {
                 "match_ambiguous": False,
                 "match_multiallelic": False,
+                "match_flipped": True,
                 "effect_allele": "A",
                 "other_allele": "T",
                 "ref": "A",
@@ -585,6 +593,7 @@ def test_matchresult(
             {
                 "match_ambiguous": False,
                 "match_multiallelic": False,
+                "match_flipped": True,
                 "effect_allele": "A",
                 "other_allele": "G",
                 "ref": "A",
@@ -605,6 +614,7 @@ def test_matchresult(
             {
                 "match_ambiguous": False,
                 "match_multiallelic": True,
+                "match_flipped": True,
                 "effect_allele": "A",
                 "other_allele": "G",
                 "ref": "A",
@@ -625,6 +635,7 @@ def test_matchresult(
             {
                 "match_ambiguous": False,
                 "match_multiallelic": False,
+                "match_flipped": True,
                 "effect_allele": "A",
                 "other_allele": "T",
                 "ref": "C",
@@ -670,6 +681,7 @@ def test_match_variant_unmatchable_allele(alts: list[str]) -> None:
     assert match_variant(
         False,  # match_ambiguous
         False,  # match_multiallelic
+        True,  # match_flipped
         "A",  # effect_allele
         "T",  # other_allele
         "A",  # ref
@@ -689,7 +701,67 @@ def test_match_variant_unmatchable_allele(alts: list[str]) -> None:
 def test_match_variant_corrupt_allele() -> None:
     """A corrupt allele string isn't unmatchable, it's wrong, and still raises"""
     with pytest.raises(ValueError):
-        match_variant(False, False, "A", "T", "A", ["XYZ"])
+        match_variant(False, False, True, "A", "T", "A", ["XYZ"])
+
+
+def test_ignoring_strand_flips_excludes_a_flipped_match() -> None:
+    """The variant was found, so it's excluded and says why, not reported unmatched.
+
+    revcomp(T/G) is A/C, so this score variant matches REF=A ALT=C only when read
+    complemented. Nothing matches it as written (docs/adr/0011).
+    """
+    kept = _best_match(effect_allele="T", other_allele="G", ref="A", alts=["C"])
+    assert kept.match_type == "REFALT_FLIP"
+
+    dropped = _best_match(
+        effect_allele="T", other_allele="G", ref="A", alts=["C"], match_flipped=False
+    )
+    assert dropped.match_summary == "excluded"
+    assert dropped.exclusion_reason is ExclusionReason.STRAND_FLIP
+    assert dropped.effect_allele_idx is None
+
+
+def test_ignoring_strand_flips_leaves_a_forward_match_alone() -> None:
+    """Only a variant that matched *by* a complemented reading is dropped"""
+    assert (
+        _best_match(
+            effect_allele="A",
+            other_allele="C",
+            ref="A",
+            alts=["C"],
+            match_flipped=False,
+        ).match_type
+        == "REFALT"
+    )
+
+
+def test_ignoring_strand_flips_keeps_the_ambiguity_check() -> None:
+    """The reading is still made, so a palindrome is still ambiguous.
+
+    Skipping the complemented reading instead would make is_ambiguous unreachable and
+    quietly score every palindromic SNP on a forward-strand assumption, which is the
+    opposite of what the flag promises (docs/adr/0011).
+    """
+    result = _best_match(
+        effect_allele="A", other_allele="T", ref="A", alts=["T"], match_flipped=False
+    )
+    assert result.is_ambiguous is True
+    assert result.exclusion_reason is ExclusionReason.AMBIGUOUS
+
+
+def test_a_kept_ambiguous_palindrome_still_matches_forward() -> None:
+    """Both flags raised: the pairing matched both ways round, and the forward
+    reading is the one that won, so --ignore_strand_flips has nothing to drop."""
+    result = _best_match(
+        effect_allele="A",
+        other_allele="T",
+        ref="A",
+        alts=["T"],
+        match_ambiguous=True,
+        match_flipped=False,
+    )
+    assert result.is_ambiguous is True
+    assert result.match_type == "REFALT"
 
 
 def test_multiallelic_takes_precedence_over_ambiguous() -> None:
@@ -702,6 +774,7 @@ def test_multiallelic_takes_precedence_over_ambiguous() -> None:
     result = match_variant(
         False,  # match_ambiguous
         False,  # match_multiallelic
+        True,  # match_flipped
         "A",  # effect_allele
         "T",  # other_allele
         "A",  # ref
@@ -756,7 +829,12 @@ def test_setup_enums() -> None:
     (reason_values,) = conn.execute(
         "SELECT enum_range(NULL::exclusion_reason_enum)"
     ).fetchone()
-    assert reason_values == ["multiallelic", "ambiguous", "collision"]
+    assert reason_values == [
+        "multiallelic",
+        "ambiguous",
+        "strand_flip",
+        "collision",
+    ]
 
 
 def _make_test_conn(
@@ -814,6 +892,7 @@ def test_update_match_table_spanning_deletion(pgs000001) -> None:
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
 
@@ -839,6 +918,7 @@ def test_update_match_table(pgs000001) -> None:
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
 
@@ -982,6 +1062,7 @@ def test_collision_excludes_both_score_variants() -> None:
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
 
@@ -1011,6 +1092,7 @@ def test_collision_outcome_is_the_same_on_every_run() -> None:
             conn=conn,
             match_ambiguous=False,
             match_multiallelic=False,
+            match_flipped=True,
             sampleset="test",
         )
         outcomes.append(_match_outcomes(conn))
@@ -1037,6 +1119,7 @@ def test_two_score_variants_at_one_position_are_not_always_a_collision() -> None
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
 
@@ -1073,6 +1156,7 @@ def test_match_rate_counts_a_target_allele_once() -> None:
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
 
@@ -1247,6 +1331,7 @@ def test_every_exclusion_names_its_reason() -> None:
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
 
@@ -1271,6 +1356,7 @@ def test_keeping_multiallelics_leaves_the_other_reasons_alone() -> None:
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=True,
+        match_flipped=True,
         sampleset="test",
     )
 

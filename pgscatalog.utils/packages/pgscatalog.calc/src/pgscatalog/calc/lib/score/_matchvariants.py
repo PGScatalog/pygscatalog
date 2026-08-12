@@ -38,15 +38,18 @@ def update_match_table(
     conn: duckdb.DuckDBPyConnection,
     match_ambiguous: bool,
     match_multiallelic: bool,
+    match_flipped: bool,
     sampleset: str,
 ) -> None:
     logger.info("Matching score variants with target variants by position and alleles")
     # python UDF function parameters have to get values from db columns
     # use functools.partial to "pre-fill" the function with non-column parameters
     # be careful to use posargs not kwargs (duckdb complains about kwargs)
-    match_variant_function: Callable[
-        [bool, bool, str, str | None, str, list[str]], dict
-    ] = functools.partial(match_variant, match_ambiguous, match_multiallelic)
+    match_variant_function: Callable[[str, str | None, str, list[str]], dict] = (
+        functools.partial(
+            match_variant, match_ambiguous, match_multiallelic, match_flipped
+        )
+    )
     # register a Python user defined function
     conn.create_function(
         "match_variant",
@@ -269,6 +272,7 @@ def create_allele_match_table(
 def match_variant(
     match_ambiguous: bool,
     match_multiallelic: bool,
+    match_flipped: bool,
     effect_allele: str,
     other_allele: str | None,
     ref: str,
@@ -302,6 +306,7 @@ def match_variant(
             effect_allele=effect_allele,
             other_allele=other_allele,
             match_ambiguous=match_ambiguous,
+            match_flipped=match_flipped,
         )
         # always only interested in the best possible match for each variant
         best_match = max(matches, key=lambda x: x.match_priority.value)
@@ -312,11 +317,16 @@ def match_variant(
 class ExclusionReason(enum.StrEnum):
     """Why a score variant was excluded, for a reader of the match log.
 
-    match_summary 'excluded' covers three unrelated decisions and the target variant
+    match_summary 'excluded' covers four unrelated decisions and the target variant
     flags can't tell them apart: is_multiallelic on a matched row is a fact about the
     target, on an excluded row it is the cause, and a collision has no flag at all.
     Each reason names its own fix - raise --keep_multiallelic, raise --keep_ambiguous,
-    or go and look at the scoring file (docs/adr/0010).
+    drop --ignore_strand_flips, or go and look at the scoring file (docs/adr/0010).
+
+    Declared in precedence order, which is the order they're decided in: multiallelic
+    before any allele is compared, ambiguous before a winning match is known,
+    strand_flip once it is, and collision last because it's the only reason that
+    isn't a property of one score variant.
 
     Not folded into match_type_enum: match_type comes from MatchPriority.name, and
     MatchPriority is an ordering consumed by max() and by the ranking window, so
@@ -326,6 +336,7 @@ class ExclusionReason(enum.StrEnum):
 
     MULTIALLELIC = "multiallelic"
     AMBIGUOUS = "ambiguous"
+    STRAND_FLIP = "strand_flip"
     COLLISION = "collision"
 
 
@@ -464,6 +475,17 @@ _FLIPPED: dict[MatchPriority, MatchPriority] = {
 }
 
 
+def _best_match_is_flipped(matches: list[AlleleMatch]) -> bool:
+    """Did this score variant match, and only by a complemented reading?
+
+    The same max() the caller applies, asked one question earlier: a forward reading
+    outranks a complemented one, so a flipped winner means no allele of the target
+    matched the score variant as written.
+    """
+    best = max(matches, key=lambda match: match.priority.value)
+    return best.priority in _FLIPPED.values()
+
+
 def classify_match(
     *,
     effect_allele: str,
@@ -549,6 +571,7 @@ def get_variant_match_priority(
     ref: str,
     alts: list[str],
     match_ambiguous: bool,
+    match_flipped: bool,
 ) -> Generator[MatchResult, None, None]:
     """Match a score variant against every alternative allele of a target variant.
 
@@ -567,6 +590,12 @@ def get_variant_match_priority(
     alternative allele forward and another one complemented, which no per-allele
     check could see. A palindromic pair of alleles at the target is no longer
     ambiguous by itself: it only makes the score variants that match it ambiguous.
+
+    match_flipped is False when the caller knows which strand their target genotypes
+    are on. The complemented reading is still made - ambiguity is defined by it, so
+    skipping it would make is_ambiguous unreachable and quietly score every
+    palindromic SNP - but a score variant that only matched that way is excluded
+    instead of matched (docs/adr/0011).
     """
     is_multiallelic: bool = len(alts) > 1
     matches: list[AlleleMatch] = []
@@ -617,6 +646,19 @@ def get_variant_match_priority(
             is_ambiguous=True,
             is_multiallelic=is_multiallelic,
             exclusion_reason=ExclusionReason.AMBIGUOUS,
+        )
+        return
+
+    if not match_flipped and _best_match_is_flipped(matches):
+        # the variant was found: a complemented reading of it matched, and nothing
+        # else did. Policy is what discarded it, so it's excluded and says why
+        # rather than reported unmatched (docs/adr/0011)
+        yield MatchResult(
+            match_priority=MatchPriority.EXCLUDED,
+            effect_allele_idx=None,
+            is_ambiguous=is_ambiguous,
+            is_multiallelic=is_multiallelic,
+            exclusion_reason=ExclusionReason.STRAND_FLIP,
         )
         return
 
