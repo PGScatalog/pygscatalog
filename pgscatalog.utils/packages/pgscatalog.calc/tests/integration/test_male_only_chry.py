@@ -125,6 +125,7 @@ def test_a_male_only_chry_passes_match_combine_and_scores(
     chry_target,
     chry_records,
     autosome_and_chry_scorefile,
+    sex_map,
     tmp_path,
     monkeypatch,
 ):
@@ -143,6 +144,7 @@ def test_a_male_only_chry_passes_match_combine_and_scores(
         tmp_path,
         autosome_and_chry_scorefile,
         monkeypatch,
+        sex_map=sex_map,
     )
 
     # everyone gets exactly one row, including the women no chrY leaf holds
@@ -182,6 +184,7 @@ def test_a_truncated_chry_is_accepted_like_a_male_only_one(
     chry_target,
     chry_records,
     autosome_and_chry_scorefile,
+    sex_map,
     tmp_path,
     monkeypatch,
 ):
@@ -199,6 +202,7 @@ def test_a_truncated_chry_is_accepted_like_a_male_only_one(
         tmp_path,
         autosome_and_chry_scorefile,
         monkeypatch,
+        sex_map=sex_map,
     )
 
     assert scores.shape[0] == 3202
@@ -263,7 +267,12 @@ def test_a_truncated_autosome_is_still_rejected(
 
 
 def test_a_mixed_sex_chry_vcf_is_rejected(
-    chry_target, chry_records, autosome_and_chry_scorefile, tmp_path, monkeypatch
+    chry_target,
+    chry_records,
+    autosome_and_chry_scorefile,
+    sex_map,
+    tmp_path,
+    monkeypatch,
 ):
     """VCF writes `.` for a no-call and for a sample that has no Y alike, so a
     mixed-sex chrY file is uninterpretable rather than imputable (ADR 0007).
@@ -286,7 +295,11 @@ def test_a_mixed_sex_chry_vcf_is_rejected(
 
     with pytest.raises(ValueError) as excinfo:
         load_targets(
-            [(path, "Y")], tmp_path / "cache", autosome_and_chry_scorefile, monkeypatch
+            [(path, "Y")],
+            tmp_path / "cache",
+            autosome_and_chry_scorefile,
+            monkeypatch,
+            sex_map=sex_map,
         )
 
     message = str(excinfo.value)

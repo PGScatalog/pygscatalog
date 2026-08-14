@@ -103,7 +103,7 @@ def chrx_scorefile(chrx_records, tmp_path_factory) -> pathlib.Path:
 
 
 def test_mixed_sex_chrx_scores_end_to_end(
-    chrx_records, chrx_target, chrx_scorefile, tmp_path, monkeypatch
+    chrx_records, chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch
 ):
     """A hemizygous effect allele contributes 1, a female heterozygote 1 and a
     female homozygote 2, and each sample's allele count follows its own ploidy.
@@ -115,7 +115,9 @@ def test_mixed_sex_chrx_scores_end_to_end(
     _, par, records = chrx_records
     expected_dosage, expected_alleles = _observed([par, *records])
 
-    scores = run_serial([(chrx_target, "X")], tmp_path, chrx_scorefile, monkeypatch)
+    scores = run_serial(
+        [(chrx_target, "X")], tmp_path, chrx_scorefile, monkeypatch, sex_map=sex_map
+    )
 
     assert scores.shape[0] == 3202
     # the padded position can't match, so it counts against the match rate and
@@ -146,7 +148,7 @@ def test_mixed_sex_chrx_scores_end_to_end(
 
 
 def test_a_pseudoautosomal_variant_is_diploid_for_every_sample(
-    chrx_records, chrx_target, tmp_path, monkeypatch
+    chrx_records, chrx_target, sex_map, tmp_path, monkeypatch
 ):
     """No PAR coordinate map is consulted: the same men are hemizygous a few
     kilobases away, and diploid here, because that is what the file says"""
@@ -154,20 +156,26 @@ def test_a_pseudoautosomal_variant_is_diploid_for_every_sample(
     scorefile = tmp_path / "PGS999994.txt.gz"
     _write_scorefile(scorefile, [par])
 
-    scores = run_serial([(chrx_target, "X")], tmp_path, scorefile, monkeypatch)
+    scores = run_serial(
+        [(chrx_target, "X")], tmp_path, scorefile, monkeypatch, sex_map=sex_map
+    )
 
     assert scores["allele_count"].unique().to_list() == [2]
     assert scores["dosage_sum"].max() == 2
 
 
 def test_padded_positions_are_diploid_shaped_but_carry_no_alleles(
-    chrx_target, chrx_scorefile, tmp_path, monkeypatch
+    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch
 ):
     """The other half of the padding evidence: the fabricated row really is width
     2 on a chromosome where most calls are hemizygous. It's harmless because it
     holds no alleles and has no REF, so it never becomes a match candidate"""
     zip_path = load_target(
-        f"{chrx_target}:X", tmp_path / "cache", chrx_scorefile, monkeypatch
+        f"{chrx_target}:X",
+        tmp_path / "cache",
+        chrx_scorefile,
+        monkeypatch,
+        sex_map=sex_map,
     )
     unzip_zarr(zip_path, tmp_path / "unzipped")
     leaf = f"{SAMPLESET}/X/{chrx_target.name}"

@@ -300,7 +300,12 @@ def _score_shard(zip_path, work_dir, scorefile, monkeypatch) -> pl.DataFrame:
 
 
 def test_mixed_sex_chrx_bgen_scores_like_the_vcf(
-    chrx_vcf_target, chrx_bgen_target, chrx_scorefile, tmp_path, monkeypatch
+    chrx_vcf_target,
+    chrx_bgen_target,
+    chrx_scorefile,
+    sex_map,
+    tmp_path,
+    monkeypatch,
 ):
     """Ploidy arrives on a different channel in each format, and the cache is
     format-blind, so the scores have to be the same number"""
@@ -322,6 +327,8 @@ def test_mixed_sex_chrx_bgen_scores_like_the_vcf(
             str(chrx_scorefile),
             "--bgen_sample_file",
             str(sample_path),
+            "--sex_map",
+            str(sex_map),
         ],
         monkeypatch,
     )
@@ -333,7 +340,11 @@ def test_mixed_sex_chrx_bgen_scores_like_the_vcf(
     )
 
     vcf_zip = load_target(
-        f"{chrx_vcf_target}:X", tmp_path / "vcf_cache", chrx_scorefile, monkeypatch
+        f"{chrx_vcf_target}:X",
+        tmp_path / "vcf_cache",
+        chrx_scorefile,
+        monkeypatch,
+        sex_map=sex_map,
     )
     vcf_scores = _score_shard(vcf_zip, tmp_path / "vcf", chrx_scorefile, monkeypatch)
 
@@ -344,7 +355,7 @@ def test_mixed_sex_chrx_bgen_scores_like_the_vcf(
 
 
 def test_a_mixed_sex_chry_bgen_scores(
-    chry_records, chry_bgen_target, chry_scorefile, tmp_path, monkeypatch
+    chry_records, chry_bgen_target, chry_scorefile, sex_map, tmp_path, monkeypatch
 ):
     """A woman's chrY call is nullploid rather than missing, which VCF can't say and
     bgen can (ADR 0007): she carries no alleles there, so she takes no dosage, no
@@ -369,6 +380,8 @@ def test_a_mixed_sex_chry_bgen_scores(
             str(chry_scorefile),
             "--bgen_sample_file",
             str(sample_path),
+            "--sex_map",
+            str(sex_map),
         ],
         monkeypatch,
     )

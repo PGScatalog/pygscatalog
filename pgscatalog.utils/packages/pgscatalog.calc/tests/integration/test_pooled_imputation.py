@@ -177,7 +177,7 @@ def imputed_chrx(vcf_path, tmp_path_factory):
 
 
 def test_a_mixed_sex_chrx_vcf_with_missing_calls_scores(
-    imputed_chrx, tmp_path, monkeypatch
+    imputed_chrx, sex_map, tmp_path, monkeypatch
 ):
     """The frequency isn't halved by the hemizygous samples: it is computed here by
     hand over the same calls, not read back out of the implementation"""
@@ -186,6 +186,7 @@ def test_a_mixed_sex_chrx_vcf_with_missing_calls_scores(
         tmp_path,
         imputed_chrx["scorefile"],
         monkeypatch,
+        sex_map=sex_map,
     )
 
     # by hand: total effect alleles over total called alleles
@@ -277,7 +278,7 @@ def hemizygous_chrx(vcf_path, tmp_path_factory):
 
 
 def test_a_mans_missing_chrx_call_imputes_at_ploidy_one(
-    hemizygous_chrx, tmp_path, monkeypatch
+    hemizygous_chrx, sex_map, tmp_path, monkeypatch
 ):
     """A hemizygous no-call is one expected copy of the effect allele, not two, and
     it counts one allele toward the sample's denominator - through the real reader,
@@ -291,6 +292,7 @@ def test_a_mans_missing_chrx_call_imputes_at_ploidy_one(
         tmp_path,
         hemizygous_chrx["scorefile"],
         monkeypatch,
+        sex_map=sex_map,
     )
 
     freq = hemizygous_chrx["freq"]
@@ -337,7 +339,7 @@ def test_a_dot_where_nothing_is_hemizygous_stops_the_load(
 
 
 def test_a_dot_at_a_mixed_sex_chrx_variant_is_stored_hemizygous(
-    vcf_path, tmp_path, monkeypatch
+    vcf_path, sex_map, tmp_path, monkeypatch
 ):
     """The mirror of it: the same `.` at a variant where some sample really is
     hemizygous is ordinary conformant output, so it loads and is stored [255, 254].
@@ -356,7 +358,9 @@ def test_a_dot_at_a_mixed_sex_chrx_variant_is_stored_hemizygous(
     scorefile = tmp_path / "PGS999993.txt.gz"
     _write_scorefile(scorefile, records)
 
-    zip_path = load_target(f"{target}:X", tmp_path / "cache", scorefile, monkeypatch)
+    zip_path = load_target(
+        f"{target}:X", tmp_path / "cache", scorefile, monkeypatch, sex_map=sex_map
+    )
     unzip_zarr(zip_path, tmp_path / "unzipped")
     store = zarr.storage.LocalStore(tmp_path / "unzipped" / "genotypes.zarr")
     root = zarr.open_group(store=store, mode="r")

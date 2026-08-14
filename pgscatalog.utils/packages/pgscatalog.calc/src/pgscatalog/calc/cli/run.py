@@ -98,6 +98,9 @@ def run_cli(args: argparse.Namespace) -> None:
         if args.bgen_sample_file
         else []
     )
+    # without this `run` cannot score any X-carrying PGS, because LOAD refuses one
+    # without a declaration (ADR 0014)
+    sex_map = ["--sex_map", str(args.sex_map)] if args.sex_map else []
 
     print(":test_tube:", "pgsc_calc run", ":dna:", "starting...")
 
@@ -128,6 +131,7 @@ def run_cli(args: argparse.Namespace) -> None:
                 "--threads",
                 str(args.threads),
                 *sample_file,
+                *sex_map,
                 *verbose,
             ],
             dispatched,
