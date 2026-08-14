@@ -29,7 +29,13 @@ from pgscatalog.calc.cli._utils import absence_semantics, check_positive
 from pgscatalog.calc.lib.cache.genotypecache import leaf_group_path
 from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import canonicalise_chrom
-from pgscatalog.calc.lib.sexcheck import check_sex_map_covers, read_sex_map
+from pgscatalog.calc.lib.sexcheck import (
+    check_sex,
+    check_sex_map_covers,
+    read_sex_map,
+    report_sex_check,
+    write_sex_check_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -341,13 +347,36 @@ def load_cli(args: argparse.Namespace) -> None:
             "If you're not expecting this: do your genotypes have good "
             "variant density? Are they imputed? Are your scorefile positions/build OK?"
         )
+        # nothing was cached, so there is nothing for the sex check to read. Returning
+        # here skips it deliberately rather than by accident
         return
+
+    # read the calls before the directory store is deleted, but hold the verdict until
+    # after the archive is written. The sex map influences nothing that gets cached, so
+    # a cache written before the exception is valid and complete: the user fixes the
+    # map, re-runs with --zarr_zip_file, and get_unique_positions returns nothing, so
+    # the retry costs a check rather than a re-load.
+    #
+    # This looks backwards - LOAD finishes work it is about to reject - and it is
+    # deliberate. Turning it into a fast failure would make every iteration of an
+    # override loop re-read chrX, over a biobank hours at a time (ADR 0014).
+    sex_check_results = (
+        check_sex(cache_dir=args.cache_dir, sampleset=args.sampleset, sex_map=sex_map)
+        if sex_map is not None
+        else []
+    )
 
     zip_zarr(zip_path=zip_path, zarr_path=zarr_path)
 
     # clean up the original directory store
     logger.info("Cleaning up zarr directory store")
     shutil.rmtree(zarr_path)
+
+    if sex_check_results:
+        write_sex_check_report(
+            path=args.cache_dir / "sex_check.tsv", results=sex_check_results
+        )
+        report_sex_check(sex_check_results)
 
     print("Finished caching :tada: Goodbye!")
 

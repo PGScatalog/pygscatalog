@@ -35,6 +35,7 @@ from .conftest import (
     _is_ambiguous,
     _subset_samples,
     _write_vcf,
+    flip_sex_map,
     load_target,
     load_targets,
     run_serial,
@@ -470,3 +471,33 @@ def test_a_variant_nobody_called_still_stops_the_pipeline():
         _score_one_variant(gts)
 
     assert "no called alleles because every call is missing" in str(e.value)
+
+
+def test_a_shard_below_the_floor_warns_instead_of_concluding(
+    vcf_path, sex_map, tmp_path, monkeypatch, caplog
+):
+    """Two informative variants is not enough to stop a run over: hemizygosity is
+    deterministic, so the floor is tolerance to bad calls rather than statistical
+    power, and a single miswritten no-call would invert a fraction that small.
+
+    It warns rather than failing, and the declaration here is deliberately wrong for
+    one man: not concluding has to hold even when the calls disagree, or the floor
+    would only be a floor for samples that pass (ADR 0014).
+    """
+    header, records, males = _hemizygous_chrx_records(vcf_path, 2)
+    target = tmp_path / "two_variants_chrX.vcf.gz"
+    _write_vcf(target, header, records)
+    scorefile = tmp_path / "PGS999993.txt.gz"
+    _write_scorefile(scorefile, records)
+
+    flipped = flip_sex_map(sex_map, tmp_path / "flipped.tsv", {males[0]: 2})
+    cache_dir = tmp_path / "cache"
+
+    with caplog.at_level("WARNING"):
+        load_target(f"{target}:X", cache_dir, scorefile, monkeypatch, sex_map=flipped)
+
+    assert "does not conclude" in caplog.text
+
+    report = pl.read_csv(cache_dir / "sex_check.tsv", separator="\t")
+    assert report["n_informative"].unique().to_list() == [2]
+    assert set(report["outcome"].unique()) == {"not_concluded", "exempt"}
