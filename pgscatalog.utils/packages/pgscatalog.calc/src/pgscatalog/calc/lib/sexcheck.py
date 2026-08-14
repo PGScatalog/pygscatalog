@@ -12,9 +12,10 @@ from __future__ import annotations
 import csv
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
+import numpy.typing as npt
 
 from pgscatalog.calc.lib.cache.genotypecache import GenotypeCache
 from pgscatalog.calc.lib.config import config
@@ -25,6 +26,8 @@ from pgscatalog.calc.lib.constants import (
 
 if TYPE_CHECKING:
     import pathlib
+
+    import zarr
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +157,9 @@ class SexCheckMismatch(ValueError):
     """The calls contradict the declaration for at least one sample"""
 
 
-def _shard_fractions(genotypes, samples: list[str]) -> tuple[list[float | None], int]:
+def _shard_fractions(
+    genotypes: zarr.Array, samples: list[str]
+) -> tuple[list[float | None], int]:
     """Per sample, the fraction of its called genotypes that are hemizygous.
 
     A variant is **informative** when at least one call in the shard is hemizygous.
@@ -178,7 +183,11 @@ def _shard_fractions(genotypes, samples: list[str]) -> tuple[list[float | None],
     # read in variant-axis slices rather than whole: a biobank chrX shard is
     # (n_variants, n_samples, 2) uint8, and a PGS can carry thousands of X positions
     for start in range(0, genotypes.shape[0], config.ZARR_VARIANT_CHUNK_SIZE):
-        gt = genotypes[start : start + config.ZARR_VARIANT_CHUNK_SIZE]
+        # asarray, not the bare slice: a zarr read is typed loosely enough that the
+        # comparisons below lose their ndarray-ness
+        gt: npt.NDArray[np.uint8] = np.asarray(
+            genotypes[start : start + config.ZARR_VARIANT_CHUNK_SIZE]
+        )
 
         # ploidy is derived from the genotype array, never stored (ADR 0007)
         ploidy = (gt != NO_ALLELE_SENTINEL_VALUE).sum(axis=2)
@@ -229,7 +238,7 @@ def check_sex(
     for shard in shards:
         samples = shard.samples
         fractions, n_informative = _shard_fractions(
-            root[f"{shard.path}/genotypes"], samples
+            cast("zarr.Array", root[f"{shard.path}/genotypes"]), samples
         )
 
         if n_informative < MIN_INFORMATIVE_VARIANTS:
