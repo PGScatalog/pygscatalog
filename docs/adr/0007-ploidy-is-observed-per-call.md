@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Relaxes one invariant in [ADR 0003](0003-shards-are-zarr-leaf-groups.md).
+Accepted. Relaxes one invariant in [ADR 0003](0003-shards-are-zarr-leaf-groups.md). Amended by [ADR 0014](0014-declared-sex-is-checked-never-used.md), which introduces a sample sex declaration for QC only — see *Amendment* below before reading the rejection of declared sex as a reversal.
 
 The bgen claims below were checked against the library rather than assumed — see the Consequences for what was run, what it showed, and the two cases left untested.
 
@@ -73,6 +73,14 @@ The residual risk is stated rather than removed: at a mixed-sex chrX variant, a 
 **MT is a deliberate exception to observed ploidy.** MT is biologically hemizygous, but callers write it as `1`, `1/1`, or `0/1`. Honouring the file would let a formatting convention change a score: the same homoplasmic variant reads as dosage 1 from one caller and 2 from another, so two callsets of the same people disagree. Handlers therefore collapse homozygous diploid-coded MT calls to hemizygous (`0/0`→`0`, `1/1`→`1`, unambiguous), and **a heterozygous MT call is a hard error**. A het MT call is heteroplasmy — a within-sample mixture — and polygenic scoring has no defined dosage semantics for it. Calling it 1, or 0, or missing would invent one.
 
 Unlike X, where ploidy genuinely differs between people and the caller is the authority on which, MT ploidy is a fact about mitochondria. That is what makes this an exception rather than an inconsistency.
+
+## Amendment: a sex declaration exists, and is never used
+
+[ADR 0014](0014-declared-sex-is-checked-never-used.md) adds a mandatory `--sex_map` when a scoring file carries sex chromosome variants. A reader who finds that flag and this ADR's "no pipeline-wide sample sex column is introduced" together should not conclude one of them lost.
+
+Nothing above is reversed. Declared sex never derives ploidy, never fills a ploidy a format could not express, and never reaches a dosage or a score. The rejection of *declared sex plus a PAR coordinate map* below is unchanged, no PAR coordinates are in the repository, and the limitations this ADR accepts on principle — the mixed-sex chrY VCF, the woman's no-call miswritten `.` — are still accepted rather than resolved by the new declaration. The `_vcf.py` comment and `test_vcf.py` docstring that cite this ADR as refusing a declared sample sex remain correct as written.
+
+What 0014 adds is the opposite operation. This ADR's argument against a declaration is that it produces a second answer free to disagree with the file, with no principled way to resolve the conflict. A declaration that can only be *checked* inverts that objection: the disagreement is the output, and 0014 stops the run rather than picking a winner. The genotype file remains the sole authority on how a sample is scored.
 
 ## Considered and rejected
 
