@@ -62,6 +62,39 @@ def tests(session):
     )
 
 
+@nox.session(default=False, python="3.12")
+def v2_parity(session):
+    """Run only the all-chromosome PLINK 2 score parity integration test."""
+    package = "pgscatalog.calc"
+    config_file = "packages/pgscatalog.calc/pyproject.toml"
+    test_path = "packages/pgscatalog.calc/tests/integration/test_v2_parity.py"
+
+    session.run_install(
+        "uv",
+        "sync",
+        "--group",
+        "test",
+        "--package",
+        package,
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+    session.run(
+        "uv",
+        "run",
+        "--group",
+        "test",
+        "--exact",
+        "--package",
+        package,
+        "pytest",
+        "-c",
+        config_file,
+        test_path,
+        external=True,
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+
 @nox.session
 def lint(session):
     """Run linting checks"""

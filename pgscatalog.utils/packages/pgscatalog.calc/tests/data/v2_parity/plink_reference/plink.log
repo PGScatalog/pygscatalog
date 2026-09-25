@@ -1,0 +1,876 @@
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr1
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr1.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 4 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr1-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr1-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+4 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr1-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 48 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 4 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr1.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr1.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr2
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr2.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr2-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr2-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr2-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr2.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr2.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr3
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr3.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr3-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr3-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr3-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr3.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr3.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr4
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr4.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr4-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr4-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr4-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr4.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr4.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr5
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr5.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr5-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr5-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr5-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr5.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr5.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr6
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr6.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr6-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr6-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr6-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr6.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr6.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr7
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr7.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr7-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr7-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr7-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr7.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr7.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr8
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr8.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr8-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr8-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr8-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr8.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr8.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr9
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr9.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:58 2026
+
+Random number seed: 1790349778
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr9-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr9-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr9-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr9.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr9.sscore .
+
+End time: Fri Sep 25 16:22:58 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr10
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr10.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr10-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr10-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr10-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr10.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr10.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr11
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr11.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr11-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr11-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr11-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr11.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr11.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr12
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr12.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr12-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr12-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr12-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr12.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr12.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr13
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr13.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr13-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr13-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr13-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr13.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr13.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr14
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr14.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr14-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr14-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr14-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr14.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr14.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr15
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr15.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr15-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr15-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr15-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr15.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr15.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr16
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr16.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr16-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr16-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr16-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr16.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr16.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr17
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr17.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr17-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr17-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr17-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr17.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr17.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr18
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr18.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr18-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr18-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr18-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr18.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr18.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr19
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr19.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr19-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr19-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr19-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr19.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr19.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr20
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr20.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr20-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr20-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr20-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr20.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr20.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr21
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr21.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr21-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr21-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr21-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr21.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr21.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr22
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chr22.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr22-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr22-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr22-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr22.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chr22.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrX
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --split-par b38
+  --threads 1
+  --vcf target.chrX.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrX-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrX-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+Warning: --split-par had no effect (no X variants were in the PARs).
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrX-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrX.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrX.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrY
+  --psam samples.Y.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chrY.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrY-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrY-temporary.pvar.zst
+written.
+2 samples (0 females, 2 males; 2 founders) loaded from samples.Y.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrY-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrY.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrY.sscore .
+
+End time: Fri Sep 25 16:22:59 2026
+
+PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)
+Options in effect:
+  --out /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrMT
+  --psam samples.psam
+  --score plink.weights.tsv 1 2 3 header-read no-mean-imputation list-variants cols=+scoresums
+  --threads 1
+  --vcf target.chrMT.vcf.gz
+  --xchr-model 1
+
+Hostname: L0J4Y46CJX
+Working directory: /Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity
+Start time: Fri Sep 25 16:22:59 2026
+
+Random number seed: 1790349779
+32768 MiB RAM detected; reserving 16384 MiB for main workspace.
+Using 1 compute thread.
+--vcf: 2 variants scanned.
+--vcf:
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrMT-temporary.pgen
++
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrMT-temporary.pvar.zst
+written.
+4 samples (2 females, 2 males; 4 founders) loaded from samples.psam.
+2 variants loaded from
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrMT-temporary.pvar.zst.
+Note: No phenotype data present.
+Warning: --score: 50 entries in plink.weights.tsv were skipped due to missing
+variant IDs.
+--score: 2 variants processed.
+--score: Variant list written to /var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrMT.sscore.vars .
+--score: Results written to
+/var/folders/yy/bk6dt9_j69jgbx7zp0_hx04h0000gp/T/tmppru09kjn/chrMT.sscore .
+
+End time: Fri Sep 25 16:22:59 2026

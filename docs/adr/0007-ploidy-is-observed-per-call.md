@@ -32,7 +32,7 @@ plink is worth stating precisely because the previous pipeline used it and handl
 
 ## Decision
 
-**A hemizygous effect allele contributes a dosage of 1**, not 2. This matches plink2 `--score`'s default; the doubled coding is `--xchr-model 2`, an opt-in.
+**A hemizygous effect allele contributes a dosage of 1**, not 2. For male non-pseudoautosomal X calls, matching this behavior in PLINK 2 requires explicit `--xchr-model 1`; PLINK 2 defaults to doubled coding with `--xchr-model 2`. Other haploid chromosomes use dosage 0–1. See the [PLINK 2 dosage documentation](https://www.cog-genomics.org/plink/2.0/assoc#xchr-model).
 
 **Ploidy is observed per call**, never derived from a declared sample sex plus a pseudoautosomal region map. The caller already made this decision and wrote it down; re-deriving it produces a second answer that is free to disagree with the file, with no principled way to resolve the conflict. It also makes PAR free — a pseudoautosomal variant is diploid in the file because it is diploid — which avoids shipping build-specific PAR coordinates and keeping them correct.
 
