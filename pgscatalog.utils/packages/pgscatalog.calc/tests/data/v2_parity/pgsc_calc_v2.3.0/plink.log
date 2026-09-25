@@ -1,0 +1,732 @@
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_1_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_1_additive_0
+  --pfile vzs GRCh38_synthetic_1
+  --score synthetic_1_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: c8d3ff559f8a
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/70/3ee3e4e979541f907d798a5a3b7de6
+Start time: Fri Sep 25 16:09:03 2026
+
+1959 MiB RAM detected, ~1676 available; reserving 1612 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_1.psam.
+4 variants loaded from GRCh38_synthetic_1.pvar.zst.
+Note: No phenotype data present.
+--extract: 4 variants remaining.
+4 variants remaining after main filters.
+--score: 4 variants processed.
+Variant list written to synthetic_1_additive_0.sscore.vars .
+--score: Results written to synthetic_1_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:03 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_2_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_2_additive_0
+  --pfile vzs GRCh38_synthetic_2
+  --score synthetic_2_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 76422f128ffb
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/65/75cdbeb4adf7563f6c12ee2ed9c562
+Start time: Fri Sep 25 16:09:04 2026
+
+1959 MiB RAM detected, ~1684 available; reserving 1620 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_2.psam.
+2 variants loaded from GRCh38_synthetic_2.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_2_additive_0.sscore.vars .
+--score: Results written to synthetic_2_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:04 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_3_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_3_additive_0
+  --pfile vzs GRCh38_synthetic_3
+  --score synthetic_3_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 377dd65340ab
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/aa/82c7484ce3c64b134fdbc8f28713a0
+Start time: Fri Sep 25 16:09:03 2026
+
+1959 MiB RAM detected, ~1684 available; reserving 1620 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_3.psam.
+2 variants loaded from GRCh38_synthetic_3.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_3_additive_0.sscore.vars .
+--score: Results written to synthetic_3_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:03 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_4_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_4_additive_0
+  --pfile vzs GRCh38_synthetic_4
+  --score synthetic_4_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 6b2ca1793c0b
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/fd/3f6f85cd6aca6b0c820f15c66693b3
+Start time: Fri Sep 25 16:09:03 2026
+
+1959 MiB RAM detected, ~1682 available; reserving 1618 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_4.psam.
+2 variants loaded from GRCh38_synthetic_4.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_4_additive_0.sscore.vars .
+--score: Results written to synthetic_4_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:03 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_5_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_5_additive_0
+  --pfile vzs GRCh38_synthetic_5
+  --score synthetic_5_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: c7e941b301ee
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/89/a0532675f7a93e9d141b4c98bfa297
+Start time: Fri Sep 25 16:09:04 2026
+
+1959 MiB RAM detected, ~1688 available; reserving 1624 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_5.psam.
+2 variants loaded from GRCh38_synthetic_5.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_5_additive_0.sscore.vars .
+--score: Results written to synthetic_5_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:04 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_6_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_6_additive_0
+  --pfile vzs GRCh38_synthetic_6
+  --score synthetic_6_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 0010c3d0056b
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/69/61a6cc01f6840358c026947fa3b8d8
+Start time: Fri Sep 25 16:09:04 2026
+
+1959 MiB RAM detected, ~1686 available; reserving 1622 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_6.psam.
+2 variants loaded from GRCh38_synthetic_6.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_6_additive_0.sscore.vars .
+--score: Results written to synthetic_6_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:04 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_7_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_7_additive_0
+  --pfile vzs GRCh38_synthetic_7
+  --score synthetic_7_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 505a0b965bf6
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/1e/be00248772a10fd3b78bb910e48821
+Start time: Fri Sep 25 16:09:04 2026
+
+1959 MiB RAM detected, ~1697 available; reserving 1633 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_7.psam.
+2 variants loaded from GRCh38_synthetic_7.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_7_additive_0.sscore.vars .
+--score: Results written to synthetic_7_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:04 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_8_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_8_additive_0
+  --pfile vzs GRCh38_synthetic_8
+  --score synthetic_8_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 0b7adef5ac00
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/f0/2d686b835e400a7e63c71f2f1bf8b0
+Start time: Fri Sep 25 16:09:03 2026
+
+1959 MiB RAM detected, ~1676 available; reserving 1612 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_8.psam.
+2 variants loaded from GRCh38_synthetic_8.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_8_additive_0.sscore.vars .
+--score: Results written to synthetic_8_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:03 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_9_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_9_additive_0
+  --pfile vzs GRCh38_synthetic_9
+  --score synthetic_9_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 56af261928e1
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/e5/252d6ba54b2010474d8968a1537c00
+Start time: Fri Sep 25 16:09:04 2026
+
+1959 MiB RAM detected, ~1685 available; reserving 1621 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_9.psam.
+2 variants loaded from GRCh38_synthetic_9.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_9_additive_0.sscore.vars .
+--score: Results written to synthetic_9_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:04 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_10_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_10_additive_0
+  --pfile vzs GRCh38_synthetic_10
+  --score synthetic_10_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: dec448257d1e
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/70/99c475632e0d1567d2502fb6b81dcc
+Start time: Fri Sep 25 16:09:01 2026
+
+1959 MiB RAM detected, ~1676 available; reserving 1612 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_10.psam.
+2 variants loaded from GRCh38_synthetic_10.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_10_additive_0.sscore.vars .
+--score: Results written to synthetic_10_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:01 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_11_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_11_additive_0
+  --pfile vzs GRCh38_synthetic_11
+  --score synthetic_11_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: bddeb57eb518
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/cc/4e3566541595a0a2c0058ecb9c87e9
+Start time: Fri Sep 25 16:09:02 2026
+
+1959 MiB RAM detected, ~1672 available; reserving 1608 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_11.psam.
+2 variants loaded from GRCh38_synthetic_11.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_11_additive_0.sscore.vars .
+--score: Results written to synthetic_11_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:02 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_12_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_12_additive_0
+  --pfile vzs GRCh38_synthetic_12
+  --score synthetic_12_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 9ef549901eb5
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/11/6e2ff4622ccd613fab27d88cf5af04
+Start time: Fri Sep 25 16:09:01 2026
+
+1959 MiB RAM detected, ~1669 available; reserving 1605 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_12.psam.
+2 variants loaded from GRCh38_synthetic_12.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_12_additive_0.sscore.vars .
+--score: Results written to synthetic_12_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:01 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_13_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_13_additive_0
+  --pfile vzs GRCh38_synthetic_13
+  --score synthetic_13_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 9c2ffd7a652a
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/15/844942c18b52515c613c3608c73bf1
+Start time: Fri Sep 25 16:09:02 2026
+
+1959 MiB RAM detected, ~1672 available; reserving 1608 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_13.psam.
+2 variants loaded from GRCh38_synthetic_13.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_13_additive_0.sscore.vars .
+--score: Results written to synthetic_13_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:02 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_14_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_14_additive_0
+  --pfile vzs GRCh38_synthetic_14
+  --score synthetic_14_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: cf545b9652f6
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/27/9de32f5c05053a00c8ecc7b108add6
+Start time: Fri Sep 25 16:09:02 2026
+
+1959 MiB RAM detected, ~1685 available; reserving 1621 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_14.psam.
+2 variants loaded from GRCh38_synthetic_14.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_14_additive_0.sscore.vars .
+--score: Results written to synthetic_14_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:02 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_15_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_15_additive_0
+  --pfile vzs GRCh38_synthetic_15
+  --score synthetic_15_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: a63a26aa5f20
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/9b/a87f6ccedef373643d02c4b0696929
+Start time: Fri Sep 25 16:09:01 2026
+
+1959 MiB RAM detected, ~1676 available; reserving 1612 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_15.psam.
+2 variants loaded from GRCh38_synthetic_15.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_15_additive_0.sscore.vars .
+--score: Results written to synthetic_15_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:01 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_16_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_16_additive_0
+  --pfile vzs GRCh38_synthetic_16
+  --score synthetic_16_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: e171bbca230f
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/e9/e84a9bea40ccb7697c829988704522
+Start time: Fri Sep 25 16:09:01 2026
+
+1959 MiB RAM detected, ~1669 available; reserving 1605 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_16.psam.
+2 variants loaded from GRCh38_synthetic_16.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_16_additive_0.sscore.vars .
+--score: Results written to synthetic_16_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:02 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_17_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_17_additive_0
+  --pfile vzs GRCh38_synthetic_17
+  --score synthetic_17_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: a671e26c68c3
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/a6/5772e2a4a8848d5adca447231f8777
+Start time: Fri Sep 25 16:09:02 2026
+
+1959 MiB RAM detected, ~1681 available; reserving 1617 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_17.psam.
+2 variants loaded from GRCh38_synthetic_17.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_17_additive_0.sscore.vars .
+--score: Results written to synthetic_17_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:02 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_18_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_18_additive_0
+  --pfile vzs GRCh38_synthetic_18
+  --score synthetic_18_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 3f84b598938b
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/43/6e426b9469a9855dfc395834c079bb
+Start time: Fri Sep 25 16:09:03 2026
+
+1959 MiB RAM detected, ~1684 available; reserving 1620 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_18.psam.
+2 variants loaded from GRCh38_synthetic_18.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_18_additive_0.sscore.vars .
+--score: Results written to synthetic_18_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:03 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_19_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_19_additive_0
+  --pfile vzs GRCh38_synthetic_19
+  --score synthetic_19_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: fa3b2b634c03
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/24/36ad56caad2865999885ab051bfe6d
+Start time: Fri Sep 25 16:09:03 2026
+
+1959 MiB RAM detected, ~1680 available; reserving 1616 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_19.psam.
+2 variants loaded from GRCh38_synthetic_19.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_19_additive_0.sscore.vars .
+--score: Results written to synthetic_19_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:03 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_20_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_20_additive_0
+  --pfile vzs GRCh38_synthetic_20
+  --score synthetic_20_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 86d0f1e043c6
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/3c/e9230df71770fdd23e91876eeb21c8
+Start time: Fri Sep 25 16:09:04 2026
+
+1959 MiB RAM detected, ~1685 available; reserving 1621 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_20.psam.
+2 variants loaded from GRCh38_synthetic_20.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_20_additive_0.sscore.vars .
+--score: Results written to synthetic_20_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:04 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_21_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_21_additive_0
+  --pfile vzs GRCh38_synthetic_21
+  --score synthetic_21_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: a6ef3a3cff9b
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/be/6c24eb513dd217783dfbc7204b4e5d
+Start time: Fri Sep 25 16:09:03 2026
+
+1959 MiB RAM detected, ~1676 available; reserving 1612 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_21.psam.
+2 variants loaded from GRCh38_synthetic_21.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_21_additive_0.sscore.vars .
+--score: Results written to synthetic_21_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:03 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_22_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_22_additive_0
+  --pfile vzs GRCh38_synthetic_22
+  --score synthetic_22_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 4e939bd372bc
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/3b/b745cd8c94ff11874a23ced13dbf32
+Start time: Fri Sep 25 16:09:03 2026
+
+1959 MiB RAM detected, ~1686 available; reserving 1622 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from
+GRCh38_synthetic_22.psam.
+2 variants loaded from GRCh38_synthetic_22.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_22_additive_0.sscore.vars .
+--score: Results written to synthetic_22_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:03 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_X_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_X_additive_0
+  --pfile vzs GRCh38_synthetic_X
+  --score synthetic_X_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: 1480b2071dc4
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/e5/f9cb15b11ec3c891d2a8dbb20920fe
+Start time: Fri Sep 25 16:09:04 2026
+
+1959 MiB RAM detected, ~1690 available; reserving 1626 MiB for main workspace.
+Using up to 2 compute threads.
+4 samples (2 females, 2 males; 4 founders) loaded from GRCh38_synthetic_X.psam.
+2 variants loaded from GRCh38_synthetic_X.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_X_additive_0.sscore.vars .
+--score: Results written to synthetic_X_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:04 2026
+
+PLINK v2.00a5.10 64-bit (5 Jan 2024)
+Options in effect:
+  --allow-extra-chr
+  --error-on-freq-calc
+  --extract synthetic_Y_additive_0.scorefile.gz
+  --memory 8192
+  --out synthetic_Y_additive_0
+  --pfile vzs GRCh38_synthetic_Y
+  --score synthetic_Y_additive_0.scorefile.gz header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation
+  --seed 31
+  --threads 2
+  --xchr-model 1
+
+Hostname: e92457386f1b
+Working directory: /Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/work/6e/42c2d392677e33a0b6724ca6ceff78
+Start time: Fri Sep 25 16:09:05 2026
+
+1959 MiB RAM detected, ~1694 available; reserving 1630 MiB for main workspace.
+Using up to 2 compute threads.
+2 samples (0 females, 2 males; 2 founders) loaded from GRCh38_synthetic_Y.psam.
+2 variants loaded from GRCh38_synthetic_Y.pvar.zst.
+Note: No phenotype data present.
+--extract: 2 variants remaining.
+2 variants remaining after main filters.
+--score: 2 variants processed.
+Variant list written to synthetic_Y_additive_0.sscore.vars .
+--score: Results written to synthetic_Y_additive_0.sscore .
+
+End time: Fri Sep 25 16:09:05 2026

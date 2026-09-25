@@ -64,7 +64,7 @@ def tests(session):
 
 @nox.session(default=False, python="3.12")
 def v2_parity(session):
-    """Run only the all-chromosome PLINK 2 score parity integration test."""
+    """Run only the PLINK 2 and pgsc_calc v2.3.0 score parity integration tests."""
     package = "pgscatalog.calc"
     config_file = "packages/pgscatalog.calc/pyproject.toml"
     test_path = "packages/pgscatalog.calc/tests/integration/test_v2_parity.py"

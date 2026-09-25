@@ -1,6 +1,6 @@
-"""All-chromosome score parity with the saved independent PLINK 2 reference.
+"""Score parity with saved PLINK 2 and pgsc_calc v2.3.0 references.
 
-PLINK is only used to regenerate the reference, never during this test.
+PLINK and Nextflow are only used to regenerate references, never in this test.
 See tests/data/v2_parity/README.md for the fixture and regeneration commands.
 """
 
@@ -13,38 +13,47 @@ from collections import defaultdict
 from decimal import ROUND_HALF_UP, Decimal
 
 import polars as pl
+import pytest
 
 from .conftest import SAMPLESET, load_targets, run_cli
 
 DATA_DIR = pathlib.Path(__file__).parent.parent / "data" / "v2_parity"
 CHROMS = (*map(str, range(1, 23)), "X", "Y", "MT")
 SCORE_FILE = DATA_DIR / "score.txt.gz"
-REFERENCE = DATA_DIR / "plink_reference"
 
 
-def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
+@pytest.mark.parametrize("reference_name", ["plink_reference", "pgsc_calc_v2.3.0"])
+def test_chromosomes_match_reference_scores(reference_name, tmp_path, monkeypatch):
     """Exercise LOAD through COMBINE with multiallelic and mixed-ploidy calls."""
+    is_v2 = reference_name == "pgsc_calc_v2.3.0"
+    reference = DATA_DIR / reference_name
+    # v2's pinned matcher supports 1-22, X and Y, but filters out MT.
+    chroms = CHROMS[:-1] if is_v2 else CHROMS
+    n_matched = 50 if is_v2 else 52
+    filename = "synthetic_{chrom}_additive_0.sscore" if is_v2 else "chr{chrom}.sscore"
+    sample_column = "IID" if is_v2 else "#IID"
+    sum_column = "PGS999997_SUM" if is_v2 else "WEIGHT_SUM"
     sample_ids = {"XX_1", "XX_2", "XY_1", "XY_2"}
     expected = defaultdict(lambda: defaultdict(Decimal))
     chromosome_counts = {}
-    assert {p.name for p in REFERENCE.glob("*.sscore")} == {
-        f"chr{chrom}.sscore" for chrom in CHROMS
+    assert {p.name for p in reference.glob("*.sscore")} == {
+        filename.format(chrom=chrom) for chrom in chroms
     }
-    for chrom in CHROMS:
-        with (REFERENCE / f"chr{chrom}.sscore").open() as handle:
+    for chrom in chroms:
+        with (reference / filename.format(chrom=chrom)).open() as handle:
             rows = list(csv.DictReader(handle, delimiter="\t"))
         wanted = {"XY_1", "XY_2"} if chrom == "Y" else sample_ids
         assert len(rows) == len(wanted), chrom
-        assert {r["#IID"] for r in rows} == wanted, chrom
+        assert {r[sample_column] for r in rows} == wanted, chrom
         chromosome_counts[chrom] = {}
         for row in rows:
-            key = ("PGS999997", row["#IID"])
+            key = ("PGS999997", row[sample_column])
             count = int(row["ALLELE_CT"])
             assert count > 0, (chrom, key)
             chromosome_counts[chrom][key] = count
             expected[key]["allele_count"] += count
             for field, plink_field in (
-                ("score", "WEIGHT_SUM"),
+                ("score", sum_column),
                 ("dosage_sum", "NAMED_ALLELE_DOSAGE_SUM"),
             ):
                 contribution = Decimal(row[plink_field])
@@ -58,7 +67,26 @@ def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
                 Decimal("0.000001"), rounding=ROUND_HALF_UP
             )
 
-    targets = [(DATA_DIR / f"target.chr{chrom}.vcf.gz", chrom) for chrom in CHROMS]
+    if is_v2:
+        # The saved end-to-end v2 output must also agree with its raw shards.
+        with gzip.open(reference / "aggregated_scores.txt.gz", "rt") as handle:
+            aggregate = list(csv.DictReader(handle, delimiter="\t"))
+        assert len(aggregate) == 4
+        assert {(r["PGS"], r["IID"]) for r in aggregate} == set(expected)
+        for row in aggregate:
+            key = (row["PGS"], row["IID"])
+            assert row["sampleset"] == "synthetic"
+            for field, column in (
+                ("score", "SUM"),
+                ("allele_count", "DENOM"),
+                ("score_avg", "AVG"),
+            ):
+                value = Decimal(row[column]).quantize(
+                    Decimal("0.000001"), rounding=ROUND_HALF_UP
+                )
+                assert value == expected[key][field], (key, column)
+
+    targets = [(DATA_DIR / f"target.chr{chrom}.vcf.gz", chrom) for chrom in chroms]
     zips = load_targets(
         targets,
         tmp_path / "load",
@@ -72,7 +100,7 @@ def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
 
     # run does not expose --keep_multiallelic yet; exercise the public stages.
     matches, samples, partials = [], [], []
-    for chrom, archive in zip(CHROMS, zips, strict=True):
+    for chrom, archive in zip(chroms, zips, strict=True):
         out = tmp_path / "match" / chrom
         stage(
             "match",
@@ -97,13 +125,14 @@ def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
         SCORE_FILE,
         "--sampleset",
         SAMPLESET,
-        # Current gate uses >. 51/52 < 0.99, so only all 52 can pass.
+        # Current gate uses >. Require all supported variants: 49/52 < 0.95
+        # < 50/52 for v2, and 51/52 < 0.99 < 52/52 for the full fixture.
         "--min_overlap",
-        "0.99",
+        "0.95" if is_v2 else "0.99",
         "--out_dir",
         combined,
     )
-    for chrom, archive in zip(CHROMS, zips, strict=True):
+    for chrom, archive in zip(chroms, zips, strict=True):
         out = tmp_path / "score" / chrom
         stage(
             "score",
@@ -133,7 +162,7 @@ def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
     assert set(expected) == keys
     assert {(r["accession"], r["sample_id"]) for r in actual} == keys
     assert {r["sampleset"] for r in actual} == {SAMPLESET}
-    assert all(int(r["n_matched"]) == 52 for r in actual)
+    assert all(int(r["n_matched"]) == n_matched for r in actual)
     # Check every numerical output against PLINK, with no float tolerance.
     for row in actual:
         key = (row["accession"], row["sample_id"])

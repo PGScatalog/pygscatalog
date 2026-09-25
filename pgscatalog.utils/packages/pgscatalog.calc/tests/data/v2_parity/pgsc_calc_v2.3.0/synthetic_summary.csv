@@ -1,0 +1,4 @@
+dataset,accession,score_pass,match_status,ambiguous,is_multiallelic,duplicate_best_match,duplicate_ID,match_flipped,match_IDs,count,percent
+synthetic,PGS999997,true,unmatched,,,,,,,2,3.8461538461538463
+synthetic,PGS999997,true,matched,false,false,false,false,false,NA,26,50.0
+synthetic,PGS999997,true,matched,false,true,true,false,false,NA,24,46.15384615384615

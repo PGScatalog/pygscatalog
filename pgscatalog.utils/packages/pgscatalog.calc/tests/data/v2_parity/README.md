@@ -1,9 +1,11 @@
-# PLINK 2 parity fixture
+# PLINK 2 and pgsc_calc v2.3.0 parity fixture
 
 This directory holds one self-contained fixture for comparing the public score
-from the v3 scoring stages with a score independently produced by PLINK 2, configured
-to match v3 scoring semantics. It does not reproduce the historical pgsc_calc
-v2 pipeline. The directory and nox session retain their existing names for now.
+from the v3 scoring stages with two independent references: standalone PLINK 2
+across all 25 chromosomes, and the actual pgsc_calc v2.3.0 workflow across its
+24 supported chromosomes (1–22, X and Y). Both are configured to match v3's
+scoring semantics. See [the v2.3.0 reference](pgsc_calc_v2.3.0/README.md) for its
+coverage, configuration and regeneration instructions.
 
 Add these files:
 
@@ -16,15 +18,17 @@ Add these files:
 - `sex.tsv`: v3 sample-sex map.
 - `samples.psam` and `samples.Y.psam`: PLINK sample metadata for the full
   cohort and the XY-only Y file, respectively.
-- `plink_reference/chr{chrom}.sscore`: the original PLINK 2 chromosome results.
+- `plink_reference/chr{chrom}.sscore`: the original standalone PLINK 2 results.
+- `pgsc_calc_v2.3.0/`: raw chromosome scores, final aggregate and provenance
+  from the actual v2.3.0 workflow.
 
 The generator produces the VCFs, indexes, scoring inputs, and sample-sex
 files from one fixed variant and sample definition. Running PLINK 2 and
 refreshing the saved reference are separate, explicit steps.
-The generator must not generate or overwrite `plink_reference/`. The integration
-test sums the committed `WEIGHT_SUM` values by `#IID` using Decimal and rounds
-only the final totals to six decimal places. There is no pre-aggregated expected
-score file.
+The generator must not overwrite either reference directory. The integration
+test sums committed chromosome score sums by sample ID using Decimal and rounds
+only the final totals to six decimal places. It also checks v2.3.0's original
+aggregate against that workflow's chromosome outputs.
 
 The fixture contains four samples in fixed order: `XX_1`, `XX_2`, `XY_1`,
 `XY_2`. Use explicit, fixed genotypes that collectively exercise effect-allele
@@ -220,7 +224,7 @@ uv run pytest -q -c packages/pgscatalog.calc/pyproject.toml \
     packages/pgscatalog.calc/tests/data/v2_parity/test_generate.py
 ```
 
-The `v2_parity` directory, test and nox session retain their historical names;
-the numerical reference is direct PLINK 2, not the old pgsc_calc v2 pipeline.
+The integration test has two cases: standalone PLINK 2 (52 variants) and
+pgsc_calc v2.3.0 (50 variants; MT remains covered by the first case).
 Only refresh the raw `.sscore` files and their provenance after inspecting and understanding
 any change to the results.
