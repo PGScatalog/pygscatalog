@@ -10,7 +10,9 @@ import csv
 import gzip
 import pathlib
 from collections import defaultdict
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
+
+import polars as pl
 
 from .conftest import SAMPLESET, load_targets, run_cli
 
@@ -23,7 +25,8 @@ REFERENCE = DATA_DIR / "plink_reference"
 def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
     """Exercise LOAD through COMBINE with multiallelic and mixed-ploidy calls."""
     sample_ids = {"XX_1", "XX_2", "XY_1", "XY_2"}
-    expected = defaultdict(Decimal)
+    expected = defaultdict(lambda: defaultdict(Decimal))
+    chromosome_counts = {}
     assert {p.name for p in REFERENCE.glob("*.sscore")} == {
         f"chr{chrom}.sscore" for chrom in CHROMS
     }
@@ -33,14 +36,27 @@ def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
         wanted = {"XY_1", "XY_2"} if chrom == "Y" else sample_ids
         assert len(rows) == len(wanted), chrom
         assert {r["#IID"] for r in rows} == wanted, chrom
+        chromosome_counts[chrom] = {}
         for row in rows:
-            contribution = Decimal(row["WEIGHT_SUM"])
-            assert contribution.is_finite(), (chrom, row["#IID"])
-            expected["PGS999997", row["#IID"]] += contribution
+            key = ("PGS999997", row["#IID"])
+            count = int(row["ALLELE_CT"])
+            assert count > 0, (chrom, key)
+            chromosome_counts[chrom][key] = count
+            expected[key]["allele_count"] += count
+            for field, plink_field in (
+                ("score", "WEIGHT_SUM"),
+                ("dosage_sum", "NAMED_ALLELE_DOSAGE_SUM"),
+            ):
+                contribution = Decimal(row[plink_field])
+                assert contribution.is_finite(), (chrom, key, field)
+                expected[key][field] += contribution
     # Round once after adding chromosome sums, never average WEIGHT_AVG.
-    expected = {
-        key: value.quantize(Decimal("0.000001")) for key, value in expected.items()
-    }
+    for values in expected.values():
+        values["score_avg"] = values["score"] / values["allele_count"]
+        for field in ("score", "dosage_sum", "score_avg"):
+            values[field] = values[field].quantize(
+                Decimal("0.000001"), rounding=ROUND_HALF_UP
+            )
 
     targets = [(DATA_DIR / f"target.chr{chrom}.vcf.gz", chrom) for chrom in CHROMS]
     zips = load_targets(
@@ -101,6 +117,13 @@ def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
             out,
         )
         partials.append(out / "partial_scores.parquet")
+        # X and Y counts can cancel in the combined denominator: check each
+        # chromosome independently, including the absence of XX samples on Y.
+        partial_rows = pl.read_parquet(partials[-1]).to_dicts()
+        assert len(partial_rows) == len(chromosome_counts[chrom]), chrom
+        assert {
+            (r["accession"], r["sample_id"]): r["allele_count"] for r in partial_rows
+        } == chromosome_counts[chrom], chrom
     stage("combine", "--partial_scores", *partials, "--out_dir", tmp_path / "combined")
 
     with gzip.open(tmp_path / "combined" / "scores.txt.gz", "rt") as handle:
@@ -111,7 +134,8 @@ def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
     assert {(r["accession"], r["sample_id"]) for r in actual} == keys
     assert {r["sampleset"] for r in actual} == {SAMPLESET}
     assert all(int(r["n_matched"]) == 52 for r in actual)
-    # Compare the public six-decimal score sums exactly, with no float tolerance.
-    assert {
-        (r["accession"], r["sample_id"]): Decimal(r["score"]) for r in actual
-    } == expected
+    # Check every numerical output against PLINK, with no float tolerance.
+    for row in actual:
+        key = (row["accession"], row["sample_id"])
+        for field in ("score", "allele_count", "dosage_sum", "score_avg"):
+            assert Decimal(row[field]) == expected[key][field], (key, field)

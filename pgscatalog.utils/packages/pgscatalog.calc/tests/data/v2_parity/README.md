@@ -190,6 +190,14 @@ places. It validates chromosome file coverage and sample membership before
 aggregation, rejects duplicate sample rows and non-finite contributions. XX samples have no Y
 contribution. Neither v3 nor the generator produced these PLINK results.
 
+The test also sums PLINK's `ALLELE_CT` and `NAMED_ALLELE_DOSAGE_SUM` to check
+v3's `allele_count` and `dosage_sum`. It derives `score_avg` by dividing the
+combined `WEIGHT_SUM` by the combined `ALLELE_CT`, then rounds once to six
+decimal places; chromosome averages are never averaged. Each chromosome's
+partial allele counts are checked separately against PLINK because the X/Y
+contributions happen to give all four samples the same total of 98 alleles,
+which could otherwise hide errors that cancel in the combined denominator.
+
 The integration test loads all 25 checked-in VCFs, supplies the sex map, keeps
 multiallelic matches, and runs the public v3 stages through COMBINE. It requires
 all 52 variants to match, all four sample/accession keys to be present without
