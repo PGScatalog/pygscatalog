@@ -58,7 +58,7 @@ def test_chromosomes_match_reference_scores(reference_name, tmp_path, monkeypatc
     # male X dosage, whereas v3 counts the single allele recorded in the VCF.
     sample_ids = {"XX_1", "XX_2", "XY_1", "XY_2"}
     expected = defaultdict(lambda: defaultdict(Decimal))
-    chromosome_counts = {}
+    chromosome_expected = {}
     # Enumerate the required files and samples before summing: a missing shard
     # or duplicate row could otherwise become a plausible but incorrect total.
     assert {p.name for p in reference.glob("*.sscore")} == {
@@ -73,12 +73,12 @@ def test_chromosomes_match_reference_scores(reference_name, tmp_path, monkeypatc
         wanted = {"XY_1", "XY_2"} if chrom == "Y" else sample_ids
         assert len(rows) == len(wanted), chrom
         assert {r[sample_column] for r in rows} == wanted, chrom
-        chromosome_counts[chrom] = {}
+        chromosome_expected[chrom] = {}
         for row in rows:
             key = ("PGS999997", row[sample_column])
             count = int(row["ALLELE_CT"])
             assert count > 0, (chrom, key)
-            chromosome_counts[chrom][key] = count
+            chromosome_expected[chrom][key] = {"allele_count": count}
             expected[key]["allele_count"] += count
             # Dosage counts copies of the named effect allele, not all ALT
             # alleles. At a multiallelic 1/2 call, an ALT2 effect has dosage 1;
@@ -91,6 +91,7 @@ def test_chromosomes_match_reference_scores(reference_name, tmp_path, monkeypatc
             ):
                 contribution = Decimal(row[plink_field])
                 assert contribution.is_finite(), (chrom, key, field)
+                chromosome_expected[chrom][key][field] = contribution
                 expected[key][field] += contribution
     # The average's denominator is the number of observed alleles, not variants
     # or effect-allele copies. Because every call is present and neither run
@@ -254,12 +255,18 @@ def test_chromosomes_match_reference_scores(reference_name, tmp_path, monkeypatc
         # Every sample happens to have 98 alleles in the full fixture (96 without
         # MT): XY samples' two fewer X alleles are offset by their two Y alleles.
         # A wrong X count and wrong Y count could therefore cancel in the total.
-        # Check each chromosome independently, including no XX rows on Y.
+        # Scores and dosage sums can also conceal compensating errors: swapping
+        # chr2 and chr8 weights preserves totals for these repeated genotypes.
+        # Check all three fields per chromosome, including no XX rows on Y.
         partial_rows = pl.read_parquet(partials[-1]).to_dicts()
-        assert len(partial_rows) == len(chromosome_counts[chrom]), chrom
-        assert {
-            (r["accession"], r["sample_id"]): r["allele_count"] for r in partial_rows
-        } == chromosome_counts[chrom], chrom
+        assert len(partial_rows) == len(chromosome_expected[chrom]), chrom
+        assert {(r["accession"], r["sample_id"]) for r in partial_rows} == set(
+            chromosome_expected[chrom]
+        ), chrom
+        for row in partial_rows:
+            key = (row["accession"], row["sample_id"])
+            for field, value in chromosome_expected[chrom][key].items():
+                assert Decimal(str(row[field])) == value, (chrom, key, field)
     stage("combine", "--partial_scores", *partials, "--out_dir", tmp_path / "combined")
 
     with gzip.open(tmp_path / "combined" / "scores.txt.gz", "rt") as handle:
