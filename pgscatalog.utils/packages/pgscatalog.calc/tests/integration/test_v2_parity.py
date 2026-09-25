@@ -29,6 +29,7 @@ from collections import defaultdict
 from decimal import ROUND_HALF_UP, Decimal
 
 import polars as pl
+import pysam
 import pytest
 
 from .conftest import SAMPLESET, load_targets, run_cli
@@ -177,6 +178,65 @@ def test_chromosomes_match_reference_scores(reference_name, tmp_path, monkeypatc
         "--out_dir",
         combined,
     )
+    if is_v2:
+        # Equal totals can conceal different allele choices. Compare selected
+        # variants directly, not v2's exploded candidate rows: its ID-only join
+        # duplicates multiallelic candidates and can report the wrong ALT, while
+        # matched_effect_allele is the allele actually passed to PLINK.
+        with gzip.open(reference / "synthetic_log.csv.gz", "rt") as handle:
+            selected_v2 = [
+                r for r in csv.DictReader(handle) if r["match_status"] == "matched"
+            ]
+        selected_v3 = []
+        for path in (combined / "logs").rglob("*.csv.gz"):
+            with gzip.open(path, "rt") as handle:
+                selected_v3.extend(
+                    r for r in csv.DictReader(handle) if r["match_summary"] == "matched"
+                )
+        expected_matches = {
+            (r["accession"], int(r["row_nr"])): (
+                r["chr_name"],
+                int(r["chr_position"]),
+                r["matched_effect_allele"],
+            )
+            for r in selected_v2
+        }
+        actual_matches = {
+            (r["accession"], int(r["row_nr"])): (
+                r["chr_name"],
+                int(r["chr_position"]),
+                r["matched_effect_allele"],
+            )
+            for r in selected_v3
+        }
+        assert len(selected_v2) == len(expected_matches) == n_matched
+        assert len(selected_v3) == len(actual_matches) == n_matched
+        assert actual_matches == expected_matches
+
+        # v3's log derives its allele string from the score row and match type.
+        # Also resolve the index consumed by SCORE against the original VCF so
+        # a correct-looking log cannot hide an incorrect ALT1/ALT2 selection.
+        target_alleles = {}
+        for path, chrom in targets:
+            with pysam.VariantFile(path) as vcf:
+                for variant in vcf:
+                    target_alleles[chrom, variant.pos] = variant.alleles
+        selected_table = [
+            r
+            for r in pl.read_parquet(combined / "match_table.parquet").to_dicts()
+            if r["match_result"]["is_matched"]
+        ]
+        table_keys = {(r["accession"], r["row_nr"]) for r in selected_table}
+        assert len(selected_table) == len(table_keys) == n_matched
+        assert table_keys == set(expected_matches)
+        for row in selected_table:
+            key = (row["accession"], row["row_nr"])
+            chrom, position, effect = expected_matches[key]
+            index = row["match_result"]["effect_allele_idx"]
+            alleles = target_alleles[chrom, position]
+            assert 0 <= index < len(alleles), key
+            assert alleles[index] == effect, key
+
     for chrom, archive in zip(chroms, zips, strict=True):
         out = tmp_path / "score" / chrom
         stage(

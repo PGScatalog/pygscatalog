@@ -15,6 +15,12 @@ weights, positions and allele pairs, converted to the custom scoring-file
 format expected by v2. The matching summary and full matching log show the two
 unmatched MT rows. `--min_overlap 0.95` admits 50/52 matches, but not 49/52.
 The integration test independently requires exactly 50 matched variants.
+It compares selected matches by accession and scoring-file row, requiring the
+same chromosome, position and matched effect allele. It also resolves v3's
+effect-allele indices against the original VCF alleles. Unselected v2 candidates,
+duplicate flags and ALT annotations are not compared: v2's ID-only join can
+duplicate multiallelic candidates and attach the wrong ALT annotation without
+changing the effect allele passed to PLINK.
 
 The configuration explicitly supplies the committed sample-sex metadata during
 VCF import and uses `--xchr-model 1` during scoring, matching the dosage semantics
