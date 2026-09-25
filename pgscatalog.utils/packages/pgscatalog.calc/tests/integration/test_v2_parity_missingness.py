@@ -1,12 +1,12 @@
-"""Missing calls are an explicit v2/v3 policy difference, not false parity.
+"""Check the differences in v2 and v3 policies for missing calls.
 
-With at least 50 samples, v2 and v3 fill missing calls using the observed
-allele frequency (ADR 0009). Their average denominators intentionally differ:
-observed allele counts remain the denominator in v3, so a completely missing
-sample has an imputed sum but no defined average. v2 counts imputed alleles too.
-Donor calls imply integer dosages 0, 1 and 2, with no DS/GP inputs or fractional
-dosage examples. The cohort satisfies the real floor of 50.
-"""
+With at least 50 samples, v2 and v3 fill missing calls from observed allele
+frequencies (ADR 0009). They intentionally use different denominators for the
+average. v3 counts observed alleles. A sample with no calls has an imputed sum
+but no defined average. v2 also counts imputed alleles.
+
+Donor calls give integer dosages of 0, 1 and 2. The fixture has no DS/GP inputs
+or fractional dosage examples. The cohort meets the actual minimum of 50 samples."""
 
 import csv
 import gzip
@@ -68,9 +68,9 @@ def test_missingness_is_a_documented_policy_difference(tmp_path, monkeypatch):
         else:
             assert row["AVG"] == ""
 
-    # Heterozygous donors imply one copy at the first locus. Homozygous REF
-    # donors imply zero ALT copies on chr1 and two REF copies on chr2. This
-    # rules out a constant-one fill masquerading as frequency-based imputation.
+    # Heterozygous donors give one copy at the first locus. Homozygous REF donors give
+    # zero ALT copies on chr1 and two REF copies on chr2. These cases detect an
+    # incorrect imputer that always fills missing calls with one copy.
     for index, (chrom, score, dosage, missing) in enumerate(
         (
             ("1", Decimal("2"), 1, {"S00", "S01"}),
@@ -87,8 +87,8 @@ def test_missingness_is_a_documented_policy_difference(tmp_path, monkeypatch):
             observed = int(sample not in missing)
             raw = reference[chrom, ACCESSION, sample]
             assert raw["score"] == score
-            # PLINK reports observed named alleles even when its weighted sum
-            # includes imputation; v3's dosage statistic includes filled calls.
+            # PLINK reports observed named alleles even when its weighted sum includes
+            # imputation. v3 includes imputed calls in its dosage statistic.
             assert raw["dosage_sum"] == dosage * observed
             assert raw["allele_count"] == 4 * observed
             assert raw["denom"] == 4
@@ -144,9 +144,9 @@ def test_missingness_is_a_documented_policy_difference(tmp_path, monkeypatch):
     ],
 )
 def test_imputation_rejects_unsupported_inputs(filename, error, tmp_path, monkeypatch):
-    # LOAD filters entirely uncalled VCF sites, so the score fails matching;
-    # four samples with missing calls instead fail the imputation floor at SCORE.
-    # Neither input may fabricate zeros.
+    # LOAD removes entirely uncalled VCF sites, so the score fails matching. Four
+    # samples with missing calls instead fail the minimum sample count at SCORE.
+    # Neither case may produce fabricated zero scores.
     with pytest.raises(ValueError, match=error):
         run_case(
             [(DATA / filename, "1")], [DATA / "score.txt.gz"], tmp_path, monkeypatch

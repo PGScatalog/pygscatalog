@@ -1,8 +1,7 @@
-"""Match policy affects biological allele identity before any weighted arithmetic.
+"""Matching policy determines the effect allele before the test calculates scores.
 
-Compare shared policies with the unchanged v2 workflow; pin deliberate v3 changes
-with independently counted GT alleles rather than preserving old matcher defects.
-"""
+Compare shared policies with the unchanged v2 workflow. Check intentional v3
+differences with independent GT counts. Do not preserve old matcher defects."""
 
 import csv
 import gzip
@@ -21,8 +20,8 @@ MODES = {
     "keep_ambiguous": ("--keep_ambiguous",),
     "ignore_strand_flips": ("--ignore_strand_flips",),
 }
-# The expected target record and effect sequence are explicit biological choices,
-# not inferred by calling the matcher or reading its output.
+# The expected target record and effect sequence specify the biological choices
+# directly. They do not come from the matcher or its output.
 SELECTED = {
     "PGS990020": {
         0: ("direct", "A"),
@@ -80,8 +79,8 @@ def hardcall_expectations(selected):
                 )
                 total += copies * weights[row]
                 dosage += copies
-            # Each retained score row observes two alleles. Distinct ALT effects
-            # at one locus are separate score rows, not a collision (ADR 0010).
+            # Each retained score row observes two alleles. Distinct ALT effects at
+            # one locus form separate scoring rows, not a collision (ADR 0010).
             count = 2 * len(choices)
             expected[accession, sample] = {
                 "score": total,
@@ -122,8 +121,8 @@ def test_matching_policy_and_scores(mode, tmp_path, monkeypatch):
         for field in ("score", "dosage_sum", "allele_count"):
             assert Decimal(str(row[field])) == expected[key][field], (key, field)
 
-    # Validate actual genotype routing, not just the allele string reconstructed
-    # in logs. This VCF's only absent score position lies after every real row.
+    # Check which genotype scoring actually uses, not only the allele string in the
+    # log. This VCF's only absent score position follows every real row.
     with pysam.VariantFile(CASE / "target.chr1.vcf.gz") as vcf:
         records = list(vcf)
     table = pl.read_parquet(tmp_path / "matched/match_table.parquet").to_dicts()
@@ -165,7 +164,7 @@ def test_matching_policy_and_scores(mode, tmp_path, monkeypatch):
     reference = CASE / "pgsc_calc_v2.3.0" / mode
     validate_inputs(CASE, reference)
     saved = read_reference(reference)
-    # Pin the old policy with explicit selections, including its deliberate
+    # Check the old policy with explicit selections. Include its intentional
     # differences: ID-based collisions, plain complements and indel inference.
     v2_selected = expected_selection(mode)
     v2_selected["PGS990022"] = {0: ("anchor", "C")}
@@ -199,10 +198,10 @@ def test_matching_policy_and_scores(mode, tmp_path, monkeypatch):
     assert len(chosen) == len(identities)
     assert identities == wanted_identities
     assert set(saved) == {("1", *key) for key in v2_expected}
-    # PLINK scores these accessions together: its count/dosage columns describe
-    # the UNION of selected alleles, including rows with zero-filled weights in
-    # other score columns. v3 reports per-score statistics. This is an explicit
-    # denominator difference, not a tolerance or a reason to skip AVG checks.
+    # PLINK scores these accessions together. Its count and dosage columns describe
+    # the union of selected alleles, including rows with zero-filled weights in other
+    # columns. v3 reports statistics for each score. This is an explicit denominator
+    # difference. It does not justify a tolerance change or omission of AVG checks.
     union = {identity for rows in v2_selected.values() for identity in rows.values()}
     for key, values in v2_expected.items():
         sample = key[1]
@@ -222,13 +221,13 @@ def test_matching_policy_and_scores(mode, tmp_path, monkeypatch):
         raw = saved["1", *key]
         assert Decimal(row["SUM"]) == raw["score"]
         assert Decimal(row["DENOM"]) == raw["denom"]
-        # v2's aggregate is written to more precision than v3's six decimals.
+        # v2 writes its aggregate with more precision than v3's six decimal places.
         quantum = Decimal("0.000001")
         assert Decimal(row["AVG"]).quantize(quantum, rounding=ROUND_HALF_UP) == (
             raw["score"] / raw["denom"]
         ).quantize(quantum, rounding=ROUND_HALF_UP)
-    # These three accessions share v2's rules, including exclusion of colliding
-    # score rows and priority selection between multiple target candidates.
+    # These three accessions share v2's rules. The rules exclude colliding score rows
+    # and select between target candidates by priority.
     for accession in ("PGS990020", "PGS990021", "PGS990023"):
         for sample in ("S0", "S1", "S2"):
             key = accession, sample
@@ -236,11 +235,11 @@ def test_matching_policy_and_scores(mode, tmp_path, monkeypatch):
 
 
 def test_matching_overlap_rejects_incomplete_accessions(tmp_path, monkeypatch):
-    """A high overlap gate must remove scores, not report their partial sums.
+    """Check that the overlap gate rejects scores instead of reporting partial sums.
 
     Only the distinct-ALT and candidate-selection scores match every row. The
-    former deliberately differs from v2's ID-based collision policy (ADR 0010).
-    """
+    distinct-ALT policy intentionally differs from v2's ID-based collision policy
+    (ADR 0010)."""
     result = run_case(
         [(CASE / "target.chr1.vcf.gz", "1")],
         sorted(CASE.glob("PGS*.txt.gz")),

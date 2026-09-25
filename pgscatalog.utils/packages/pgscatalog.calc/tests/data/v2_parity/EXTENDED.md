@@ -1,45 +1,107 @@
 # Extended scoring compatibility tests
 
-These cases test selected alleles and calculated scores, not byte-for-byte output
-or preservation of v2 defects. All normal test runs use committed inputs and
-reference outputs without launching PLINK, Nextflow or Docker.
+These cases test selected alleles and calculated scores.
+They do not require identical output bytes or preservation of v2 defects.
+Normal tests read committed inputs and reference outputs.
+They do not launch PLINK, Nextflow or Docker.
 
-| Case | Agreement checked | Explicit difference or boundary |
-| --- | --- | --- |
-| Arithmetic | Multiple accessions, overlapping/disjoint variants, opposite effects, decimal signed weights, cancellation, additive/dominant/recessive contributions | v2 batches accessions into files with shared variant-union statistics; its final aggregate also includes denominators from unrelated effect-type files. v3 counts each accession's own observed alleles. Averages are independently checked under each denominator. |
-| Partitioning | Reordered sample columns, reversed chromosome/score input order and complete sample batches reproduce the arithmetic reference | Fully called data only; changing an imputation population is not an invariance claim. MATCH receives all sample batches of a chromosome together. |
-| Missingness | Called and missing GTs yield the same weighted sums under default v2 imputation; integer imputations 0, 1 and 2 depend on the called donors | v2 DENOM includes imputed calls while ALLELE_CT and NAMED_ALLELE_DOSAGE_SUM remain observed statistics. v3 averages use observed alleles and its dosage sum includes imputed values. Explicit v2 no-mean-imputation outputs document the policy difference. |
-| Missingness rejection | An all-missing sample has a null v3 average; a wholly uncalled target is filtered then fails matching; a cohort below the imputation floor is rejected | These are specific v3 behaviours, not requirements to reproduce v2 failure wording. |
-| Matching | Direct, swapped, complemented and no-other-allele matches; ambiguity and strand flags; exclusions, candidate selection and overlap rejection | Distinct ALT effects at one site and multi-base strand handling follow ADRs 0010/0011 rather than v2's ID collisions and plain complements. Selected target row and effect index are asserted explicitly. |
-| Zero weights | An explicit zero-weight row retains its observed-allele and dosage statistics; an all-zero accession has a zero sum and zero average when calls exist | Corrects v3's previous use of nonzero coefficients as a membership mask; see ADR 0015. |
+## Coverage and differences
 
-Counts and selected allele identities are exact. Decimal scores have an explicit
-bound derived from PLINK's original six-significant-figure text precision, summed
-over individual shards before cancellation. Independent GT/Decimal calculations
-check v3 with a tighter floating-point bound; final averages allow its public
-six-decimal rounding. Tolerances are not fitted to observed discrepancies.
+### Arithmetic
 
-Each reference contains original `.sscore` files, the final aggregate, matching
-reports, software versions, run log, configuration and provenance. Tests check
-the expected shard filenames, recorded input hashes and equivalent v2/v3 scoring
-rows, including effect types. Generators reproduce inputs without writing
-reference outputs. PAR, heteroplasmy, ancestry normalisation and fractional
-dosages remain outside this suite; the original standalone PLINK case covers MT.
+The tests cover multiple accessions with overlapping and disjoint variants, opposite effects, decimal weights and cancellation.
+They also cover additive, dominant and recessive contributions.
 
-One further boundary emerged in the final source review: the current weight
-matrix primary key contains target row and effect-allele index but not genetic
-model. Different accessions using the same target/effect allele under different
-models can therefore conflict. The mixed-model case here uses distinct scoring
-rows; it does not establish support for that shared-allele combination.
+v2 groups accessions into files with shared statistics for the union of their variants.
+Its final aggregate also includes denominators from unrelated files for other effect types.
+v3 counts the observed alleles for each accession separately.
+The tests check each version's averages with that version's denominator.
 
-## Deliberate regeneration
+### Partitioning
 
-Use the unchanged upstream v2.3.0 commit and the recorded Docker image digests.
-The script checks both before running. The work directory must be new and shared
-with Docker; it must not be inside the pipeline checkout. The command writes the
-selected case's reference directory, so review and commit its outputs together.
+The tests change sample-column order, chromosome-input order and scoring-file order.
+They also divide the samples into complete batches.
+All results must agree with the arithmetic reference.
+MATCH receives all sample batches for a chromosome together.
 
-From the repository root:
+These tests use complete genotype calls.
+They do not claim that results remain unchanged when a change to sample batches changes the population used for imputation.
+
+### Missingness
+
+Default v2 imputation and v3 produce the same weighted sums for the fixture's called and missing genotypes.
+Called genotypes determine integer imputed dosages of 0, 1 and 2.
+
+v2's DENOM includes imputed calls.
+Its ALLELE_CT and NAMED_ALLELE_DOSAGE_SUM describe only observed calls.
+v3 uses observed alleles as the average denominator, but its dosage sum includes imputed values.
+A separate v2 reference disables mean imputation to show the difference between these policies.
+
+The tests also check specific v3 outcomes:
+
+- A sample with no called genotypes has a null average.
+- LOAD removes a wholly uncalled target, which then fails matching.
+- v3 rejects a cohort below the minimum sample count for imputation.
+
+The tests do not require identical error wording in v2 and v3.
+
+### Matching
+
+The tests cover direct, swapped and complemented matches, including matches without an other allele.
+They check ambiguity flags, strand flags, exclusions, candidate selection and overlap rejection.
+They also check the selected target row and effect-allele index.
+
+v3 follows ADRs 0010 and 0011 for distinct ALT effects at one site and strand handling for multi-base alleles.
+It does not reproduce v2's ID collisions or plain-complement behaviour where those policies differ.
+
+### Zero weights
+
+An explicit zero-weight row retains its observed-allele and dosage statistics.
+A score with only zero weights has a zero sum and zero average when calls exist.
+ADR 0015 corrects v3's previous use of nonzero coefficients to identify score membership.
+
+## Numerical checks
+
+The tests require exact counts and selected allele identities.
+PLINK writes the reference scores with six significant figures.
+The permitted error follows that text precision.
+The tests add the error bounds for individual shards before score contributions cancel.
+A shard is one part of the data used for scoring.
+
+Independent calculations from GT calls and `Decimal` weights check v3 with a smaller floating-point error bound.
+Checks of final averages allow v3's rounding to six decimal places.
+The tests do not choose tolerances from observed differences.
+
+## Reference files and limits
+
+Each reference contains these files:
+
+- Original `.sscore` outputs and the final aggregate.
+- Matching reports and software versions.
+- The run log, configuration and provenance.
+
+Tests check the expected shard filenames and recorded input hashes.
+They check equivalent v2 and v3 scoring rows, including effect types.
+Generators reproduce inputs without writing reference outputs.
+
+The suite excludes PAR, heteroplasmy, ancestry normalisation and fractional dosages.
+The original standalone PLINK case covers MT.
+
+The current weight-matrix primary key contains the target row and effect-allele index, but not the genetic model.
+Different accessions can therefore conflict if they use the same target/effect allele with different models.
+The mixed-model case uses distinct scoring rows.
+It does not establish support for that shared-allele combination.
+
+## Regenerate references
+
+Use the unchanged upstream v2.3.0 commit and recorded Docker image digests.
+The script checks both before it runs the workflow.
+Use a new work directory that Docker can read.
+Place that directory outside the pipeline checkout.
+The command writes to the selected case's reference directory.
+Review the outputs together before you commit them.
+
+Run from the repository root:
 
 ```bash
 git clone --branch v2.3.0 --depth 1 https://github.com/PGScatalog/pgsc_calc.git "$HOME/pgsc-calc-reference"
@@ -49,19 +111,26 @@ pgscatalog.utils/.venv/bin/python \
   --work-dir "$HOME/pgsc-reference-arithmetic"
 ```
 
-Run `arithmetic`, `missingness`, `zero_weight` with default mode. Also run
-`missingness --mode no_mean_imputation`. Matching requires `matching` with each
-of `--mode default`, `--mode keep_ambiguous` and `--mode ignore_strand_flips`.
-Choose a distinct work directory for every invocation. `NXF_OFFLINE=true` is
-optional when the required Nextflow components are cached.
+Generate each reference with a separate work directory:
 
-The strand-exclusion mode uses the release's documented `task.ext.args`
-configuration on MATCH_VARIANTS and MATCH_COMBINE. Merely passing an
-`--ignore_strand_flips` Nextflow parameter does not wire the flag through this
-release; the saved configuration and selected-match assertions verify the
-effective behaviour. No workflow source is modified.
+| Case | Mode |
+| --- | --- |
+| `arithmetic` | Default |
+| `missingness` | Default |
+| `missingness` | `--mode no_mean_imputation` |
+| `zero_weight` | Default |
+| `matching` | `--mode default` |
+| `matching` | `--mode keep_ambiguous` |
+| `matching` | `--mode ignore_strand_flips` |
 
-Run the suite with `nox -s v2_parity` from `pgscatalog.utils`, or use that
-workspace's Python to run `pytest -c packages/pgscatalog.calc/pyproject.toml
-packages/pgscatalog.calc/tests/integration/test_v2_parity*.py` from the same
-directory.
+`NXF_OFFLINE=true` is optional when the required Nextflow components are cached.
+
+The strand-exclusion mode uses `task.ext.args` on MATCH_VARIANTS and MATCH_COMBINE.
+This release does not pass a top-level `--ignore_strand_flips` Nextflow parameter to those commands.
+The saved configuration and selected-match assertions check the effective behaviour.
+The workflow source remains unchanged.
+
+Run `nox -s v2_parity` from `pgscatalog.utils` to test the suite.
+Alternatively, use the workspace Python from that directory with this command:
+
+`pytest -c packages/pgscatalog.calc/pyproject.toml packages/pgscatalog.calc/tests/integration/test_v2_parity*.py`

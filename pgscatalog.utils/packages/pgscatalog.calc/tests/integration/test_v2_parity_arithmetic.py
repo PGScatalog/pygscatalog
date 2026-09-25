@@ -1,4 +1,4 @@
-"""Cross-score routing and hard-call arithmetic, independently checked with Decimal."""
+"""Check score assignment and hard-call arithmetic with independent Decimal sums."""
 
 import csv
 import gzip
@@ -18,7 +18,7 @@ TARGETS = [(CASE / f"target.chr{chrom}.vcf.gz", chrom) for chrom in ("1", "2")]
 
 
 def exact_scores():
-    """Count alleles from GT directly, without using v3 matching/dosage code."""
+    """Count alleles directly from GT calls without v3 matching or dosage code."""
     calls = {}
     for path, chrom in TARGETS:
         with pysam.VariantFile(path) as vcf:
@@ -53,7 +53,7 @@ def exact_scores():
 
 
 def reference_budgets():
-    """Accumulate six-significant-figure rounding bounds before cancellation."""
+    """Add rounding bounds before cancellation, at six significant figures."""
     budgets = defaultdict(Decimal)
     for path in (CASE / "pgsc_calc_v2.3.0").glob("*.sscore"):
         chrom = path.stem.rsplit("_", 3)[1]
@@ -62,8 +62,9 @@ def reference_budgets():
                 for column, text in row.items():
                     if column.startswith("PGS") and column.endswith("_SUM"):
                         value = Decimal(text)
-                        # Exact zero in these fully called files needs no text
-                        # rounding allowance. Nonzero shards may cancel later.
+                        # Exact zero needs no text-rounding allowance in these files
+                        # with complete calls. Nonzero shard contributions may cancel
+                        # later.
                         if value:
                             budgets[chrom, column.removesuffix("_SUM"), row["IID"]] += (
                                 Decimal("0.5") * Decimal(10) ** (value.adjusted() - 5)
@@ -72,7 +73,7 @@ def reference_budgets():
 
 
 def test_arithmetic_inputs_regenerate(tmp_path):
-    """The generator cannot silently change the committed reference inputs."""
+    """Check that generated inputs equal the committed reference inputs."""
     runpy.run_path(str(CASE / "generate.py"))["generate"](tmp_path)
     generated = list(tmp_path.iterdir())
     assert len(generated) == 12
@@ -85,30 +86,31 @@ def test_multiple_scores_decimal_weights_and_effect_models(tmp_path, monkeypatch
     expected, identities = exact_scores()
     reference = read_reference(CASE / "pgsc_calc_v2.3.0")
     assert set(reference) == set(expected)
-    # PLINK's text output has six significant figures. One shard can therefore
-    # differ by at most half a unit at that precision; the public v3 CSV adds
-    # half a unit at its six decimal places. The bound is defined from precision,
-    # never fitted to differences observed between the two implementations.
+    # PLINK writes six significant figures. A shard can differ by at most half a unit
+    # at that precision. The v3 CSV adds half a unit at six decimal places. These
+    # precision limits determine the bound. Observed differences between
+    # implementations do not determine it.
     reference_budget = reference_budgets()
     for key, values in reference.items():
         assert abs(values["score"] - expected[key]["score"]) <= reference_budget[key], (
             key
         )
         assert values["denom"] == values["allele_count"]
-        # v2 batches scores together and reports union-of-variant statistics in
-        # each .sscore. These are not accession-specific denominators/dosages.
-        # PGS990004 has one contributing variant per effect-type shard, so its
-        # raw statistics are comparable; the others intentionally are not.
+        # v2 groups scores and reports statistics for the union of their variants in
+        # each .sscore file. These denominators and dosage sums are not accession-
+        # specific. Each PGS990004 shard for an effect type contributes one variant,
+        # so its raw statistics are comparable. The other accessions intentionally
+        # differ.
         if key[1] == "PGS990004":
             for field in ("allele_count", "dosage_sum"):
                 assert values[field] == expected[key][field], (key, field)
         else:
-            # additive_0 names A,C,A,C,C,C at variant indices 1..6: counting
-            # those GT alleles gives (5,9,4,3) in S0..S3 order on chr1.
-            # PGS990001 also appears in additive_1, which names C at position
-            # 1000 and adds (0,1,2,1). Chr2 reverses the sample call vectors.
-            # Pin raw union statistics as well as the per-score v3 statistics;
-            # merely asserting that the denominators differ misses corruption.
+            # additive_0 names A,C,A,C,C,C at variant indices 1..6. Counting those GT
+            # alleles gives (5,9,4,3) in S0..S3 order on chr1. PGS990001 also occurs
+            # in additive_1, which names C at position 1000 and adds (0,1,2,1). Chr2
+            # reverses the sample call vectors. Check exact raw union statistics as
+            # well as v3 statistics for each score. A check that denominators differ
+            # would not detect corrupted values.
             dosage_counts = (5, 10, 6, 4) if key[1] == "PGS990001" else (5, 9, 4, 3)
             if key[0] == "2":
                 dosage_counts = dosage_counts[::-1]
@@ -120,9 +122,10 @@ def test_multiple_scores_decimal_weights_and_effect_models(tmp_path, monkeypatch
             ), key
             assert values["allele_count"] == (14 if key[1] == "PGS990001" else 12), key
 
-    # Six cached variants and batch_size=2 exercise real Dask/Zarr boundaries
-    # while keeping the fixture inspectable. Opposing weights straddle chunks
-    # in the expanded effect-allele/model matrix, where routing errors matter.
+    # Six cached variants and batch_size=2 test actual Dask and Zarr boundaries.
+    # Opposing weights occur in different chunks of the expanded effect-allele/model
+    # matrix. These cases help detect errors in weight assignment without a large
+    # fixture.
     actual = run_case(TARGETS, SCORES, tmp_path, monkeypatch, batch_size=2)
     for index, (_, chrom) in enumerate(TARGETS):
         rows = pl.read_parquet(
@@ -135,8 +138,8 @@ def test_multiple_scores_decimal_weights_and_effect_models(tmp_path, monkeypatch
             key = chrom, row["accession"], row["sample_id"]
             for field in ("score", "allele_count", "dosage_sum"):
                 value = Decimal(str(row[field]))
-                # Decimal expectations also catch a shared error in the v2/v3
-                # comparison. Float64 arithmetic permits tiny round-off only.
+                # Independent Decimal expectations also detect errors shared by v2 and
+                # v3. Allow only small Float64 rounding errors.
                 budget = Decimal("0.000000001") if field == "score" else 0
                 assert abs(value - expected[key][field]) <= budget, (key, field)
                 if field == "score":
@@ -168,9 +171,9 @@ def test_multiple_scores_decimal_weights_and_effect_models(tmp_path, monkeypatch
             accession == key[0] for accession, _ in identities
         )
 
-    # v2's aggregator sums every shard's denominator for every accession,
-    # including shards with no column for that score. Preserve that evidence,
-    # but assert v3's per-score biological denominator against the GT oracle.
+    # v2's aggregator sums every shard's denominator for every accession, including
+    # shards without a column for that score. Retain this evidence. Check v3's
+    # denominator for each score against the independent GT calculation.
     with gzip.open(CASE / "pgsc_calc_v2.3.0/aggregated_scores.txt.gz", "rt") as handle:
         aggregate = list(csv.DictReader(handle, delimiter="\t"))
     assert len(aggregate) == len(totals)

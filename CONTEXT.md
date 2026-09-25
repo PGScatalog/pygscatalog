@@ -1,78 +1,328 @@
 # pygscatalog
 
-Python packages (`pgscatalog.core`, `pgscatalog.match`, `pgscatalog.calc`, `pgscatalog.validate`) used by the [PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc) (`pgsc_calc`, a Nextflow workflow) to compute polygenic scores. `pgscatalog.calc` is mid-rewrite: a `1.0.0-alpha.1` Python/dask/zarr/duckdb reimplementation (`v3`) is replacing the plink2/Nextflow-based scoring pipeline used by `pgsc_calc` v2 (`release/v2` branch, bugfix-only).
+The Python packages `pgscatalog.core`, `pgscatalog.match`, `pgscatalog.calc` and `pgscatalog.validate` support the
+[PGS Catalog Calculator](https://github.com/PGScatalog/pgsc_calc).
+The calculator, `pgsc_calc`, is a Nextflow workflow that calculates polygenic scores.
+
+`pgscatalog.calc` is undergoing a rewrite.
+The `1.0.0-alpha.1` implementation, called v3, uses Python, dask, zarr and duckdb.
+It replaces the plink2/Nextflow scoring pipeline used by pgsc_calc v2.
+The `release/v2` branch accepts bug fixes only.
 
 ## Language
 
 ### Scoring pipeline (`pgscatalog.calc` v3)
 
 **Split-apply-combine (scoring step)**:
-The pattern used to scale PGS calculation across a genotype dataset too large to score in one process. SPLIT partitions target genotype data into independent shards (see Shard); the rest of the pipeline runs as four stages: MATCH (per chromosome, over variant metadata only, producing partial match counts and the chromosome's Assessed variants) → MATCH_COMBINE (pools match counts across a sampleset, decides which accessions pass `min_overlap`) → SCORE (per shard, only for accessions that passed) → SCORE_COMBINE (sums partial per-shard scores into one final score per sample per accession). Stages fan out at different levels of the Cache hierarchy on purpose, which is what lets MATCH see a chromosome whole while SCORE stays bounded to one shard's genotypes. Every fan-out stage is implemented as separate Nextflow tasks rather than handled inside a single Python process with a distributed dask cluster — Nextflow's executor plugins (SLURM, cloud batch, etc.) already solve cross-node portability, which matters because every Trusted Research Environment (TRE) configures this differently, and a dask scheduler/worker cluster would need cross-node network reachability that TREs often don't allow. See [ADR 0001](docs/adr/0001-nextflow-fanout-for-split-apply.md), [ADR 0003](docs/adr/0003-shards-are-zarr-leaf-groups.md).
-_Avoid_: chromosome split (too narrow — see Shard), two-stage split-apply-combine (it's four stages: MATCH/MATCH_COMBINE gate SCORE/SCORE_COMBINE)
+A pattern for calculating polygenic scores when one process cannot score the whole genotype dataset.
+SPLIT divides target genotypes into independent shards (see Shard).
+Four stages then process the data:
+
+1. MATCH reads variant metadata for each chromosome. It produces partial match counts and the chromosome's Assessed variants.
+2. MATCH_COMBINE combines match counts across a sampleset. It decides which accessions pass `min_overlap`.
+3. SCORE calculates scores for each shard, using only accessions that passed.
+4. SCORE_COMBINE sums partial scores into one final score per sample and accession.
+
+Stages operate at different levels of the Cache hierarchy.
+MATCH sees a whole chromosome. SCORE holds only one shard's genotypes.
+Nextflow dispatches separate tasks for stages that process multiple parts of the data.
+One Python process with a distributed dask cluster does not dispatch those tasks.
+
+Nextflow executor plugins already support different computing systems, including SLURM and cloud batch services.
+This matters because each Trusted Research Environment (TRE) configures its systems differently.
+A dask cluster would need network access between nodes, which TREs often prohibit.
+
+See [ADR 0001](docs/adr/0001-nextflow-fanout-for-split-apply.md) and
+[ADR 0003](docs/adr/0003-shards-are-zarr-leaf-groups.md).
+
+_Avoid_:
+- **Chromosome split** is too narrow. See Shard.
+- **Two-stage split-apply-combine** is incorrect. MATCH and MATCH_COMBINE control which accessions reach SCORE and SCORE_COMBINE.
 
 **Serial run**:
-One process executing all four scoring stages in sequence over every shard, with no executor dispatching them — the entry point for environments where Nextflow cannot run, or where its fan-out is a complication rather than a help. The stages, their artefacts, and the shape of the fan-out are unchanged; only the thing dispatching them is gone, so a serial run passes the same on-disk artefacts between stages that Nextflow tasks pass between themselves. Peak memory is consequently the same as the largest single stage rather than their sum, and what a serial run gives up is wall-clock — which makes its limit the *number of shards*, not the size of the dataset. See [ADR 0013](docs/adr/0013-serial-run-is-a-convenience-entry-point.md).
-_Avoid_: local mode (Nextflow's default executor is already local, and is a different thing), small-data mode (the limit is shard count, not sample or variant count), orchestrator (ADR 0006 rejects an orchestrator as the *scaling* mechanism; a serial run is a convenience entry point, and holding the two apart is what keeps both decisions true)
+One process that executes all four scoring stages in sequence over every shard, without an executor to dispatch them.
+This entry point serves environments where Nextflow cannot run or where separate tasks add unnecessary complexity.
+The stages, artefacts and levels of data partitioning remain unchanged.
+A serial run passes the same files between stages as Nextflow tasks use.
+
+Peak memory therefore equals the largest single stage, not the sum of all stages.
+Serial execution increases elapsed time.
+Its practical limit is the number of shards, not the dataset size.
+
+See [ADR 0013](docs/adr/0013-serial-run-is-a-convenience-entry-point.md).
+
+_Avoid_:
+- **Local mode** is ambiguous. Nextflow's default executor is already local.
+- **Small-data mode** is incorrect. Shard count limits this mode, not sample or variant count.
+- **Orchestrator** obscures the decision in ADR 0006. That ADR rejects an orchestrator as the scaling mechanism. A serial run is a convenience entry point.
 
 **Shard**:
-The cached genotypes of one target genome file — a leaf of the Cache hierarchy, and the unit SPLIT produces and SCORE fans out over. Identified by its place in that hierarchy rather than by the input file that produced it, so a shard is a property of the cache, not of the input. Shards vary along two axes at once: the **variant axis** (which chromosome) and the **sample axis** (which Sample batch). Stages deliberately fan out at different levels of the same hierarchy — MATCH per chromosome, over every batch's variant metadata at once; SCORE per shard, where the genotype arrays are. SCORE_COMBINE sums partial per-shard results grouped by sample ID, valid because every (sample, variant) pair appears in at most one shard — not because shards share samples. At most, rather than exactly: a woman and a chrY variant are a pair no shard holds, and the sum is already tolerant of that. See [ADR 0003](docs/adr/0003-shards-are-zarr-leaf-groups.md).
-_Avoid_: chromosome, chunk, file, sample batch (a grouping of samples across shards — see Sample batch)
+The cached genotypes of one target genome file.
+A shard is a leaf of the Cache hierarchy, a unit that SPLIT produces, and a unit that SCORE processes.
+Its position in the cache identifies it, rather than the source file alone.
+Thus, a shard is a property of the cache.
+
+Shards vary along two axes:
+
+- The **variant axis** identifies the chromosome.
+- The **sample axis** identifies the Sample batch.
+
+MATCH reads all batches' variant metadata for one chromosome together.
+SCORE reads the genotype arrays for one shard.
+SCORE_COMBINE groups partial results by sample ID and sums them.
+This sum is valid because each sample/variant pair occurs in at most one shard.
+It does not require shards to share samples.
+Some pairs occur in no shard, such as a woman and a chrY variant. The sum already permits that absence.
+
+See [ADR 0003](docs/adr/0003-shards-are-zarr-leaf-groups.md).
+
+_Avoid_: **chromosome**, **chunk**, **file** and **sample batch** as synonyms.
+A Sample batch groups samples across shards.
 
 **Match rate threshold (`min_overlap`)**:
-The minimum fraction of a scoring file's variants that must be found in the target genome before an accession's score is calculated (default 75%), used to guard against silently publishing an inaccurate reproduction of a PGS Catalog score. Pooled per (sampleset, accession) — never decided per shard, and never per sample batch: a technical sample batch is a slice of one callset, so a match rate that differs between batches is a data-quality alarm rather than a reason to score some samples and not others. Whether an absent variant counts against the rate depends on Absence semantics.
-_Avoid_: overlap threshold, match threshold (use the canonical parameter name `min_overlap`), per-batch match rate (not a gate — see Sample batch)
+The minimum fraction of scoring-file variants that must match the target genome before the pipeline calculates an accession's score.
+The default is 75%.
+This threshold helps prevent publication of an inaccurate reproduction of a PGS Catalog score without a warning.
+
+The pipeline combines counts per sampleset and accession.
+It never decides acceptance separately for a shard or sample batch.
+A technical sample batch is part of one callset.
+A difference in match rates between batches indicates a possible data-quality problem, not permission to score only some samples.
+Absence semantics determines whether an absent variant reduces the match rate.
+
+_Avoid_:
+- **Overlap threshold** and **match threshold**. Use the canonical parameter name `min_overlap`.
+- **Per-batch match rate** as an acceptance gate. See Sample batch.
 
 **Assessed variants**:
-The set of variants a callset actually interrogated for a chromosome, whether or not any individual file records them. This is the set MATCH compares scoring files against, and the distinction that Absence semantics turns on: a variant absent from a shard but assessed is homozygous reference, while a variant absent and never assessed is simply unknown. Defined by its role, not its provenance — currently it can only be the union of what the sampleset's shards were observed to contain. Note that an external population reference (e.g. 1000 Genomes, HGDP) cannot supply this set: it records what is polymorphic in humans, not what a given callset interrogated, and treating the two as interchangeable would convert honestly unmatched variants into confident homozygous-reference calls.
-_Avoid_: sites, union, variant universe
+The variants that a callset assessed for a chromosome, whether or not an individual file records them.
+MATCH compares scoring files against this set.
+Absence semantics distinguishes an assessed variant absent from a shard from a variant that the callset never assessed.
+The first indicates a homozygous-reference call. The second is unknown.
+
+The set is defined by its role, not its source.
+Currently, only the union of variants observed in the sampleset's shards can provide this set.
+An external population reference, such as 1000 Genomes or HGDP, cannot provide it.
+Such a reference records human variation, not which variants a particular callset assessed.
+Substituting that reference would incorrectly convert unmatched variants into homozygous-reference calls.
+
+_Avoid_: **sites**, **union** and **variant universe** as synonyms.
 
 **Ambiguous variant**:
-A score variant whose strand cannot be resolved from its alleles, because a complemented reading of it also matches an allele the target variant carries. Classically a palindromic SNP — an `A/T` score variant read on the other strand is still `A/T` — but not only that: a score variant with no other allele is equally unresolvable when the target carries both the effect allele and the effect allele's complement, which only a Multiallelic variant can do. A property of the *pairing* of a score variant with a target variant, never of either alone: a palindromic pair of alleles at a target variant leaves other score variants there perfectly resolvable. Excluded by default, because scoring one means guessing which strand it was written on and counting the wrong allele's dosage when the guess is wrong.
-_Avoid_: palindromic SNP (too narrow — see above), ambiguous site (ambiguity is not a property of the target alone), strand flip (a *resolved* complemented reading — see Strand flip)
+A score variant whose alleles do not resolve its strand when compared with a target variant.
+A complemented reading also matches an allele in the target.
+A palindromic SNP is the usual example: an `A/T` score variant still reads `A/T` on the opposite strand.
+
+Ambiguity also occurs without an other allele when the target contains both the effect allele and its complement.
+Only a Multiallelic variant can provide that combination.
+Ambiguity belongs to the pairing of a score variant and target variant, not to either variant alone.
+Other score variants at the same palindromic target can remain resolvable.
+The pipeline excludes ambiguous variants by default.
+Scoring one requires a strand assumption, and an incorrect assumption counts dosage for the wrong allele.
+
+_Avoid_:
+- **Palindromic SNP** as a synonym. It excludes other ambiguous pairings.
+- **Ambiguous site**. Ambiguity is not a property of the target alone.
+- **Strand flip**. That term describes a resolved complemented reading.
 
 **Strand flip**:
-A score variant and a target variant reporting the same allele from opposite strands, so the score variant matches a **reverse complement** of itself rather than itself. Reverse, not merely complemented: a sequence is read 5'→3' on both strands, so flipping strand reverses the order of the bases as well as complementing each one — invisible for a single base, wrong for anything longer. An indel has no strand-flipped reading at all, because its shared anchor base is *positional*: it stays leftmost on whichever strand the record is read, so the flipped record sits at a different position with different alleles and no operation on the two alleles in hand recovers it. The opposite case to an Ambiguous variant, which is what a *second* matching reading means: one matching reading resolves the strand, two leave it unresolved. See [ADR 0011](docs/adr/0011-strand-flips-are-reverse-complements-and-optional.md).
-_Avoid_: complement (a plain complement is a different sequence and matching on one is a bug), flipped variant (the variant is unchanged — the *reading* of it flipped)
+A match in which the score and target report the same allele from opposite strands.
+The score variant matches its reverse complement instead of its original sequence.
+Both strands read 5'→3'. A reverse complement reverses base order and complements each base.
+For one base, reversing the order has no effect. For longer sequences, a plain complement is incorrect.
+
+An indel has no strand-flipped reading in this matching model.
+Its shared anchor base depends on position and remains leftmost on either strand.
+The opposite-strand record therefore has a different position and different alleles.
+An operation on the two available allele strings cannot recover that record.
+
+One matching reading resolves the strand.
+A second matching reading leaves it unresolved and creates an Ambiguous variant.
+
+See [ADR 0011](docs/adr/0011-strand-flips-are-reverse-complements-and-optional.md).
+
+_Avoid_:
+- **Complement** as a synonym. A plain complement can be a different sequence, and matching it is a defect.
+- **Flipped variant**. The variant does not change. Its reading changes.
 
 **Match collision**:
-Two score variants of the same accession resolving to the *same allele of the same target variant*, so that both carry a weight for one dosage. Not a duplicate in the scoring file's sense — the rows differ in their alleles, so the Catalog rightly considers them distinct variants, and the collision only becomes visible after matching. Runs in the opposite direction to best-match selection, which resolves *many candidate matches for one score variant*; here each score variant already has exactly one best match and nothing is competing. Collisions are excluded rather than resolved, because choosing between two weights for one dosage means guessing what the score's author meant.
-_Avoid_: duplicate variant (`is_duplicated` is computed upstream on the allele pair and correctly says these are not duplicates), not-best match (the opposite direction — see above), duplicate position (two score variants at one position are only a collision when they resolve to the same allele)
+Two score variants from one accession that resolve to the same allele of the same target variant.
+Two weights then compete for one dosage.
+The scoring rows can differ in their alleles, so the Catalog correctly treats them as distinct variants.
+The collision becomes visible only after matching.
+
+Best-match selection handles the opposite relationship: several candidate matches for one score variant.
+In a collision, each score variant already has one best match.
+The pipeline excludes colliding rows instead of choosing a weight.
+Choosing a weight would require an assumption about the score author's intention.
+
+_Avoid_:
+- **Duplicate variant**. Upstream `is_duplicated` uses the allele pair and correctly does not identify these as duplicates.
+- **Not-best match**. That term describes the opposite relationship.
+- **Duplicate position**. Two score variants at one position collide only when they resolve to the same allele.
 
 **Multiallelic variant**:
-A target variant carrying more than one alternative allele. Its alleles are identified by their position in the variant — reference first, then each alternative in the order the caller recorded them — and a genotype call names the alleles it carries by that position rather than by sequence. So an allele can never be dropped from a variant without renaming every allele after it, which is why alleles no score can match (the spanning-deletion `*`, symbolic alleles like `<NON_REF>`) are kept in place and skipped at match time rather than filtered away. A score variant matches at most one alternative allele. Dosage is counted for the matched allele itself, so a strand flip changes *which* allele a score matched, never how a matched allele is counted.
-_Avoid_: multi-allele site, exploded variant (a v2 representation — `pgscatalog.match` splits multiallelics into biallelic equivalents to hand to plink2; v3 never does)
+A target variant with more than one alternative allele.
+Allele position identifies each allele: reference first, then alternatives in the order recorded by the caller.
+Genotype calls refer to these positions instead of allele sequences.
+Removing an allele would therefore change the indices of later alleles.
+
+The cache retains alleles that no score can match, including the spanning-deletion `*` and symbolic alleles such as `<NON_REF>`.
+Matching skips those alleles without removing them.
+A score variant matches at most one alternative allele.
+The pipeline counts dosage for the matched allele itself.
+A strand flip changes which allele matches, not how dosage is counted.
+
+_Avoid_:
+- **Multi-allele site** as a synonym.
+- **Exploded variant** for v3. v2's `pgscatalog.match` splits multiallelic variants into biallelic equivalents for plink2. v3 does not.
 
 **Ploidy**:
-How many alleles a sample carries at a variant — 2 for a diploid call, 1 for a **hemizygous** one (a male's non-pseudoautosomal X, Y, and MT in everyone). A property of a *call*, not of a sample or a chromosome: the same sample is diploid at a pseudoautosomal X variant and hemizygous a few kilobases away. Observed per call from the target genome file, never derived from a declared sample sex and a pseudoautosomal region map — the caller already decided this and recorded it, so re-deriving it only creates a second answer free to disagree with the file. A hemizygous effect allele contributes a dosage of 1, so a sample's Allele count depends on its own ploidy rather than being its matched-variant count doubled. See [ADR 0007](docs/adr/0007-ploidy-is-observed-per-call.md).
-_Avoid_: sex chromosome (X is diploid in half the cohort and MT is hemizygous without being one), hemizygous sample (hemizygosity is a property of a call)
+The number of alleles a sample carries at one variant.
+A diploid call has two alleles. A hemizygous call has one.
+Examples of hemizygous calls include male non-PAR X, male Y, and MT in all samples.
+Ploidy belongs to a call, not to a sample or chromosome.
+The same sample can have diploid X calls in PAR and hemizygous X calls a few kilobases away.
+
+The pipeline reads ploidy from each call in the target genome file.
+It does not derive ploidy from declared sex and a PAR map.
+The caller already recorded that decision.
+Deriving ploidy again would create a second result that could disagree with the file.
+A hemizygous effect allele contributes dosage 1.
+A sample's Allele count therefore depends on its own ploidy, not twice its matched-variant count.
+
+See [ADR 0007](docs/adr/0007-ploidy-is-observed-per-call.md).
+
+_Avoid_:
+- **Sex chromosome** as a synonym. X is diploid in half the cohort, and MT is hemizygous without being a sex chromosome.
+- **Hemizygous sample**. Hemizygosity belongs to a call.
 
 **Declared sex**:
-What an external source asserts about a sample's sex, as distinct from what its genotype calls show. An input to be *checked*, never a fact to be used: Ploidy stays observed per call, so a declared sex never competes with the file for authority over how a sample is scored. Where the two disagree the run stops instead of one of them winning. Coded `0` unknown, `1` male, `2` female — plink and UK Biobank's convention — and supplied only as a two-column sample-ID-to-sex map. No other source is read: no VCF header field records sex at all, and a bgen `.sample` file's `sex` column is left alone deliberately, because a column matched by name and read under an assumed coding is an inference, and nothing inferred should sit upstream of a check that stops a run. `0` carries a second meaning by design: it is also how a user exempts a sample from the Sex check, so an unknown sex is both a statement about the sample and an instruction to the pipeline. Every sample being genotyped needs a declaration; a map may cover more samples than a given shard holds, because sample batches see a subset of the cohort.
-_Avoid_: genetic sex (that is the *conclusion* of a sex check, not an input to one — UK Biobank ships field 31 and field 22001 precisely because they are different things), gender (a different concept, recorded by none of these files), sex chromosome (see Ploidy)
+An external declaration of a sample's sex, distinct from what its genotype calls show.
+The pipeline checks this declaration but never uses it to determine scoring ploidy.
+Ploidy remains a property observed in each call.
+If the declaration and calls disagree, the run stops instead of choosing one source.
+
+The declaration uses the plink and UK Biobank codes: `0` for unknown, `1` for male and `2` for female.
+A two-column map from sample ID to sex is the only accepted source.
+No VCF header field records sex.
+The pipeline deliberately ignores the sex column in a bgen `.sample` file.
+Reading a named column with an assumed coding would introduce an inference before a check that can stop the run.
+
+Code `0` also exempts a sample from the Sex check.
+It states that sex is unknown and instructs the pipeline to exclude that sample from the check.
+Every genotyped sample needs a declaration.
+The map may contain more samples than a shard because a sample batch contains only part of the cohort.
+
+_Avoid_:
+- **Genetic sex** as an input name. It is the conclusion of a check. UK Biobank fields 31 and 22001 represent this distinction.
+- **Gender**. It is a different concept that these files do not record.
+- **Sex chromosome** as a synonym. See Ploidy.
 
 **Sex check**:
-A comparison of a sample's Declared sex against the shape of its own X calls, made at load time, and the only thing a declared sex is ever used for. It reads Ploidy directly rather than estimating an inbreeding coefficient from heterozygosity (plink's F): F is a workaround for a genotype representation that records allele counts and no ploidy at all, which is a limitation the Cache does not have, and it would in any case be estimated from whatever handful of X variants the scoring files happened to ask for. Only an **informative variant** can inform it — one where hemizygosity is somewhere in evidence across the shard. A variant diploid in every sample is either pseudoautosomal or a cohort with no hemizygous samples in it, and nothing tells those apart without the build-specific coordinates ADR 0007 declined to ship, so such variants are excluded rather than read as evidence of femaleness. Required whenever a scoring file carries sex chromosome variants, because that is what decides whether the Cache will hold anything to check.
-_Avoid_: sex imputation / sex inference (nothing is inferred — a sample's sex is declared and the check either agrees or stops), F coefficient (see above), QC (too broad — this is one check with one input)
+A comparison of Declared sex with the pattern of a sample's X calls during LOAD.
+This check is the only use of declared sex.
+It reads Ploidy directly instead of estimating plink's inbreeding coefficient F from heterozygosity.
+F compensates for a genotype representation that records allele counts but no ploidy.
+The Cache already records ploidy.
+Estimating F here would also depend on the small set of X variants requested by the scoring files.
+
+Only informative variants contribute to the check.
+An informative variant has evidence of hemizygosity somewhere in the shard.
+A variant that is diploid in every sample could be pseudoautosomal or belong to a cohort without hemizygous samples.
+The pipeline cannot distinguish those cases without the build-specific coordinates excluded by ADR 0007.
+It therefore excludes such variants instead of treating them as evidence of female sex.
+
+The check is required whenever a scoring file contains sex chromosome variants.
+Those variants determine whether the Cache can contain data for the check.
+
+_Avoid_:
+- **Sex imputation** and **sex inference**. The input declares sex. The check either agrees or stops the run.
+- **F coefficient**. The check uses observed ploidy instead.
+- **QC** as a synonym. It is broader than this single check and input.
 
 **Allele count**:
-The number of alleles a sample actually carries at the variants an accession matched, and the denominator of that sample's average-weighted score. Per sample, not per accession — it already varies because calls go missing, and Ploidy is the second reason it varies. Distinct from **matched variant count** (`n_matched`), which counts variants an accession matched genome-wide and is the same for every sample.
-_Avoid_: n_matched (a different quantity — see above), allele frequency
+The number of alleles a sample carries at the variants matched by an accession.
+It is the denominator of that sample's average weighted score.
+It is specific to each sample because calls can be missing and Ploidy can differ.
+The matched variant count, `n_matched`, is different.
+It counts the variants matched by an accession across the genome and is the same for every sample.
+
+_Avoid_: **n_matched** and **allele frequency** as synonyms.
 
 **Absence semantics**:
-What it means for a variant to be absent from a shard: `unobserved` (the variant was never assessed — the historical assumption, rooted in imputed SNP arrays) or `homref` (it was assessed and every sample in that shard is homozygous reference — the sparse-called WGS assumption). Not detectable from a target genome file alone: the two produce identical files, so it is declared per sampleset. It is a single fact with several consequences — it decides whether an absent variant counts against `min_overlap`, whether an absent-but-assessed variant is imputed or filled as a known homozygous-reference dosage, and whether ragged sample batches are an error or expected. Only meaningful for VCF input; bgen is dense, so every bgen shard records every assessed variant. Says nothing about a variant a sample cannot carry — a woman and a chrY variant are not an absence of either kind, but a Ploidy of zero.
-_Avoid_: missingness (overloaded — a genotype call within a file can also be missing, which is a separate thing), sparse, nullploid (a property of a call, not of a callset)
+The declared meaning of a variant's absence from a shard.
+The two meanings are:
+
+- `unobserved`: the callset never assessed the variant. This historical assumption comes from imputed SNP arrays.
+- `homref`: the callset assessed the variant and every sample in the shard is homozygous reference. This assumption applies to sparse-called WGS.
+
+These cases can produce identical target files, so the pipeline cannot infer the meaning from a file alone.
+The user declares it per sampleset.
+It determines three behaviours:
+
+1. Whether an absent variant reduces the match rate used by `min_overlap`.
+2. Whether an assessed but absent variant receives an imputed dosage or a known homozygous-reference dosage.
+3. Whether ragged sample batches indicate an error or an expected representation.
+
+Absence semantics applies only to VCF input.
+bgen is dense, so each bgen shard records every assessed variant.
+Absence semantics does not describe a variant that a sample cannot carry.
+A woman and a chrY variant instead have Ploidy zero.
+
+_Avoid_:
+- **Missingness** as a synonym. A genotype call inside a file can also be missing, which is a different condition.
+- **Sparse** as a synonym.
+- **Nullploid**. It is a property of a call, not of a callset.
 
 **Chromosome**:
-A level of the Cache hierarchy and the granularity MATCH fans out over, named from one canonical vocabulary — `1`–`22`, `X`, `Y`, `MT`, plus the sentinel `ALL` for unsplit whole-genome input. Input dialects (`chrX`, `0X`, `23`, `chrM`) are canonicalised once at the boundary, so no stage below LOAD compares names across dialects. `XY` is not in the vocabulary: pseudoautosomal variants are ordinary `X` variants, because what made the region worth naming was knowing where a man is diploid, and Ploidy is now observed rather than derived from position. See [ADR 0008](docs/adr/0008-canonical-chromosome-names.md).
-_Avoid_: contig, chrom prefix forms, XY / PAR as a chromosome (it is a region, and an unnamed one here)
+A level of the Cache hierarchy and the unit that MATCH processes.
+The canonical names are `1`–`22`, `X`, `Y` and `MT`.
+The sentinel `ALL` identifies unsplit whole-genome input.
+LOAD canonicalises input forms such as `chrX`, `0X`, `23` and `chrM` once.
+Later stages therefore do not compare names from different dialects.
+
+The vocabulary excludes `XY`.
+Pseudoautosomal variants use `X` because the pipeline observes ploidy rather than deriving it from position.
+The separate region name previously indicated where male calls were diploid.
+
+See [ADR 0008](docs/adr/0008-canonical-chromosome-names.md).
+
+_Avoid_:
+- **Contig** as a synonym.
+- Chromosome names with input-specific prefixes.
+- **XY** or **PAR** as a chromosome. PAR is a region, which this model does not name separately.
 
 **Sample batch**:
-One slice of a **unified callset** that has been chopped up by sample (e.g. 100,000 samples per file) because a single file covering the whole cohort would be unmanageable. Batches are disjoint in samples and together cover the sampleset. Because every batch comes from the same calling process, batches are expected to agree on which variants exist; where they don't (**ragged** batches — typically because monomorphic sites were dropped per batch), the difference reflects Absence semantics, not a real difference in data quality. A batch is not an independently genotyped cohort — samples genotyped on different arrays or called in separate runs are different samplesets, not batches of one.
-_Avoid_: sample set (means Sampleset), chunk, shard (a batch is a grouping of samples; a shard is one file — see Shard), sample axis
+One part of a unified callset divided by sample, for example into files containing 100,000 samples each.
+The division avoids one unmanageable file for the whole cohort.
+Batches contain disjoint samples and together cover the sampleset.
+Because they come from the same calling process, they should agree on which variants exist.
+
+Ragged batches contain different variants, often because each batch omits monomorphic sites.
+This difference reflects Absence semantics rather than a real difference in data quality.
+A batch is not an independently genotyped cohort.
+Samples genotyped on different arrays or called in separate runs belong to different samplesets, not batches of one sampleset.
+
+_Avoid_:
+- **Sample set**. It means Sampleset.
+- **Chunk**, **shard** and **sample axis** as synonyms. A batch groups samples across shards. See Shard.
 
 **Sampleset**:
-A human-readable label for a set of target genomes belonging to the same cohort (e.g. `UKBiobank`), spanning one or more shards. The zarr storage hierarchy is `/{sampleset}/{chromosome}/{shard filename}/genotypes`, chosen so the cache is self-describing: the partitioning is legible to a domain expert inspecting the store, without reference to a samplesheet. Unsplit whole-genome input occupies the sentinel chromosome `ALL`, so the depth is the same whatever the input shape.
+A human-readable label for target genomes from the same cohort, such as `UKBiobank`.
+A sampleset can contain one or more shards.
+The zarr hierarchy is `/{sampleset}/{chromosome}/{shard filename}/genotypes`.
+A domain expert can read the partitioning directly from this hierarchy without a samplesheet.
+Unsplit whole-genome input uses chromosome `ALL`, so every input layout has the same hierarchy depth.
 
 **Cache**:
-The zarr store written by LOAD and read by every later stage. It is the portable interface between them — once genotypes are cached, no downstream stage knows or cares whether the input was VCF or bgen, and the shard is defined over the cache rather than over the input file that produced it. Consequently checks on the shape of the data (see Sample batch, Absence semantics) are made against the cache, which holds only the positions the scoring files asked for. That is narrower than the source files and deliberately so: it is exactly the subset that can affect a score.
-_Avoid_: zarr store (implementation), archive
+The zarr store that LOAD writes and later stages read.
+It provides a portable interface between the stages.
+After LOAD creates the cache, later stages do not need to know whether the input was VCF or bgen.
+The cache defines the shard, rather than the original input file alone.
+
+Checks of the data layout therefore use the cache. See Sample batch and Absence semantics.
+The cache contains only positions requested by scoring files.
+This deliberately narrower view contains exactly the subset that can affect a score.
+
+_Avoid_: **zarr store** and **archive** as domain synonyms. They describe implementation or storage rather than the domain concept.

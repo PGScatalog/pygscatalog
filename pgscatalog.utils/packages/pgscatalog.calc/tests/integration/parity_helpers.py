@@ -1,4 +1,4 @@
-"""Shared stage driver and readers for committed v2 reference experiments."""
+"""Shared stage driver and readers for committed v2 references."""
 
 import csv
 import gzip
@@ -22,7 +22,7 @@ def run_case(
     min_overlap="0.01",
     batch_size=None,
 ):
-    """Run the public stages; every intermediate remains available for assertions."""
+    """Run the public stages. Retain intermediate outputs for assertions."""
 
     def stage(command, *args):
         run_cli(["pgsc_calc", command, *map(str, args)], monkeypatch)
@@ -49,8 +49,8 @@ def run_case(
         archive = cache / "genotypes.zarr.zip"
         archives.append(archive)
         chromosomes[chrom].append(archive)
-    # MATCH sees every sample batch of a chromosome together, as in the public
-    # stage graph. SCORE still operates on each individual shard.
+    # MATCH receives every sample batch of a chromosome together, as the public stage
+    # graph requires. SCORE processes each shard separately.
     for index, chromosome_archives in enumerate(chromosomes.values()):
         out = out_dir / "match" / str(index)
         stage(
@@ -102,12 +102,13 @@ def run_case(
 
 
 def read_reference(reference_dir):
-    """Sum original effect-type shards, retaining DENOM separately from ALLELE_CT."""
+    """Sum effect-type shards. Keep DENOM separate from ALLELE_CT."""
     paths = sorted(reference_dir.glob("*.sscore"))
     assert paths, reference_dir
     result = defaultdict(lambda: defaultdict(Decimal))
     for path in paths:
-        # sampleset_chrom_effecttype_index.sscore; sampleset may contain underscores.
+        # The filename is sampleset_chrom_effecttype_index.sscore. The sampleset can
+        # contain underscores.
         chrom = path.stem.rsplit("_", 3)[1]
         with path.open() as handle:
             rows = list(csv.DictReader(handle, delimiter="\t"))
@@ -135,7 +136,7 @@ def read_reference(reference_dir):
 
 
 def validate_inputs(case_dir, reference_dir=None):
-    """Tie saved outputs to the exact inputs and both scoring-file representations."""
+    """Check saved outputs against their inputs and both scoring-file formats."""
     reference_dir = reference_dir or case_dir / "pgsc_calc_v2.3.0"
     provenance = json.loads((reference_dir / "provenance.json").read_text())
     assert provenance["commit"] == "72ee54f2119d2fe65ac671327342dfc412bd0a3b"

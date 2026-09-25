@@ -1,4 +1,4 @@
-# One module per stage; no stage base class, and no in-process orchestrator
+# Use one module per stage without a stage base class or an in-process orchestrator
 
 ## Status
 
@@ -6,33 +6,89 @@ Accepted
 
 ## Context
 
-Scoring's four stages ([ADR 0001](0001-nextflow-fanout-for-split-apply.md), [ADR 0003](0003-shards-are-zarr-leaf-groups.md)) were driven by a single `ScorePipeline` class whose interface was the union of all four stages' needs. Only `load_scores` was used by more than two stages. Three parts of the interface were stage-conditional, and none of that was visible in a type signature:
+One `ScorePipeline` class previously drove all four scoring stages.
+[ADR 0001](0001-nextflow-fanout-for-split-apply.md) and [ADR 0003](0003-shards-are-zarr-leaf-groups.md) describe those stages.
+The class exposed the combined requirements of all four stages.
+Only `load_scores` served more than two stages.
 
-- `shard` raised for three of the four stages
-- `sampleset` was read from the cache by MATCH and SCORE, but had to be passed to the constructor by MATCH_COMBINE and SCORE_COMBINE, which have no cache to read
-- `minimum_samples_for_impute` meant something only to SCORE
+Three interface members depended on the stage, but their type signatures did not show these restrictions:
 
-So a caller had to know which stage it was in order to know which members were legal, and the class grew a check for each of those facts instead of the facts being expressed by construction.
+- `shard` raised an exception for three of the four stages.
+- MATCH and SCORE read `sampleset` from the cache.
+  MATCH_COMBINE and SCORE_COMBINE had no cache, so their constructors needed `sampleset` explicitly.
+- `minimum_samples_for_impute` applied only to SCORE.
 
-Two shared seams had meanwhile been separated out: the Cache (`GenotypeCache`, one module owning the zarr hierarchy) and the score database (`ScoreDatabase`, one module owning connections and the task's resource limits).
+Callers needed to know the stage before they could know which members were valid.
+The class accumulated checks for these conditions instead of expressing them through construction.
+
+Two shared components already had separate modules.
+`GenotypeCache` owned the zarr hierarchy.
+`ScoreDatabase` owned connections and each task's resource limits.
 
 ## Decision
 
-Four concrete modules, one per stage, named after the stages in `CONTEXT.md`: `MatchStage`, `MatchCombineStage`, `ScoreStage`, `ScoreCombineStage`. Each takes only what it needs, over the two shared seams. Stage-conditional parts become constructor arguments of the stage that has them, so `MatchCombineStage` requires a sampleset and has no cache, and only `ScoreStage` has an imputation floor or a shard.
+Four concrete modules represent the stages named in `CONTEXT.md`:
 
-Genuinely shared behaviour — `load_scores`, `import_match_tables`, `scratch_dir` — sits in a small module of functions, not a base class.
+- `MatchStage`
+- `MatchCombineStage`
+- `ScoreStage`
+- `ScoreCombineStage`
 
-`ScorePipeline` is deleted.
+Each module accepts only its own requirements and uses the two shared components.
+Stage-specific values become constructor arguments only for the stage that needs them.
+`MatchCombineStage` therefore requires a sampleset and has no cache.
+Only `ScoreStage` has an imputation floor or a shard.
 
-**A stage base class or `Protocol` was rejected.** The four stages do not vary behind a common interface: nothing in this codebase chooses between them at runtime. Nextflow chooses, by invoking a different subcommand. One implementation per slot is a hypothetical seam, not a real one. Worse, a base class would have to hold whatever the four stages have in common, which is how `ScorePipeline` became a union of four stages' needs in the first place — it would re-create the problem one level down.
+A small function module contains shared behaviour: `load_scores`, `import_match_tables` and `scratch_dir`.
+It is not a base class.
+The design deletes `ScorePipeline`.
 
-**An orchestrator that runs all four stages in one process was rejected.** It contradicts ADR 0001: the fan-out belongs to Nextflow because a dask-distributed scheduler needs inter-node network reachability that TREs often do not allow. An in-process orchestrator would also be a second definition of the stage graph, free to diverge from `main.nf`.
+**We rejected a stage base class or `Protocol`.**
+The four stages do not provide interchangeable implementations of one interface.
+Nothing in this codebase selects between them at runtime.
+Nextflow selects a stage by invoking its subcommand.
+
+With one implementation for each role, the proposed abstraction has no actual variation to represent.
+A base class would also collect whatever the four stages share.
+That approach previously turned `ScorePipeline` into the combined interface of four stages.
+Repeating it would restore the same problem at another level.
+
+**We rejected an orchestrator that runs all four stages in one process.**
+It conflicts with ADR 0001, which assigns task distribution to Nextflow.
+A dask-distributed scheduler needs network access between nodes, which TREs often prohibit.
+An in-process orchestrator would also define the stage graph a second time.
+That definition could diverge from `main.nf`.
 
 ## Consequences
 
-- No member of any stage module raises because of which stage constructed it. This is checked by pinning each class's public member set to what its CLI actually calls.
-- Each stage's CLI constructs exactly one stage class.
-- The four modules share no inheritance, so a change to one stage cannot silently change another. The cost is that a genuinely cross-stage change has to be made four times — accepted, because the stages have diverged more than they have converged, and the compiler cannot tell you which of four unrelated stages a base-class change breaks.
-- `ScorePipeline` is removed from `pgscatalog.calc.__all__`. This is a public API break; alpha2 is pre-release, so it is not deprecated or migrated. Alphas are not recorded in `CHANGELOG.md`, which only carries released versions.
-- **The stage graph is still defined twice**: `main.nf` in `pgsc_calc`, which is authoritative, and `run_pipeline` in this repo's integration conftest, which is test scaffolding and deliberately not shipped. What binds them is the artefact contract, and those artefacts are not yet named or schema-checked — `matches.parquet` and `match_table.parquet` were structurally interchangeable, so feeding SCORE the ungated one silently scored accessions that failed `min_overlap`. Since closed: SCORE declares only the columns it reads, so the binder refuses the ungated table. The other three artefacts have distinct schemas and no demonstrated silent-failure mode, and remain unmarked.
-- Future architecture reviews should not re-suggest extracting a stage base class unless something second actually varies behind the interface. Four concrete modules over two real seams is the decision, not an oversight.
+No stage module member raises an exception because of the stage that constructed it.
+A test checks each class's public members against the members its CLI calls.
+Each stage's CLI constructs exactly one stage class.
+
+The four modules share no inheritance.
+Changing one stage therefore cannot silently change another through a shared base class.
+A genuinely cross-stage change must occur in four places.
+This cost is acceptable because the stages differ more than they agree.
+The compiler cannot identify which unrelated stage a base-class change would break.
+
+`pgscatalog.calc.__all__` no longer exports `ScorePipeline`.
+This breaks the public API.
+Alpha2 is pre-release, so the project provides neither deprecation nor migration.
+`CHANGELOG.md` records released versions only, not alphas.
+
+**The stage graph still has two definitions.**
+`main.nf` in `pgsc_calc` is authoritative.
+This repository's integration conftest contains `run_pipeline` as test scaffolding, which the package deliberately does not ship.
+The artefact contract connects these definitions.
+
+At the time of this decision, the artefacts lacked explicit type markers and schema checks.
+`matches.parquet` and `match_table.parquet` were structurally interchangeable.
+SCORE could therefore accept the ungated table and silently score accessions that failed `min_overlap`.
+
+That defect was subsequently closed.
+SCORE now declares only the columns it reads, so the binder rejects the ungated table.
+The other three artefacts have distinct schemas and no demonstrated silent-failure mode.
+They remain unmarked.
+
+Future architecture reviews should propose a stage base class only when a second implementation actually varies behind the interface.
+The decision deliberately uses four concrete modules over two shared components.

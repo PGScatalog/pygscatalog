@@ -2,16 +2,11 @@
 
 ## Status
 
-Accepted. Defines the complemented reading that
-[ADR 0010](0010-multiallelic-matched-per-alt-bgen-stays-biallelic.md) computes
-ambiguity from, and adds the flag that declines to match on it.
+Accepted. Defines the complemented reading used to calculate ambiguity in [ADR 0010](0010-multiallelic-matched-per-alt-bgen-stays-biallelic.md). Adds a flag to reject matches that require that reading.
 
 ## Context
 
-A scoring file and a target genome can report the same variant from opposite strands.
-The strand-flipped reading of a sequence is its **reverse** complement: a sequence is
-read 5'→3' on both strands, so flipping strand reverses the order of the bases as
-well as complementing each one.
+A scoring file and a target genome can report the same variant from opposite strands. The strand-flipped reading of a sequence is its **reverse complement**. Both strands are read 5'→3', so changing strand reverses the base order and complements each base.
 
 ```
 'A'    complement 'T'     reverse complement 'T'    <- agree
@@ -20,119 +15,50 @@ well as complementing each one.
 'ATG'  complement 'TAC'   reverse complement 'CAT'
 ```
 
-For a single base the reversal is invisible, which is why a plain complement passes
-casual inspection: SNPs are nearly all of the exposure. For anything longer the two
-disagree, and a plain complement matches sequences a strand flip does not produce
-while missing the ones it does — a score variant `AC/CC` would be `REFALT_FLIP`
-against a target `TG/GG`, which is not what the other strand of `AC/CC` carries, and
-unmatched against `GT/GG`, which is.
+Reversal has no visible effect on a single base. SNPs account for nearly all cases, so a plain complement can appear correct. Longer sequences differ. A plain complement matches sequences that a strand flip does not produce and misses sequences that it does produce.
 
-Indels are the reason this needs a decision rather than a definition. A VCF indel
-allele carries a shared anchor base at the start (`REF=A ALT=AT`), and that anchor is
-*positional* — it stays leftmost on whichever strand the record is read.
+For example, a plain complement labels score variant `AC/CC` as `REFALT_FLIP` against target `TG/GG`. That target does not represent the opposite strand of `AC/CC`. The correct target is `GT/GG`, which the plain complement leaves unmatched.
 
-Two consumers depend on the answer, not one. The complemented reading decides
-`REFALT_FLIP` / `ALTREF_FLIP` matches, and it is also what
-[ADR 0010](0010-multiallelic-matched-per-alt-bgen-stays-biallelic.md) computes
-ambiguity from: a score variant is ambiguous when a complemented reading of it also
-matches an allele the target carries.
+Indels require a separate decision. A VCF indel has a shared anchor base at the start, as in `REF=A ALT=AT`. This anchor is positional and stays leftmost on either strand.
 
-plink2 contributes no strand logic to compare against. v2's flipped allele becomes
-`matched_effect_allele` and is renamed `effect_allele` in the plink2 scorefile
-(`_match/plink.py:96`), so plink2 matches a literal string against the pvar and has
-no opinion about strand. There is no external behaviour to stay compatible with: the
-decision is entirely ours.
+The complemented reading serves two purposes. It determines `REFALT_FLIP` and `ALTREF_FLIP` matches. [ADR 0010](0010-multiallelic-matched-per-alt-bgen-stays-biallelic.md) also uses it to detect ambiguity. A score variant is ambiguous when its complemented reading also matches an allele in the target.
 
-Some users know which strand their target genotypes are on, and would rather lose a
-variant than match one on an inferred strand. v2 gives them `--ignore_strand_flips`
-(`match_cli.py:246`), so v3 needs an answer for them too.
+plink2 provides no strand logic for this comparison. v2 records the flipped allele as `matched_effect_allele`. It renames that field to `effect_allele` in the plink2 scorefile (`_match/plink.py:96`). plink2 then compares a literal string against the pvar, without interpreting strand. Thus, no external strand behaviour constrains this decision.
+
+Some users know the strand of their target genotypes. They prefer to discard a variant rather than infer its strand. v2 provides `--ignore_strand_flips` for them (`match_cli.py:246`). v3 also needs a policy for these users.
 
 ## Decision
 
-**A complemented reading is a reverse complement.** `reverse_complement` complements
-each base and reverses the sequence. The SQL macro used to derive
-`matched_effect_allele` for the match log is the same function, so the log never
-names a different allele from the match that produced it.
+**A complemented reading is a reverse complement.** `reverse_complement` complements each base and reverses the sequence. The SQL macro that derives `matched_effect_allele` for the log uses the same function. The log therefore names the allele selected by the match.
 
-**No complemented reading is attempted where the two alleles differ in length.** An
-indel can still match forward (`REFALT`, `ALTREF`, `REF_NO_OA`, `ALT_NO_OA`); it
-simply never matches via a complemented reading, and is therefore never ambiguous
-either.
+**Do not attempt a complemented reading when the two alleles differ in length.** An indel can still match forward through `REFALT`, `ALTREF`, `REF_NO_OA` or `ALT_NO_OA`. It cannot match through a complemented reading and cannot be ambiguous.
 
-The rejected alternative is reverse-complementing indels anyway. Because the anchor
-base is positional, the strand-flipped record sits at a different position with
-different alleles, and no string operation on the two alleles in hand recovers it.
-Reverse-complementing an indel produces something plausible-looking and wrong, which
-is exactly the failure mode this ADR exists to remove. Declining is the honest
-answer: an indel written on the other strand is a record this matcher cannot
-recognise, and saying so is better than matching the wrong one.
+This ADR rejects reverse-complementing indels. The positional anchor means that the opposite-strand record has a different position and different alleles. No string operation on the available allele pair can reconstruct that record. Reverse-complementing the indel can instead produce a plausible but incorrect result.
 
-**The length comparison is made between the target's reference allele and the one
-alternative allele being read**, and it gates the whole complemented reading rather
-than one branch of it. "The two alleles are the same length" is a property of the
-*pairing* being read, never of one allele alone: `A` says nothing about whether the
-site is an indel, and a score variant with no other allele has no second allele of
-its own to compare with. The target pair is the one that is always available —
-biallelic or multiallelic, with an other allele or without — and it is per
-alternative allele, so a multiallelic variant carrying both a SNP and an indel
-alternative gets the right answer for each.
+The matcher must report its limitation rather than select an incorrect allele. It cannot recognise an indel written on the opposite strand through those two allele strings alone.
 
-It is also sufficient for the readings that *do* have a score-side pair, because a
-reverse complement preserves length: a complemented match against an equal-length
-target pair forces the score alleles to be equal-length too. Checking the score side
-as well would add a condition that can never fire.
+**Compare the target REF length with the length of the ALT under consideration.** This comparison controls the whole complemented reading, not one branch. Equal length describes an allele pair, not an individual allele. An `A` alone does not establish whether the variant is an indel. A score variant without an other allele provides no score-side pair for comparison.
 
-**`--ignore_strand_flips` declines to match on a complemented reading, and the
-reading is still always computed.** A score variant whose only matching reading was a
-complemented one is `EXCLUDED` with `exclusion_reason = 'strand_flip'` — a row in
-[ADR 0010](0010-multiallelic-matched-per-alt-bgen-stays-biallelic.md)'s exclusion
-table, not a `NO_MATCH`. The variant was found; policy is what discarded it, and the
-log says so.
+The target pair always exists, regardless of allele count or whether the score provides an other allele. The check runs separately for each ALT. Thus, a multiallelic target with SNP and indel alternatives receives the correct policy for each alternative.
 
-The reading is still computed because ambiguity is *defined* by it. Skip the
-computation and `is_ambiguous` is structurally unreachable, so a flag whose name
-promises caution would silently score every palindromic SNP on a forward-strand
-assumption — strictly more permissive than `--keep_ambiguous`, with no excluded row
-to warn anyone. **Not attempting the reading at all is therefore rejected**, cheaper
-though it is.
+A separate score-side length check would add no protection. Reverse complements preserve length. A complemented match to an equal-length target pair therefore requires equal-length score alleles too.
 
-The two flags stay orthogonal as a result. Ambiguity is decided first, before a
-winning match is known, so an ambiguous variant is excluded as `ambiguous` whatever
-the strand flag says; `--ignore_strand_flips --keep_ambiguous` together keep an
-ambiguous variant and then exclude it if the reading that won was complemented.
+**`--ignore_strand_flips` rejects complemented matches but still computes the complemented reading.** If only that reading matches, the result is `EXCLUDED` with `exclusion_reason = 'strand_flip'`. This is a row in [ADR 0010](0010-multiallelic-matched-per-alt-bgen-stays-biallelic.md)'s exclusion table, not `NO_MATCH`. The variant exists, but policy excludes it. The log records that distinction.
 
-**The decision is made inside the matching UDF, not as a post-match pass.** v2
-computes all four flip strategies, then rescues the result afterwards with
-`_label_flips` setting `exclude=True` on any `match_type` containing `_flip`
-(`_match/label.py:296-310`). That shape is an artefact of a lazy polars pipeline that
-cannot decide per variant. The UDF already holds the whole target variant and yields
-one result, so it decides there. Collisions remain a post-match SQL pass, because a
-collision is the one exclusion that is invisible inside a single UDF call.
+Ambiguity depends on the complemented reading. Without that calculation, `is_ambiguous` cannot become true. The apparently cautious flag would silently score every palindromic SNP by assuming the forward strand. This would be more permissive than `--keep_ambiguous`, without an excluded row to expose the assumption. **Omitting the complemented calculation was therefore rejected**, despite its lower cost.
 
-**`--ignore_strand_flips` keeps v2's spelling and default.** Flip matching stays on
-unless asked. The name reads backwards from the `--keep_*` flags beside it, and that
-is deliberate: users arrive from v2 with the name in their pipelines.
+The flags remain independent. The matcher determines ambiguity before selecting a winning match. Without `--keep_ambiguous`, the matcher excludes ambiguous variants as `ambiguous`, regardless of the strand flag. Together, `--ignore_strand_flips --keep_ambiguous` retain an ambiguous variant initially, then exclude it if the complemented reading wins.
+
+**The matching UDF makes the decision.** v2 computes all four flip strategies before applying `_label_flips`. That function sets `exclude=True` for any `match_type` containing `_flip` (`_match/label.py:296-310`). This separate step reflects the lazy polars pipeline, which cannot decide per variant.
+
+The UDF already holds the whole target variant and returns one result, so it can decide directly. Collisions remain a separate SQL step after matching. A single UDF call cannot observe a collision between score variants.
+
+**`--ignore_strand_flips` retains v2's spelling and default.** Flip matching remains enabled unless the user disables it. Its name describes the opposite action to the adjacent `--keep_*` flags. This is deliberate because existing v2 pipelines already use that name.
 
 ## Consequences
 
-- **v3 diverges from released v2 on multi-base alleles.** v2 uses a plain complement
-  with no length guard, so a multi-base pairing it reports `REFALT_FLIP` may be
-  unmatched here, and one it reports unmatched may be a flipped match here. Anyone
-  diffing v3 match logs against v2 will see it. Single-base alleles are unaffected,
-  so the practical exposure is small.
-- **An indel's strand is unresolvable rather than wrongly resolved.** Scoring files
-  carrying indels written on the opposite strand from the target lose those variants
-  to `NO_MATCH`. That costs match rate and buys correctness; there is no
-  representation of a strand-flipped indel that the two alleles alone can reach.
-- **`--ignore_strand_flips` costs match rate, and can cost a score.** `match_rate`
-  sums only `match_summary = 'matched'`, so every flip-excluded variant lowers it and
-  an accession can fall under `min_overlap` and go unscored. This matches v2, where
-  `skip_flip` also excludes rather than rescues.
-- **`match_flipped` counts zero for a flip-excluded variant.** It is derived from
-  `match_type ILIKE '%flip'` and the type is now `EXCLUDED`. The `strand_flip`
-  exclusion count in the summary log replaces it exactly, so no column is added.
-- **Nothing checks that every chromosome's MATCH task was given the same flags.** A
-  sampleset matched with `--ignore_strand_flips` on some chromosomes and not others
-  has an incoherent match log and no error. This is pre-existing with
-  `--keep_ambiguous` and `--keep_multiallelic`; Nextflow passes one parameter set to
-  every task, which is why it is tolerated rather than solved.
+- **v3 differs from released v2 for multi-base alleles.** v2 uses a plain complement without a length guard. A pairing labelled `REFALT_FLIP` by v2 may be unmatched here, and a pairing unmatched by v2 may match through a flip here. Log comparisons will expose this difference. Single-base allele behaviour stays unchanged, so practical exposure is small.
+- **The matcher leaves an indel's strand unresolved instead of resolving it incorrectly.** Opposite-strand indels become `NO_MATCH`. Match rates decrease, but the matcher avoids incorrect matches. The two allele strings alone cannot describe the required opposite-strand record.
+- **`--ignore_strand_flips` can reduce match rates enough to reject a score.** `match_rate` counts only `match_summary = 'matched'`. Each excluded flip lowers the rate, which can fall below `min_overlap`. v2 behaves the same way because `skip_flip` also excludes the variant.
+- **`match_flipped` counts zero for a variant excluded because of a flip.** The field uses `match_type ILIKE '%flip'`, but the type is now `EXCLUDED`. The summary's `strand_flip` count replaces that information exactly, without another column.
+- **Nothing checks that all chromosome MATCH tasks receive identical flags.** Mixing `--ignore_strand_flips` settings within one sampleset produces an inconsistent log without an error. This limitation already exists for `--keep_ambiguous` and `--keep_multiallelic`. Nextflow supplies one parameter set to every task, so the limitation remains accepted.

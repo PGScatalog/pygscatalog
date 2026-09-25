@@ -1,4 +1,4 @@
-"""Score identities survive input order and complete hard-call sample batches."""
+"""Check score identity after changes to input order and complete sample batches."""
 
 import gzip
 from collections import defaultdict
@@ -29,9 +29,9 @@ def test_arithmetic_partition_invariance(layout, tmp_path, monkeypatch):
     else:
         targets = []
         for source, chrom in TARGETS:
-            # Permute columns explicitly: selecting samples through a VCF reader
-            # may preserve header order. These transformations retain the exact
-            # called GT values and do not change an imputation population.
+            # Change the columns explicitly. Selecting samples with a VCF reader may
+            # preserve header order. These changes retain the exact GT values. They do
+            # not change the population used for imputation.
             with gzip.open(source, "rt") as handle:
                 lines = handle.readlines()
             header = next(line for line in lines if line.startswith("#CHROM"))
@@ -85,8 +85,8 @@ def test_arithmetic_partition_invariance(layout, tmp_path, monkeypatch):
                     key,
                     field,
                 )
-            # Saved text rounds to six significant figures; use the same
-            # shardwise precision bound as the arithmetic comparison.
+            # Saved text rounds to six significant figures. Use the arithmetic
+            # comparison's precision bound for each shard.
             assert abs(Decimal(str(row["score"])) - reference[key]["score"]) <= budgets[
                 key
             ] + Decimal("0.000000001"), key

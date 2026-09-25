@@ -1,4 +1,4 @@
-# Fan out SPLIT and APPLY as Nextflow tasks, not a distributed dask cluster
+# Run SPLIT and APPLY as separate Nextflow tasks without a distributed dask cluster
 
 ## Status
 
@@ -6,16 +6,39 @@ Accepted
 
 ## Context
 
-`pgsc_calc` v3's `PGSC_CALC_SCORE` Nextflow process is currently `label 'process_single'`: one task collects every shard's cached genotype data, merges it into a single zarr store, and computes scores over the whole thing as one dask array (local `scheduler="threads"`, i.e. parallel across cores on one node only). This fails at scale — see [pgsc_calc discussion #459](https://github.com/PGScatalog/pgsc_calc/discussions/459), where scoring ~200 scores / ~12M variants produced an 811GB unified zarr store that ran out of memory even on a 2TB-RAM instance.
+At the time of this decision, `pgsc_calc` v3's `PGSC_CALC_SCORE` Nextflow process used `label 'process_single'`.
+One task collected every shard's cached genotypes and merged them into one zarr store.
+It computed all scores as one dask array with the local `scheduler="threads"`.
+This scheduler uses several cores on one node.
 
-Reimplementing split-apply-combine for the scoring step needs a way to fan work out horizontally. Dask has a native answer to this (`dask.distributed`, a scheduler coordinating workers across multiple machines), but that requires the scheduler and workers to be directly network-reachable to each other. `pgsc_calc` is designed to run inside many different Trusted Research Environments (TREs) — UK Biobank RAP, All of Us, Genomics England, institutional HPC, etc. — each with different, often locked-down network policies. Nextflow already solves "run N tasks across a cluster" portably via its executor plugins (SLURM, LSF, AWS Batch, Google Batch, ...), which is a large part of why `pgsc_calc` is a Nextflow pipeline in the first place.
+This design failed at scale.
+[pgsc_calc discussion #459](https://github.com/PGScatalog/pgsc_calc/discussions/459) described scoring ~200 scores across ~12M variants.
+The unified zarr store reached 811GB and exhausted memory even on an instance with 2TB RAM.
+
+The split-apply-combine scoring design needs to distribute tasks across nodes.
+`dask.distributed` can coordinate workers across machines.
+However, its scheduler and workers need direct network access to each other.
+
+`pgsc_calc` must run in many Trusted Research Environments (TREs).
+Examples include UK Biobank RAP, All of Us, Genomics England and institutional HPC systems.
+Their network policies differ and often restrict access.
+Nextflow already distributes tasks through executor plugins, including SLURM, LSF, AWS Batch and Google Batch.
+This portability is a major reason for using Nextflow in `pgsc_calc`.
 
 ## Decision
 
-SPLIT and APPLY are implemented as separate Nextflow task instances, one per shard, dispatched through whichever Nextflow executor the TRE is already configured to use — mirroring how `PGSC_CALC_LOAD` already fans out one task per shard today. Dask stays scoped to intra-node parallelism only (the existing local threaded scheduler); no dask-distributed scheduler/worker cluster is introduced.
+Nextflow runs SPLIT and APPLY as separate task instances, with one task per shard.
+The TRE's configured Nextflow executor dispatches these tasks.
+This follows the existing `PGSC_CALC_LOAD` design, which also runs one task per shard.
+
+Dask provides parallel computation within a node through the existing local threaded scheduler.
+The design introduces no dask-distributed scheduler or worker cluster.
 
 ## Consequences
 
-- Horizontal scaling means adding more Nextflow-managed jobs/nodes, which works in any TRE Nextflow already supports, without new inter-node network requirements.
-- COMBINE becomes its own step, since `PGSC_CALC_SCORE` per shard no longer produces final combined output directly.
-- Per-shard computation is still bounded by the resources of a single Nextflow task (vertical scaling within a shard) — very large individual shards are not addressed by this decision.
+- Additional Nextflow jobs or nodes provide horizontal scaling in every TRE that Nextflow already supports.
+  The design adds no network requirements between nodes.
+- COMBINE becomes a separate step.
+  Each shard's `PGSC_CALC_SCORE` task no longer produces the final combined output directly.
+- Each shard remains limited by the resources of one Nextflow task.
+  This decision does not address very large individual shards.

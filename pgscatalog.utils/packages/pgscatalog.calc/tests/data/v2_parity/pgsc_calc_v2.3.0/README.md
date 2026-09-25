@@ -1,59 +1,60 @@
 # pgsc_calc v2.3.0 reference
 
-These are outputs of the actual Nextflow workflow at upstream tag `v2.3.0`,
-commit `72ee54f2119d2fe65ac671327342dfc412bd0a3b`, run with the release's pinned
-Docker images. The workflow source was not modified. `provenance.json` records
-image digests, the command, original input hashes and chromosome scoring scripts;
-`software_versions.yml` is the workflow's own version report.
+The upstream Nextflow workflow produced these outputs at tag `v2.3.0`, commit `72ee54f2119d2fe65ac671327342dfc412bd0a3b`.
+The run used the release's pinned Docker images and unchanged workflow source.
+`provenance.json` records image digests, the command, original input hashes and chromosome scoring scripts.
+`software_versions.yml` contains the workflow's version report.
 
 ## Coverage and configuration
 
-The pinned matcher (`pgscatalog.match` 0.4.0) filters targets to chromosomes
-1–22, X and Y, so this reference covers **24 chromosomes and 50 variants**.
-MT is excluded from its samplesheet. `PGS999997.txt` contains all 52 original
-weights, positions and allele pairs, converted to the custom scoring-file
-format expected by v2. The matching summary and full matching log show the two
-unmatched MT rows. `--min_overlap 0.95` admits 50/52 matches, but not 49/52.
-The integration test independently requires exactly 50 matched variants.
-It compares selected matches by accession and scoring-file row, requiring the
-same chromosome, position and matched effect allele. It also resolves v3's
-effect-allele indices against the original VCF alleles. Unselected v2 candidates,
-duplicate flags and ALT annotations are not compared: v2's ID-only join can
-duplicate multiallelic candidates and attach the wrong ALT annotation without
-changing the effect allele passed to PLINK.
+The pinned matcher, `pgscatalog.match` 0.4.0, accepts target chromosomes 1–22, X and Y.
+This reference therefore covers **24 chromosomes and 50 variants**.
+Its samplesheet excludes MT.
+`PGS999997.txt` contains all 52 original weights, positions and allele pairs in v2's custom scoring format.
+The matching summary and full log record two unmatched MT rows.
+`--min_overlap 0.95` accepts 50/52 matches and rejects 49/52 matches.
+The integration test also requires exactly 50 matched variants.
 
-The configuration explicitly supplies the committed sample-sex metadata during
-VCF import and uses `--xchr-model 1` during scoring, matching the dosage semantics
-of v3 and the standalone PLINK reference. `--split-par b38` changes no variants:
-all X positions are non-PAR. `--keep_multiallelic` retains multiallelic variants.
-The uncompressed `.sscore` format was requested to make review straightforward.
-These are configured v2.3.0 results, not a claim of equivalence to v2 defaults.
+The test compares selected matches by accession and scoring-file row.
+Each match must have the same chromosome, position and effect allele in v2 and v3.
+The test also checks v3's effect-allele indices against the original VCF alleles.
+It excludes unselected v2 candidates, duplicate flags and ALT annotations from this comparison.
+v2 joins records by ID alone. This join can duplicate multiallelic candidates and attach an incorrect ALT annotation.
+The effect allele sent to PLINK can remain correct despite this annotation error.
 
-`--only_score` skips ancestry and report generation. Resource limits are reduced
-for the tiny input; scoring runs with one thread. Nextflow 25.10.0 and the arm64
-images recorded in `provenance.json` were used.
+VCF import receives the committed sample-sex metadata.
+Scoring uses `--xchr-model 1` to match v3 and the standalone PLINK reference.
+`--split-par b38` changes no variants because all X positions are outside PAR.
+`--keep_multiallelic` retains multiallelic variants.
+The run requests uncompressed `.sscore` files to simplify review.
+These results describe this configuration. They do not establish equivalence with v2 defaults.
+
+`--only_score` excludes ancestry calculation and report generation.
+The configuration requests reduced resources and one CPU for the small input.
+The run used Nextflow 25.10.0 and the arm64 images recorded in `provenance.json`.
 
 ## Committed outputs
 
-- `synthetic_{chrom}_additive_0.sscore`: 24 original PLINK outputs emitted by
-  the v2 workflow, unchanged. The test aggregates `PGS999997_SUM`, `ALLELE_CT`
-  and `NAMED_ALLELE_DOSAGE_SUM` by `IID`, then derives the score average.
-- `aggregated_scores.txt.gz`: the original output of v2's SCORE_AGGREGATE stage.
-  The test verifies its SUM, DENOM and AVG against the raw chromosome results.
-- `synthetic_summary.csv` and `synthetic_log.csv.gz`: original matching reports.
-- `plink.log`: concatenated original scoring logs; `nextflow.log`: workflow
-  console output showing successful completion.
-- `PGS999997.txt`, `samplesheet.csv` and `reference.config`: exact run inputs.
-  The saved samplesheet and configuration retain the original absolute paths.
+- `synthetic_{chrom}_additive_0.sscore`: 24 unchanged PLINK outputs from the v2 workflow.
+  The test sums `PGS999997_SUM`, `ALLELE_CT` and `NAMED_ALLELE_DOSAGE_SUM` by `IID`.
+  It then calculates the score average.
+- `aggregated_scores.txt.gz`: the original SCORE_AGGREGATE output.
+  The test checks its SUM, DENOM and AVG against the chromosome results.
+- `synthetic_summary.csv` and `synthetic_log.csv.gz`: the original matching reports.
+- `plink.log`: the original scoring logs in sequence.
+- `nextflow.log`: the workflow console output, which records successful completion.
+- `PGS999997.txt`, `samplesheet.csv` and `reference.config`: the original inputs.
+  The samplesheet and configuration retain the original absolute paths.
 
-The v3 comparison uses the same committed score file and the same 24 VCFs.
-The separate standalone-PLINK case continues to cover all 25 chromosomes,
-including MT. Neither test launches PLINK, Nextflow or Docker.
+The v3 comparison uses the same committed scoring data and 24 VCFs.
+The separate standalone PLINK case covers all 25 chromosomes, including MT.
+Neither test launches PLINK, Nextflow or Docker.
 
 ## Regeneration
 
-From `pgscatalog.utils`, with Nextflow and Docker available, prepare a fresh
-run directory and adapt only the saved absolute fixture path:
+Nextflow and Docker must be available.
+Run these commands from `pgscatalog.utils`.
+They create a new directory and update only the saved absolute fixture path.
 
 ```bash
 fixture=$(pwd)/packages/pgscatalog.calc/tests/data/v2_parity
@@ -82,13 +83,18 @@ nextflow run pipeline -profile docker -c reference.config \
     -ansi-log false > run.log 2>&1
 ```
 
-Use a directory shared with the Docker VM; on this host `/private/tmp` was not
-shared. The recorded run used `NXF_OFFLINE=true` because its Nextflow plugin
-was already cached. That setting is optional for regeneration.
+Use a directory that the Docker VM can read.
+On this host, Docker could not read `/private/tmp`.
+The recorded run used `NXF_OFFLINE=true` because the Nextflow plugin was already cached.
+This setting is optional for regeneration.
 
-After successful completion, copy the raw `.sscore` files from the PLINK2_SCORE
-task directories and `aggregated_scores.txt.gz` from SCORE_AGGREGATE in `work/`.
-Verify 24 chromosome files, 50 scored variant IDs, four samples except for the
-two XY samples on Y, and two unmatched MT score rows. Refresh the matching
-reports, logs, version report and provenance along with any changed outputs.
-Do not derive a replacement reference from v3.
+After the workflow completes successfully:
+
+1. Copy the raw `.sscore` files from the PLINK2_SCORE task directories in `work/`.
+2. Copy `aggregated_scores.txt.gz` from the SCORE_AGGREGATE task directory in `work/`.
+3. Check that the outputs contain 24 chromosome files and 50 scored variant IDs.
+4. Check that each chromosome has four samples, except Y, which has the two XY samples.
+5. Check that the matching reports contain two unmatched MT rows.
+6. Update the matching reports, logs, version report and provenance with any changed outputs.
+
+Do not calculate a replacement reference with v3.

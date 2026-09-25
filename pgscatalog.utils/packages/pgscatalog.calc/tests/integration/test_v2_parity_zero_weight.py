@@ -1,9 +1,9 @@
 """A zero coefficient does not remove a matched locus from score statistics.
 
-Allele count describes observed alleles at matched scoring rows, independently
-of effect magnitude. The same applies to dosage sum. An all-zero score therefore
-still has a defined zero average for called samples, rather than a null average.
-"""
+Allele count describes observed alleles at matched scoring rows. It does not
+depend on effect magnitude. Dosage sum also includes zero-weight rows. A score
+with only zero weights therefore has a zero average for called samples, not a
+null average."""
 
 import csv
 import gzip

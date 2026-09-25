@@ -1,36 +1,107 @@
-# Shards are scoped to the variant axis for alpha2; combine by summing per (sampleset, accession, sample_id)
+# Limit alpha2 shards to the variant axis and sum scores per sample and accession
 
 ## Status
 
 Superseded by [ADR 0003](0003-shards-are-zarr-leaf-groups.md) and [ADR 0004](0004-absence-semantics-is-declared.md).
 
-Both blockers recorded below turned out to be consequences of fanning every stage out at the same granularity, rather than properties of the sample axis. Retained for the reasoning, not the decision.
+Both blockers below resulted from running every stage at the same granularity.
+They were not inherent limits of the sample axis.
+This document retains the original reasoning, not the superseded decision.
+The implementation findings below describe the code examined for that decision.
 
 ## Context
 
-SPLIT previously assumed a shard was always one chromosome (the variant axis: different variants, same sample cohort across shards). We explored generalizing this to also support the sample axis (sample batches — e.g. 100,000 samples per file, same variants across files, disjoint sample sets), since the underlying zarr storage doesn't structurally forbid it — the hierarchy is already keyed per shard file (`sampleset/filename/genotypes`) — and the only obstacle was code that hard-assumed a uniform sample list across a sampleset's shards (`get_sample_ids()` in `lib/score/_dosage.py` raises `NotImplementedError` if two shards disagree; `check_chromosomes()` in `cli/load.py` rejects more than one unsplit-chromosome file as input).
+SPLIT previously assumed that each shard contained one chromosome.
+These variant-axis shards contained different variants for the same sample cohort.
+We considered extending shards to the sample axis.
+For example, files could each contain 100,000 samples, with the same variants and disjoint sample sets.
 
-Investigating what sample-axis support would actually require surfaced problems specific to that axis, not the variant axis:
+The zarr structure already supported this arrangement through the per-file hierarchy `sampleset/filename/genotypes`.
+The obstacle was code that required the same sample list across a sampleset's shards.
+`get_sample_ids()` in `lib/score/_dosage.py` raised `NotImplementedError` when two shards disagreed.
+`check_chromosomes()` in `cli/load.py` rejected more than one file without a chromosome split.
 
-- **Sparse representation breaks matching correctness.** With sparse-called genotype files, a variant absent from a batch's file usually means homozygous-reference in that batch, not "not genotyped." Matching each shard independently can't tell these apart. Pooling match *counts* sampleset-wide (across batches) fixes the `min_overlap` accept/reject decision, but it doesn't fix scoring itself: a shard's `target_row_nr` values are only ever derived from that shard's own local matching (`_load_variants_from_zarr` reads only the current run's local zarr store), so a variant matched only in another batch is never indexed by this shard at all — no crash, but a **silent** per-sample score bias. Samples in a batch missing a matched-elsewhere variant have that variant's contribution dropped entirely (not 0, not imputed, not counted, not logged), so two samples in the same run can have their score computed from a different effective number of variants with no visible signal that it happened.
-- **Small batches break imputation unconditionally.** `fill_missing_dosages` (`_dosage.py`) calls `calculate_mean_dosage` regardless of whether the batch's dosage array has any missing values at all, and `calculate_mean_dosage` raises `ValueError` if `n_samples` is below `n_minimum_impute` (default 50) — before checking whether imputation is even needed. Today this is harmless because `n_samples` is always the whole cohort. Sample-batching makes hitting this floor easy and turns it into a hard crash for small batches even when nothing needed imputing.
+Investigation found two problems specific to sample-axis support.
 
-Both problems are consequences of a shard only having a partial view of the sampleset when split by sample, and both would need a real fix (matching that distinguishes true non-matches from implied-homref absences; imputation that draws on more than one shard's samples) to be safe to ship.
+**Sparse representation could make matching incorrect.**
+In sparse-called genotype files, an absent variant usually means that the batch is homozygous reference at that variant.
+It does not usually mean that the variant was not genotyped.
+Independent shard matching cannot distinguish these cases.
+
+Pooling match counts across batches corrects the sampleset-wide `min_overlap` decision.
+It does not correct scoring.
+Each shard derives its `target_row_nr` values only from its own matches.
+`_load_variants_from_zarr` reads only the current run's local zarr store.
+A variant matched only in another batch therefore receives no index in this shard.
+
+This omission causes silent per-sample score bias rather than a crash.
+The shard drops the variant's contribution entirely.
+It neither assigns zero nor imputes, counts or logs the missing contribution.
+Two samples in one run can therefore use different effective variant counts without a visible warning.
+
+**Small batches could fail imputation even without missing calls.**
+`fill_missing_dosages` in `_dosage.py` called `calculate_mean_dosage` whether or not the dosage array contained missing values.
+`calculate_mean_dosage` raised `ValueError` when `n_samples` was below `n_minimum_impute`, whose default was 50.
+It checked this limit before checking whether imputation was necessary.
+At the time, `n_samples` always described the whole cohort, so this behaviour caused no problem.
+Sample batching could easily reach this limit and crash even when every call was present.
+
+Both problems arose because a sample shard saw only part of the sampleset.
+Safe support would need matching that distinguishes genuine non-matches from implied homozygous-reference absence.
+It would also need imputation that uses samples from more than one shard.
 
 ## Decision
 
-For alpha2, a shard is scoped to the **variant axis only**: one target genotype input file, varying by chromosome (or other variant partitioning) but not by sample subset — i.e. generalizing the existing chromosome-shard model, not extending it. This is what alpha2 actually needs: the motivating problem ([pgsc_calc discussion #459](https://github.com/PGScatalog/pgsc_calc/discussions/459)) was variant-count scaling — combining all chromosomes' genotype data into one unified store for ~200 scores / 12M variants — which variant-axis splitting fully addresses on its own. Sample-count scaling (very large cohorts) is a real, separate problem, deferred to a future release alongside proper homref-aware matching.
+For alpha2, a shard contains one target genotype file and varies only along the **variant axis**.
+It can represent a chromosome or another variant partition, but not a sample subset.
+This extends the chromosome-shard model without adding another axis.
 
-Because shards stay same-samples-different-variants, `get_sample_ids()`'s existing assumption holds and doesn't need changing — no `NotImplementedError` to remove, no samplesheet schema change needed yet.
+The motivating problem was variant-count scaling, as described in [pgsc_calc discussion #459](https://github.com/PGScatalog/pgsc_calc/discussions/459).
+Combining every chromosome produced one genotype store for ~200 scores and 12M variants.
+Variant-axis splitting fully addresses that problem.
+Sample-count scaling for very large cohorts is a separate problem.
+A future release must address it with matching that understands homozygous-reference absence.
 
-Because no single shard has genome-wide visibility, `min_overlap` accession accept/reject still can't be decided per shard. Matching is split into its own stage ahead of scoring: MATCH runs per shard (fanned out like LOAD/APPLY) and produces a partial match table; a MATCH_COMBINE step pools match counts across all of a sampleset's shards, computes the genome-wide match rate per accession, and decides which accessions pass `min_overlap`. Only accessions that pass are fanned out to the scoring (APPLY) stage — this avoids spending APPLY compute on accessions that are going to be rejected anyway. The pipeline is therefore MATCH → MATCH_COMBINE (decide) → SCORE → SCORE_COMBINE (sum), not a single split→apply→combine pass.
+All shards retain the same samples and different variants.
+The existing `get_sample_ids()` assumption therefore remains valid.
+This decision requires neither removal of `NotImplementedError` nor a samplesheet schema change.
 
-Score combination: each shard's `score_table` output (`sampleset`, `accession`, `sample_id`, `n_matched`, `allele_count`, `score`, `dosage_sum`) is unioned across shards and reduced with duckdb via `GROUP BY (sampleset, accession, sample_id)` with `SUM` over the numeric columns — correct here because every shard shares the same samples, so a given sample's partial contributions from each chromosome shard simply add up.
+No shard sees the whole genome, so it cannot decide whether an accession passes `min_overlap`.
+Matching becomes a separate stage before scoring:
 
-`min_overlap` itself is a legacy concept from imputed SNP array input, where an unmatched variant genuinely means "not genotyped or imputed" — its purpose is to catch a target dataset too sparse to be a faithful reproduction of the scoring file's published PGS Catalog score (e.g. matching 1% of variants isn't a valid replication). That assumption doesn't hold for sparse-called WGS data, which is part of why sample-axis batching (where the gap actually bites) is deferred rather than shipped with a caveat.
+1. MATCH runs per shard, like LOAD and APPLY, and produces a partial match table.
+2. MATCH_COMBINE pools match counts across every shard in the sampleset.
+3. MATCH_COMBINE calculates each accession's genome-wide match rate and applies `min_overlap`.
+4. SCORE, also called APPLY, processes only accepted accessions.
+5. SCORE_COMBINE sums the partial scores.
+
+The graph is MATCH → MATCH_COMBINE (decide) → SCORE → SCORE_COMBINE (sum).
+It is not one split→apply→combine pass.
+Rejecting accessions before APPLY avoids scoring work that the overlap check would discard.
+
+Each shard emits a `score_table` with `sampleset`, `accession`, `sample_id`, `n_matched`, `allele_count`, `score` and `dosage_sum`.
+DuckDB unions these tables and groups them with `GROUP BY (sampleset, accession, sample_id)`.
+It applies `SUM` to the numeric columns.
+This reduction is correct here because every shard contains the same samples.
+Each sample's partial chromosome contributions add to its final score.
+
+`min_overlap` originated with imputed SNP array input.
+For that input, an unmatched variant genuinely means that the variant was neither genotyped nor imputed.
+The check rejects target data too sparse to reproduce the scoring file's published PGS Catalog score.
+For example, matching 1% of variants does not constitute a valid replication.
+
+Sparse-called WGS data does not satisfy this absence assumption.
+The problem becomes material with sample-axis batching.
+This decision therefore defers batching instead of releasing it with a caveat.
 
 ## Consequences
 
-- Sample-axis batching (`sample_batch` samplesheet field, disjoint-sample validation, mixed chrom × batch grids) is explicitly out of scope for alpha2 and needs its own future ADR once homref-aware matching and cross-shard-aware imputation are designed.
-- Matching becomes a distinct pipeline stage (MATCH / MATCH_COMBINE) that gates SCORE, rather than something computed inline at the start of a single `pgsc_calc score` invocation as it is today.
-- The unconditional `n_minimum_impute` check in `calculate_mean_dosage` (raising even when no imputation is needed) is a pre-existing latent bug independent of this ADR's scope decision — low risk today since `n_samples` is always the full cohort, but worth fixing opportunistically since it will matter as soon as sample-axis batching is picked back up.
+- Alpha2 explicitly excludes sample-axis batching.
+  This includes a `sample_batch` samplesheet field, checks for disjoint samples and mixed chromosome × batch grids.
+  A future ADR must follow designs for homref-aware matching and imputation across shards.
+- MATCH and MATCH_COMBINE become separate pipeline stages that gate SCORE.
+  Previously, one `pgsc_calc score` invocation computed matches before scoring.
+- The unconditional `n_minimum_impute` check was a pre-existing bug, independent of this scope decision.
+  It raised even when no imputation was necessary.
+  The whole-cohort sample count made its risk low at the time.
+  Correcting it opportunistically was still worthwhile because sample-axis batching would expose it.
