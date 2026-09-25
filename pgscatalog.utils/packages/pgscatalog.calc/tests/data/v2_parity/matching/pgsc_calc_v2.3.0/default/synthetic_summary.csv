@@ -1,0 +1,15 @@
+dataset,accession,score_pass,match_status,ambiguous,is_multiallelic,duplicate_best_match,duplicate_ID,match_flipped,match_IDs,count,percent
+synthetic,PGS990020,true,matched,false,false,false,false,true,NA,2,28.57142857142857
+synthetic,PGS990021,true,matched,false,false,false,false,false,NA,1,33.33333333333333
+synthetic,PGS990025,true,matched,false,false,false,false,false,NA,1,33.33333333333333
+synthetic,PGS990020,true,unmatched,,,,,,,2,28.57142857142857
+synthetic,PGS990022,true,excluded,false,true,true,true,false,NA,2,66.66666666666666
+synthetic,PGS990023,true,matched,false,false,false,false,false,NA,2,100.0
+synthetic,PGS990025,true,matched,false,true,true,false,false,NA,1,33.33333333333333
+synthetic,PGS990024,true,matched,false,false,false,false,false,NA,2,40.0
+synthetic,PGS990024,true,unmatched,,,,,,,1,20.0
+synthetic,PGS990025,true,excluded,true,false,false,false,false,NA,1,33.33333333333333
+synthetic,PGS990021,true,excluded,false,true,true,true,false,NA,2,66.66666666666666
+synthetic,PGS990020,true,matched,false,false,false,false,false,NA,3,42.857142857142854
+synthetic,PGS990024,true,matched,false,false,false,false,true,NA,2,40.0
+synthetic,PGS990022,true,matched,false,false,false,false,false,NA,1,33.33333333333333

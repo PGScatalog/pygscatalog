@@ -1,0 +1,3 @@
+sampleset,path_prefix,chrom,format
+synthetic,/Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity/arithmetic/target.chr1,1,vcf
+synthetic,/Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity/arithmetic/target.chr2,2,vcf

@@ -1,5 +1,12 @@
 # PLINK 2 and pgsc_calc v2.3.0 parity fixture
 
+The original all-chromosome case below remains unchanged. The additional
+[`arithmetic`](arithmetic/README.md), [`missingness`](missingness/README.md),
+[`matching`](matching/README.md) and `zero_weight` cases extend semantic coverage.
+They use committed hard-call VCFs and original v2.3.0 outputs; fractional dosage
+scenarios remain excluded. See [extended coverage](EXTENDED.md) for agreements,
+intentional differences and reference regeneration.
+
 This directory holds one self-contained fixture for comparing the public score
 from the v3 scoring stages with two independent references: standalone PLINK 2
 across all 25 chromosomes, and the actual pgsc_calc v2.3.0 workflow across its

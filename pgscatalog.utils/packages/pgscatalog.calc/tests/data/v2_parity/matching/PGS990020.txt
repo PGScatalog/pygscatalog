@@ -1,0 +1,12 @@
+#pgs_id=PGS990020
+#pgs_name=MatchingParity
+#trait_reported=Synthetic test fixture
+#genome_build=GRCh38
+chr_name	chr_position	effect_allele	other_allele	effect_weight
+1	2000	A	C	1
+1	3000	A	C	2
+1	4000	A	C	3
+1	5000	A	C	4
+1	6000	C		5
+1	7000	A	C	6
+1	999000	A	C	7

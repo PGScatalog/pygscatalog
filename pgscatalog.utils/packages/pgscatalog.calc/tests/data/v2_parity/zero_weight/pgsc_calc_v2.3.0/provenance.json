@@ -1,0 +1,59 @@
+{
+  "release": "v2.3.0",
+  "commit": "72ee54f2119d2fe65ac671327342dfc412bd0a3b",
+  "command": [
+    "/Users/bwingfield/bin/nextflow",
+    "run",
+    "/Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/pipeline",
+    "-profile",
+    "docker",
+    "-c",
+    "reference.config",
+    "--input",
+    "samplesheet.csv",
+    "--scorefile",
+    "/Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity/zero_weight/PGS*.txt",
+    "--target_build",
+    "GRCh38",
+    "--keep_multiallelic",
+    "--min_overlap",
+    "0.01",
+    "--only_score",
+    "--outdir",
+    "results",
+    "-ansi-log",
+    "false"
+  ],
+  "working_directory": "/Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-extended/zero_weight-default",
+  "input_sha256": {
+    "PGS990041.txt": "846ef845bc26745110525e73bdc80958b412ad1cd6e5a08b61f25bb988200779",
+    "PGS990040.txt": "9740185575948bdaa9f59ee1d96292f07310e584f9be6ca8d2b170507eeb35d3",
+    "PGS990041.txt.gz": "11e712eab55a5f8aa50b24f2200093bdc912fc824123a5bb3632100c8b7b7141",
+    "target.chr1.vcf.gz": "52167c7dd2835a2c55184ed8011a189f2e2d9f68f06065a7fa1e6176b6c2bbeb",
+    "samples.psam": "713d331f1527ddfd9590bdd0fcb6208365de35c972787094a380549166234a99",
+    "target.chr1.vcf.gz.tbi": "e9926164b616d1e1273521d24232b78fe70d16f554bf072c108de59c79b69071",
+    "PGS990040.txt.gz": "321ce2fd1b8f6785b42d3639be134cd7f270b3022a174d2ced19e882c5656010"
+  },
+  "score_pairs": [
+    {
+      "v2": "PGS990040.txt",
+      "v3": "PGS990040.txt.gz"
+    },
+    {
+      "v2": "PGS990041.txt",
+      "v3": "PGS990041.txt.gz"
+    }
+  ],
+  "task_commands": {
+    "3d/6b1d9af36e26fcf79110d0f3145e9a": "#!/bin/bash -euo pipefail\nplink2 \\\n    --threads 2 \\\n    --memory 16384 \\\n    --set-all-var-ids '@:#:$r:$a' \\\n     \\\n    --freq \\\n    --missing vcols=fmissdosage,fmiss \\\n    --new-id-max-allele-len 100 missing \\\n    --vcf target.chr1.vcf.gz  \\\n    --allow-extra-chr --chr 1 \\\n    --make-pgen vzs pvar-cols=\"-xheader,-maybequal,-maybefilter,-maybeinfo,-maybecm\" \\\n    --out GRCh38_synthetic_1\n\ngzip GRCh38_synthetic_1.vmiss\ngzip GRCh38_synthetic_1.afreq\n\ncat <<-END_VERSIONS > versions.yml\n\"PGSCATALOG_PGSCCALC:PGSCCALC:MAKE_COMPATIBLE:PLINK2_VCF\":\n    plink2: $(plink2 --version 2>&1 | sed 's/^PLINK v//; s/ 64.*$//' )\nEND_VERSIONS\n",
+    "8f/27b5f5b77ae84fe6ecdf404337acf2": "#!/bin/bash -euo pipefail\nplink2             --threads 2             --memory 8192             --seed 31             --extract synthetic_1_additive_0.scorefile.gz                          --allow-extra-chr --xchr-model 1             --score synthetic_1_additive_0.scorefile.gz  header-read cols=+scoresums,+denom,+fid list-variants no-mean-imputation   --error-on-freq-calc             --score-col-nums 3-4             --pfile vzs GRCh38_synthetic_1             --out synthetic_1_additive_0\n\ncat <<-END_VERSIONS > versions.yml\nPLINK2_SCORE:\n    plink2: $(plink2 --version 2>&1 | sed 's/^PLINK v//; s/ 64.*$//' )\nEND_VERSIONS\n"
+  },
+  "images": {
+    "ghcr.io/pgscatalog/pygscatalog:pgscatalog-utils-2.0.4": "sha256:93d0461e62b3eaa676951a5bc77be273d387e10b82a47c73ece66b9eeb77be52",
+    "ghcr.io/pgscatalog/plink2:2.00a5.10": "sha256:5774e0318b5d9144851e5804d471025cbe84df1e806885e7144121b56ec13c7e",
+    "ghcr.io/pgscatalog/pyyaml:6.0": "sha256:e1de290c39496de8ce5152f34ba67942756049443dfc9fa1342ccda5498d2dca"
+  },
+  "sscore_files": [
+    "synthetic_1_additive_0.sscore"
+  ]
+}

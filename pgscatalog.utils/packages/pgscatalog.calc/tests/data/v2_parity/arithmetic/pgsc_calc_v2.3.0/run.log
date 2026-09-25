@@ -1,0 +1,48 @@
+N E X T F L O W  ~  version 25.10.0
+Launching `/Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/pipeline/main.nf` [romantic_northcutt] DSL2 - revision: 2add9be690
+
+
+-[2m----------------------------------------------------[0m-
+[0;35m  pgscatalog/pgsc_calc v2.3.0[0m
+-[2m----------------------------------------------------[0m-
+[1mCore Nextflow options[0m
+  [0;34mrunName        : [0;32mromantic_northcutt[0m
+  [0;34mcontainerEngine: [0;32mdocker[0m
+  [0;34mlaunchDir      : [0;32m/Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-extended/arithmetic-default[0m
+  [0;34mworkDir        : [0;32m/Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-extended/arithmetic-default/work[0m
+  [0;34mprojectDir     : [0;32m/Users/bwingfield/.codex/visualizations/2026/09/25/01a0d8fb-20b8-75d0-ab5e-f7bff805dee5/v230-run/pipeline[0m
+  [0;34muserName       : [0;32mbwingfield[0m
+  [0;34mprofile        : [0;32mdocker[0m
+  [0;34mconfigFiles    : [0;32m[0m
+
+!! Only displaying parameters that differ from the pipeline defaults !!
+-[2m----------------------------------------------------[0m-
+If you use pgscatalog/pgsc_calc for your analysis please cite:
+
+* The Polygenic Score Catalog
+  https://doi.org/10.1101/2024.05.29.24307783
+  https://doi.org/10.1038/s41588-021-00783-5
+
+* The nf-core framework
+  https://doi.org/10.1038/s41587-020-0439-x
+
+* Software dependencies
+  https://github.com/pgscatalog/pgsc_calc/blob/main/CITATIONS.md
+
+[7a/84d46d] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:MAKE_COMPATIBLE:PLINK2_VCF (synthetic chromosome 2)
+[5f/2d5cdc] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:INPUT_CHECK:FORMAT_SCOREFILES (1)
+[1b/2389f4] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:MAKE_COMPATIBLE:PLINK2_VCF (synthetic chromosome 1)
+[24/7adc69] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:MATCH:MATCH_VARIANTS (synthetic chromosome 1)
+[e8/687eab] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:MATCH:MATCH_VARIANTS (synthetic chromosome 2)
+[45/06aa97] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:MATCH:MATCH_COMBINE (synthetic)
+[ef/dbea1f] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:PLINK2_SCORE (synthetic chromosome 1 effect type additive 0)
+[02/708682] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:PLINK2_SCORE (synthetic chromosome 2 effect type additive 1)
+[cc/75c7a3] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:PLINK2_SCORE (synthetic chromosome 1 effect type dominant 0)
+[50/d0544b] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:PLINK2_SCORE (synthetic chromosome 2 effect type recessive 0)
+[b1/2f7c81] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:PLINK2_SCORE (synthetic chromosome 1 effect type recessive 0)
+[6a/1b2867] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:PLINK2_SCORE (synthetic chromosome 2 effect type dominant 0)
+[70/beeac9] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:PLINK2_SCORE (synthetic chromosome 2 effect type additive 0)
+[79/acffde] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:PLINK2_SCORE (synthetic chromosome 1 effect type additive 1)
+[aa/d582d9] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:APPLY_SCORE:SCORE_AGGREGATE (synthetic)
+[c1/ce71e8] Submitted process > PGSCATALOG_PGSCCALC:PGSCCALC:DUMPSOFTWAREVERSIONS (1)
+-[0;35m[pgscatalog/pgsc_calc][0;32m Pipeline completed successfully[0m-

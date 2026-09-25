@@ -67,7 +67,11 @@ def v2_parity(session):
     """Run only the PLINK 2 and pgsc_calc v2.3.0 score parity integration tests."""
     package = "pgscatalog.calc"
     config_file = "packages/pgscatalog.calc/pyproject.toml"
-    test_path = "packages/pgscatalog.calc/tests/integration/test_v2_parity.py"
+    test_paths = sorted(
+        pathlib.Path("packages/pgscatalog.calc/tests/integration").glob(
+            "test_v2_parity*.py"
+        )
+    )
 
     session.run_install(
         "uv",
@@ -89,7 +93,7 @@ def v2_parity(session):
         "pytest",
         "-c",
         config_file,
-        test_path,
+        *map(str, test_paths),
         external=True,
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )

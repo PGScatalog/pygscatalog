@@ -1,0 +1,9 @@
+#pgs_id=PGS990010
+#pgs_name=IntegerMissingness
+#trait_reported=Synthetic test fixture
+#genome_build=GRCh38
+chr_name	chr_position	effect_allele	other_allele	effect_weight
+1	1000	C	A	2
+1	2000	C	A	0.25
+2	1000	A	C	-0.5
+2	2000	A	C	0.5

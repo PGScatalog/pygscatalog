@@ -1,0 +1,2 @@
+sampleset,path_prefix,chrom,format
+synthetic,/Users/bwingfield/Documents/projects/pgscatalog/pygscatalog/pgscatalog.utils/packages/pgscatalog.calc/tests/data/v2_parity/zero_weight/target.chr1,1,vcf
