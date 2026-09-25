@@ -22,7 +22,9 @@ def test_generate(tmp_path):
         p.name: p.read_bytes() for p in second.iterdir()
     }
     # Regeneration must leave the independently obtained reference untouched.
-    expected = first / "expected.csv"
+    reference = first / "plink_reference"
+    reference.mkdir()
+    expected = reference / "chr1.sscore"
     expected.write_text("independent reference\n")
     generate(first)
     assert expected.read_text() == "independent reference\n"

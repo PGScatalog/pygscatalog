@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv
 import gzip
 import pathlib
+from collections import defaultdict
 from decimal import Decimal
 
 from .conftest import SAMPLESET, load_targets, run_cli
@@ -16,11 +17,31 @@ from .conftest import SAMPLESET, load_targets, run_cli
 DATA_DIR = pathlib.Path(__file__).parent.parent / "data" / "v2_parity"
 CHROMS = (*map(str, range(1, 23)), "X", "Y", "MT")
 SCORE_FILE = DATA_DIR / "score.txt.gz"
-EXPECTED = DATA_DIR / "expected.csv"
+REFERENCE = DATA_DIR / "plink_reference"
 
 
 def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
     """Exercise LOAD through COMBINE with multiallelic and mixed-ploidy calls."""
+    sample_ids = {"XX_1", "XX_2", "XY_1", "XY_2"}
+    expected = defaultdict(Decimal)
+    assert {p.name for p in REFERENCE.glob("*.sscore")} == {
+        f"chr{chrom}.sscore" for chrom in CHROMS
+    }
+    for chrom in CHROMS:
+        with (REFERENCE / f"chr{chrom}.sscore").open() as handle:
+            rows = list(csv.DictReader(handle, delimiter="\t"))
+        wanted = {"XY_1", "XY_2"} if chrom == "Y" else sample_ids
+        assert len(rows) == len(wanted), chrom
+        assert {r["#IID"] for r in rows} == wanted, chrom
+        for row in rows:
+            contribution = Decimal(row["WEIGHT_SUM"])
+            assert contribution.is_finite(), (chrom, row["#IID"])
+            expected["PGS999997", row["#IID"]] += contribution
+    # Round once after adding chromosome sums, never average WEIGHT_AVG.
+    expected = {
+        key: value.quantize(Decimal("0.000001")) for key, value in expected.items()
+    }
+
     targets = [(DATA_DIR / f"target.chr{chrom}.vcf.gz", chrom) for chrom in CHROMS]
     zips = load_targets(
         targets,
@@ -82,17 +103,15 @@ def test_all_chromosomes_match_plink_scores(tmp_path, monkeypatch):
         partials.append(out / "partial_scores.parquet")
     stage("combine", "--partial_scores", *partials, "--out_dir", tmp_path / "combined")
 
-    with EXPECTED.open() as handle:
-        expected = list(csv.DictReader(handle))
     with gzip.open(tmp_path / "combined" / "scores.txt.gz", "rt") as handle:
         actual = list(csv.DictReader(handle))
-    keys = {("PGS999997", sample) for sample in ("XX_1", "XX_2", "XY_1", "XY_2")}
+    keys = {("PGS999997", sample) for sample in sample_ids}
     assert len(actual) == len(expected) == 4
-    assert {(r["accession"], r["sample_id"]) for r in expected} == keys
+    assert set(expected) == keys
     assert {(r["accession"], r["sample_id"]) for r in actual} == keys
     assert {r["sampleset"] for r in actual} == {SAMPLESET}
     assert all(int(r["n_matched"]) == 52 for r in actual)
     # Compare the public six-decimal score sums exactly, with no float tolerance.
-    assert {(r["accession"], r["sample_id"]): Decimal(r["score"]) for r in actual} == {
-        (r["accession"], r["sample_id"]): Decimal(r["score"]) for r in expected
-    }
+    assert {
+        (r["accession"], r["sample_id"]): Decimal(r["score"]) for r in actual
+    } == expected

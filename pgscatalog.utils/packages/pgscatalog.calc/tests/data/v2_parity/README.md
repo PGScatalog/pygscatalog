@@ -16,18 +16,15 @@ Add these files:
 - `sex.tsv`: v3 sample-sex map.
 - `samples.psam` and `samples.Y.psam`: PLINK sample metadata for the full
   cohort and the XY-only Y file, respectively.
-- `expected.csv`: the PLINK 2 score sums reduced to the public score contract.
+- `plink_reference/chr{chrom}.sscore`: the original PLINK 2 chromosome results.
 
 The generator produces the VCFs, indexes, scoring inputs, and sample-sex
 files from one fixed variant and sample definition. Running PLINK 2 and
 refreshing the saved reference are separate, explicit steps.
-The generator must not generate or overwrite `expected.csv`.
-
-`expected.csv` has this schema, with scores rounded to six decimal places:
-
-```csv
-accession,sample_id,score
-```
+The generator must not generate or overwrite `plink_reference/`. The integration
+test sums the committed `WEIGHT_SUM` values by `#IID` using Decimal and rounds
+only the final totals to six decimal places. There is no pre-aggregated expected
+score file.
 
 The fixture contains four samples in fixed order: `XX_1`, `XX_2`, `XY_1`,
 `XY_2`. Use explicit, fixed genotypes that collectively exercise effect-allele
@@ -84,7 +81,7 @@ uv run pytest -q -c packages/pgscatalog.calc/pyproject.toml "$fixture/test_gener
 ```
 
 `generate.py` uses the standard library and the existing `pysam` dependency.
-It overwrites only its 55 generated inputs, never `expected.csv`. There is no
+It overwrites only its 55 generated inputs, never `plink_reference/`. There is no
 random seed: every allele, genotype, position, ID and weight is fixed. Gzip
 headers have no filename or timestamp. Regeneration is byte-identical within
 the same Python/pysam/compression-library environment. The check regenerates
@@ -125,48 +122,11 @@ file, so warnings about other chromosomes' missing IDs are also expected.
 There must be four scored variants on chromosome 1 and two on every other
 chromosome. Do not use `WEIGHT_AVG` as the score: combine `WEIGHT_SUM`.
 
-After checking the PLINK logs, aggregate the results with the following command.
-It checks all 52 scored IDs and the expected sample membership, then writes
-four rows beside the original outputs, leaving the committed reference alone.
-
-```bash
-uv run python - "$fixture" "$plink_out" <<'PYTHON'
-import csv
-import sys
-from collections import defaultdict
-from decimal import Decimal
-from pathlib import Path
-
-fixture, results = map(Path, sys.argv[1:])
-chroms = [*map(str, range(1, 23)), "X", "Y", "MT"]
-samples = {"XX_1", "XX_2", "XY_1", "XY_2"}
-with (fixture / "plink.weights.tsv").open() as handle:
-    weights = list(csv.DictReader(handle, delimiter="\t"))
-sums = defaultdict(Decimal)
-for chrom in chroms:
-    prefix = results / f"chr{chrom}"
-    ids = prefix.with_suffix(".sscore.vars").read_text().splitlines()
-    wanted = {r["ID"] for r in weights if r["ID"].startswith(f"syn_{chrom}_")}
-    assert len(ids) == len(set(ids)) and set(ids) == wanted
-    with prefix.with_suffix(".sscore").open() as handle:
-        rows = list(csv.DictReader(handle, delimiter="\t"))
-    wanted_samples = {"XY_1", "XY_2"} if chrom == "Y" else samples
-    assert len(rows) == len(wanted_samples)
-    assert {r["#IID"] for r in rows} == wanted_samples
-    for row in rows:
-        value = Decimal(row["WEIGHT_SUM"])
-        assert value.is_finite()
-        sums[row["#IID"]] += value
-with (results / "expected.csv").open("x", newline="") as handle:
-    writer = csv.writer(handle)
-    writer.writerow(["accession", "sample_id", "score"])
-    for sample in sorted(samples):
-        writer.writerow(["PGS999997", sample, f"{sums[sample]:.6f}"])
-PYTHON
-```
-
-Inspect that `expected.csv`, record provenance, then copy it into this fixture
-when ready to commit the reference.
+After checking the PLINK logs, copy the 25 original `.sscore` files into
+`plink_reference/` and refresh the provenance and saved logs. Confirm all 52
+variant IDs were scored using the `.sscore.vars` files before recording them
+in `provenance.json`. The integration test performs the aggregation itself;
+there is no separate aggregation command or generated expected-score CSV.
 
 ## Run the current v3 stages
 
@@ -214,7 +174,7 @@ matches, dominant/recessive scores and reference normalisation are deferred.
 
 ## Saved reference and integration test
 
-`expected.csv` was generated with **PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)**.
+The committed `.sscore` files were generated with **PLINK v2.0.0-a.6.23 M1 (24 Aug 2025)**.
 The inputs were regenerated with Python 3.12.8 and pysam 0.23.3 using
 `python generate.py .` in this directory. The reference uses the commands
 above, with temporary output prefixes. The exact argument lists, versions,
@@ -224,15 +184,17 @@ input SHA-256 hashes and 52 scored variant IDs are saved in
 [`plink_reference/`](plink_reference/) retains the 25 original chromosome
 `.sscore` outputs and the concatenated original PLINK logs in `plink.log`.
 The temporary output paths in those logs are historical; the corresponding
-score files are retained here under the same basenames. The reference sums
+score files are retained here under the same basenames. The integration test sums
 `WEIGHT_SUM` by `#IID` with Decimal and rounds only the final sum to six decimal
-places, exactly as in the aggregation command above. XX samples have no Y
-contribution. Neither v3 nor the generator produced these expected scores.
+places. It validates chromosome file coverage and sample membership before
+aggregation, rejects duplicate sample rows and non-finite contributions. XX samples have no Y
+contribution. Neither v3 nor the generator produced these PLINK results.
 
 The integration test loads all 25 checked-in VCFs, supplies the sex map, keeps
 multiallelic matches, and runs the public v3 stages through COMBINE. It requires
 all 52 variants to match, all four sample/accession keys to be present without
-duplicates, and exact equality of the public six-decimal score sums. It uses
+duplicates, and exact equality of the public six-decimal score sums against the totals it
+calculates directly from the committed PLINK outputs. It uses
 the documented `min_overlap=0.99` workaround. It never invokes PLINK or Nextflow,
 generates fixtures, or rewrites the reference.
 
@@ -252,5 +214,5 @@ uv run pytest -q -c packages/pgscatalog.calc/pyproject.toml \
 
 The `v2_parity` directory, test and nox session retain their historical names;
 the numerical reference is direct PLINK 2, not the old pgsc_calc v2 pipeline.
-Only refresh `expected.csv` and its provenance after inspecting and understanding
+Only refresh the raw `.sscore` files and their provenance after inspecting and understanding
 any change to the results.
