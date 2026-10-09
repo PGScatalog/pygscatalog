@@ -1,4 +1,4 @@
-from decimal import Decimal, getcontext
+from decimal import Decimal
 
 import duckdb
 import pytest
@@ -200,7 +200,6 @@ def test_add_match_log_with_one_mapped_variants(sampleset_name, pgs000001):
     ) = summary
 
     print(summary)
-    getcontext().prec = 2
     assert sum_sampleset == sampleset_name
     assert sum_accession == "PGS000001"
     assert sum_match_summary == "matched"
