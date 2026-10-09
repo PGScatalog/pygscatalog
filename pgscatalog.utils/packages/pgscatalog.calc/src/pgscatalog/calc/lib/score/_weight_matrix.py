@@ -284,20 +284,33 @@ def get_variant_metadata(
         - target_row_nr : int64
         - is_recessive : bool
         - is_dominant: bool
+        - effect_allele_frequency: float64
+        - target_variant_id: str
+        - sampleset_n_samples: uint64
 
         Rows are ordered by target_row_nr to be consistent with the effect weight
         matrix.
     """
     return conn.execute(
         """
-        SELECT weight_mat_row_nr,
-               effect_allele_idx,
-               target_row_nr,
-               is_recessive,
-               is_dominant
-        FROM wide_score_variants
-        WHERE zarr_group = $zarr_group
-        ORDER BY target_row_nr, effect_allele_idx
+        SELECT w.weight_mat_row_nr,
+               w.effect_allele_idx,
+               w.target_row_nr,
+               w.is_recessive,
+               w.is_dominant,
+               m.effect_allele_frequency,
+               m.target_variant_id,
+               m.sampleset_n_samples
+        FROM wide_score_variants w
+        JOIN (
+            SELECT DISTINCT zarr_group, target_row_nr,
+                   match_result.effect_allele_idx AS effect_allele_idx,
+                   effect_allele_frequency, target_variant_id, sampleset_n_samples
+            FROM allele_match_table
+            WHERE match_result.effect_allele_idx IS NOT NULL
+        ) m USING (zarr_group, target_row_nr, effect_allele_idx)
+        WHERE w.zarr_group = $zarr_group
+        ORDER BY w.target_row_nr, w.effect_allele_idx
         """,
         {"zarr_group": group_path},
     ).pl()

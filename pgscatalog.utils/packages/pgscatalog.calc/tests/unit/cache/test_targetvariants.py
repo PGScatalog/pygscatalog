@@ -241,3 +241,41 @@ def test_add_missing_positions_to_lists(variant: TargetVariants):
     assert missing_gts.shape == (n_samples, 2)
     assert missing_gts.dtype == np.uint8
     assert np.all(missing_gts == MISSING_GENOTYPE_SENTINEL_VALUE)
+
+
+def test_load_counts_whole_calls_and_preserves_multiallelic_indices(valid_args):
+    missing = MISSING_GENOTYPE_SENTINEL_VALUE
+    absent = NO_ALLELE_SENTINEL_VALUE
+    args = valid_args | {
+        "chr_name": ["X"],
+        "pos": [1],
+        "refs": ["A"],
+        "alts": [["C", "G"]],
+        "samples": [str(i) for i in range(6)],
+        "gts": [
+            np.array(
+                [
+                    [0, 1],
+                    [2, absent],
+                    [1, missing],
+                    [missing, missing],
+                    [absent, absent],
+                    [2, 2],
+                ],
+                dtype=np.uint8,
+            )
+        ],
+    }
+    root = zarr.open_group(store=zarr.storage.MemoryStore())
+    TargetVariants(**args).write_zarr(root)
+    assert root["meta/allele_counts"][:].tolist() == ["1/1/3"]
+
+    # A later LOAD batch can have more alleles and longer counts without truncation.
+    args |= {
+        "pos": [2],
+        "alts": [["C", "G", "T"]],
+        "gts": [np.full((6, 2), 3, dtype=np.uint8)],
+    }
+    TargetVariants(**args).write_zarr(root)
+    assert root["meta/allele_counts"][:].tolist() == ["1/1/3", "0/0/0/12"]
+    assert root["genotypes"].shape[0] == 2

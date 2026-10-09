@@ -226,7 +226,16 @@ class TargetVariants:
 
         See https://github.com/zarr-developers/zarr-specs/discussions/365
         """
-        meta_arrays = self.variant_metadata.to_numpy()
+        meta_arrays = dict(self.variant_metadata.to_numpy())
+        counts = []
+        for calls, alts in zip(self.genotypes, self._alts, strict=True):
+            # A partial no-call excludes the whole genotype, just as SCORE does.
+            called = calls[~np.any(calls == MISSING_GENOTYPE_SENTINEL_VALUE, axis=1)]
+            alleles = called[called != NO_ALLELE_SENTINEL_VALUE]
+            allele_counts = np.bincount(alleles, minlength=1 + len(alts or []))
+            counts.append("/".join(map(str, allele_counts)))
+        # Variable-length strings preserve multiallelic counts across LOAD batches.
+        meta_arrays["allele_counts"] = np.array(counts, dtype=object)
         zarr_chunks = (config.ZARR_VARIANT_CHUNK_SIZE,)
         meta_root = zarr.open_group(
             store=zarr_group.store, path=meta_group_path(zarr_group.path)
@@ -244,12 +253,22 @@ class TargetVariants:
             start_time = time.perf_counter()
             try:
                 logger.info(f"Creating variant {metadata=} zarr array")
-                meta_root.create_array(
-                    chunks=zarr_chunks,
-                    data=array,
-                    name=metadata,
-                    compressors=config.ZARR_COMPRESSOR,
-                )
+                if metadata == "allele_counts":
+                    count_array = meta_root.create_array(
+                        name=metadata,
+                        shape=array.shape,
+                        dtype="str",
+                        chunks=zarr_chunks,
+                        compressors=config.ZARR_COMPRESSOR,
+                    )
+                    count_array[:] = array
+                else:
+                    meta_root.create_array(
+                        chunks=zarr_chunks,
+                        data=array,
+                        name=metadata,
+                        compressors=config.ZARR_COMPRESSOR,
+                    )
                 logger.info(f"Zarr array {array.shape=} created")
             except zarr.errors.ContainsArrayError:
                 # array has already been initialised
