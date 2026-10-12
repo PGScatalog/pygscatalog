@@ -71,7 +71,9 @@ class MatchCombineStage:
         # the match log reports the target alleles, so this stage consumes them
         stage.import_match_tables(db=self._db, paths=paths, target_alleles=True)
 
-    def combine_matches(self, min_overlap: float, out_path: Pathish) -> None:
+    def combine_matches(
+        self, min_overlap: float, out_path: Pathish, n_samples: int
+    ) -> None:
         """Pool every chromosome's matches, apply min_overlap, and write the
         genome-wide match table restricted to accessions that passed"""
         if not (0 < min_overlap <= 1):
@@ -80,6 +82,10 @@ class MatchCombineStage:
             )
 
         with self._db.connect() as conn:
+            conn.execute(
+                "UPDATE allele_match_table SET sampleset_n_samples = ?",
+                [n_samples],
+            )
             add_match_log(
                 conn=conn,
                 min_overlap=min_overlap,

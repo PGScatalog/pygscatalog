@@ -15,8 +15,6 @@ from pgscatalog.calc.lib.constants import (
     NO_ALLELE_SENTINEL_VALUE,
 )
 
-from ._impute import calculate_mean_dosage
-
 if TYPE_CHECKING:
     import duckdb
     import polars as pl
@@ -56,6 +54,9 @@ def make_dosage_arrays(
         - ``effect_allele_idx``: allele index for effect allele dosage calculation
         - ``is_recessive``: boolean mask for recessive effect type
         - ``is_dominant``: boolean mask for dominant effect type
+        - ``effect_allele_frequency``: pooled frequency from MATCH
+        - ``sampleset_n_samples``: distinct sample count from MATCH_COMBINE
+        - ``target_variant_id``: target identity for error reporting
     zarr_group : str
         The shard being scored: its path relative to the store root
         (``sampleset/chromosome/filename``)
@@ -74,7 +75,7 @@ def make_dosage_arrays(
     n_workers : int, default=1
         Number of threads to use when writing dosage/missing arrays with Dask
     n_minimum_impute : int, default=50
-        Minimum number of samples required for allele frequency-based imputation.
+        Minimum number of distinct samples in the sampleset for imputation.
         If fewer are available an exception will be raised.
 
     Returns
@@ -91,7 +92,7 @@ def make_dosage_arrays(
     Notes
     -----
     - Dosages are imputed as ``ploidy * mean(effect allele frequency)`` when
-      sufficient non-missing calls are present
+      the sampleset meets the sample floor and the variant has called alleles
     - Both arrays are created with chunking along the variant dimension,
       using ``ZARR_VARIANT_CHUNK_SIZE`` and compressed with ``ZARR_COMPRESSOR``.
     """
@@ -213,7 +214,11 @@ def write_dosage_arrays(
 
     # impute missing dosage: the call's own ploidy * mean effect allele frequency
     is_dosage_nan, filled = fill_missing_dosages(
-        dosage_array=dosage, ploidy_array=ploidy, n_minimum_samples=n_minimum_impute
+        dosage_array=dosage,
+        ploidy_array=ploidy,
+        effect_allele_frequencies=df["effect_allele_frequency"].to_numpy(),
+        n_samples=df["sampleset_n_samples"][0],
+        n_minimum_samples=n_minimum_impute,
     )
 
     # adjust dosages for recessive / dominant effect types
@@ -253,6 +258,8 @@ def write_dosage_arrays(
 
     if is_any_nan:
         reason = no_called_alleles_reason(dosage_array, ploidy_array)
+        failed_rows = da.any(da.isnan(da.from_zarr(dosage_array)), axis=1).compute()
+        variant_ids = df["target_variant_id"].to_numpy()[failed_rows].tolist()
         logger.critical(
             "NaNs detected in dosage array or missing array after calculating "
             f"dosage: some variants have no called alleles because {reason}. "
@@ -260,7 +267,8 @@ def write_dosage_arrays(
         )
         raise ValueError(
             "NaN values detected in dosage array or missing array: some variants "
-            f"have no called alleles because {reason}"
+            f"have no called alleles across the sampleset because {reason}: "
+            f"{variant_ids}"
         )
     logger.info("Dosage/missing arrays doesn't contain NaN values (good!)")
 
@@ -356,55 +364,23 @@ def sentinel_to_nan(target_dask: da.Array) -> da.Array:
 def fill_missing_dosages(
     dosage_array: da.Array,
     ploidy_array: da.Array,
+    effect_allele_frequencies: npt.NDArray[np.float64],
+    n_samples: int,
     n_minimum_samples: int = 50,
 ) -> tuple[da.Array, da.Array]:
+    """Fill missing calls using LOAD's counts pooled across the sampleset.
+
+    The floor counts distinct samples in the sampleset, including missing calls.
+    A small sampleset with no missing dosages needs no frequency estimate.
     """
-    Replace missing dosages with mean effect allele dosage.
-
-    Missing dosage values (NaN) are replaced with the mean effect allele dosage
-    calculated per (variant, sample), if at least `n_minimum_samples` non-missing
-    values are available. Returns both a mask of originally missing values and the
-    imputed dosage array.
-
-    Parameters
-    ----------
-    dosage_array : dask.array.Array
-        2D array of effect allele dosages with shape (n_variants, n_samples).
-        Missing dosages are represented as NaN.
-    ploidy_array : dask.array.Array
-        2D array of the same shape holding each call's observed ploidy (ADR 0007)
-    n_minimum_samples : int, default=50
-        Minimum number of non-missing samples required to compute the mean dosage
-        for imputation. An exception will be raised if too few samples are present
-        *and* there is something to impute — a small shard with no missing calls
-        needs no mean, so it is returned unchanged.
-
-    Returns
-    -------
-    is_dosage_nan : dask.array.Array
-        Boolean array of the same shape as `dosage_array` indicating which values
-        were originally missing (NaN).
-    filled : dask.array.Array
-        Float64 array with missing dosages replaced by the mean for that call
-    """
+    if not np.issubdtype(dosage_array.dtype, np.floating):
+        raise TypeError("The genotype array must contain floats")
     is_dosage_nan = da.isnan(dosage_array)
+    if n_samples < n_minimum_samples and bool(is_dosage_nan.any().compute()):
+        raise ValueError(f"{n_samples=} is less than {n_minimum_samples=}")
 
-    # ponytail: only shards below the floor pay for the missingness scan. A shard with
-    # enough samples can't trip it, so don't walk the array to find that out.
-    if dosage_array.shape[1] < n_minimum_samples and not bool(
-        is_dosage_nan.any().compute()
-    ):
-        logger.info("No missing dosages to impute, skipping the sample floor check")
-        return is_dosage_nan, dosage_array
-
-    mean_effect_dosage: da.Array = calculate_mean_dosage(
-        dosage_array=dosage_array,
-        ploidy_array=ploidy_array,
-        n_minimum_samples=n_minimum_samples,
-    )
-
-    filled: da.Array = da.where(is_dosage_nan, mean_effect_dosage, dosage_array)
-
+    imputed = ploidy_array * effect_allele_frequencies[:, None]
+    filled = da.where(is_dosage_nan, imputed, dosage_array)
     return is_dosage_nan, filled
 
 

@@ -3,6 +3,7 @@
 ## Status
 
 Accepted. Follows from [ADR 0007](0007-ploidy-is-observed-per-call.md).
+[ADR 0016](0016-pool-imputation-frequencies-across-the-sampleset.md) extends frequency estimation from one shard to the whole sampleset; pooling across ploidy remains unchanged.
 
 ## Context
 

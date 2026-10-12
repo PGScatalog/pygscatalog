@@ -1184,7 +1184,8 @@ def _match_table_with_rows(rows: list[tuple]) -> duckdb.DuckDBPyConnection:
     create_allele_match_table(conn, target_alleles=True)
     conn.executemany(
         """
-        INSERT INTO allele_match_table VALUES (
+        INSERT INTO allele_match_table (sampleset, accession, row_nr, match_result,
+            target_row_nr, zarr_group, target_ref, target_alts) VALUES (
             'test',
             ?,
             ?,

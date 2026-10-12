@@ -315,6 +315,12 @@ The zarr hierarchy is `/{sampleset}/{chromosome}/{shard filename}/genotypes`.
 A domain expert can read the partitioning directly from this hierarchy without a samplesheet.
 Unsplit whole-genome input uses chromosome `ALL`, so every input layout has the same hierarchy depth.
 
+**Sampleset allele frequency**:
+The proportion of called alleles at a target variant that carry a particular allele, pooled across the sampleset's technical sample batches and observed ploidies.
+Repartitioning the same samples into different shards does not change this frequency or the missing dosages imputed from it.
+
+_Avoid_: **Shard frequency** as a synonym; a shard contains only part of the evidence.
+
 **Cache**:
 The zarr store that LOAD writes and later stages read.
 It provides a portable interface between the stages.

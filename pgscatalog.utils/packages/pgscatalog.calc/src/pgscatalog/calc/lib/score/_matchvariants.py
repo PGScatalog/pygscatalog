@@ -120,7 +120,10 @@ def update_match_table(
                    ) AS rn
             FROM match_candidates
         )
-        INSERT INTO allele_match_table
+        INSERT INTO allele_match_table (
+            sampleset, accession, row_nr, match_result, target_row_nr,
+            zarr_group, target_ref, target_alts
+        )
         SELECT
             sampleset,
             accession,
@@ -263,6 +266,9 @@ def create_allele_match_table(
             target_row_nr UINTEGER NOT NULL,
             zarr_group TEXT NOT NULL,
             {target_allele_columns}
+            effect_allele_frequency DOUBLE,
+            target_variant_id TEXT,
+            sampleset_n_samples UBIGINT,
             -- one match per scoring variant per shard (docs/adr/0003)
             PRIMARY KEY (sampleset, accession, row_nr, zarr_group)
         );
