@@ -29,6 +29,10 @@ HOM_REF, HET, HOM_ALT = [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]
 PHASED_HET, PHASED_HOM_ALT = [1.0, 0.0, 0.0, 1.0], [0.0, 1.0, 0.0, 1.0]
 NAN = float("nan")
 
+# a triallelic unphased diploid call carries six probabilities in the spec's colex
+# ordering, which is exactly the decoder bgen doesn't have (ADR 0010)
+TRIALLELIC_HOM_REF = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
 
 #  Chromosome value normalisation
 def test_add_chrom_padding_numeric():
@@ -256,6 +260,92 @@ def test_bgen_no_index(test_positions, phased_bgen_path, bgen_sample, tmp_path_f
             sampleset="test",
             sample_path=bgen_sample,
         )
+
+
+# Allele identity (ADR 0010). These go through bgenix, because which records reach
+# the reader is decided by the query
+
+
+def _write_allele_bgen(tmp_path, records, n_samples=4):
+    """Write a bgen whose records carry their own allele lists, so one can be
+    multiallelic, and index it the way a real target is indexed.
+
+    ``records`` are (chrom, pos, alleles, probabilities) tuples, every call diploid.
+    """
+    samples = [f"sample{i}" for i in range(n_samples)]
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "test.bgen"
+    with BgenWriter(path, n_samples=n_samples, samples=samples) as bfile:
+        for i, (chrom, pos, alleles, probs) in enumerate(records):
+            bfile.add_variant(
+                varid=f"var{i}",
+                rsid=f"rs{i}",
+                chrom=chrom,
+                pos=pos,
+                alleles=alleles,
+                genotypes=np.array(probs, dtype=np.float64),
+                ploidy=np.full(n_samples, 2, dtype=np.uint8),
+                phased=False,
+                bit_depth=8,
+            )
+
+    # BgenWriter leaves its own .bgi behind, but bgenix won't query one it didn't
+    # write, so overwrite it
+    subprocess.run(["bgenix", "-index", "-clobber", "-g", str(path)], check=True)
+    sample_path = _write_sample_file(tmp_path / "test.sample", samples)
+    return path, sample_path, path.with_name(path.name + ".bgi")
+
+
+def test_a_multiallelic_record_refuses_to_load_naming_the_variant(tmp_path):
+    """bgen has no decoder for more than two alleles, and skipping the record would
+    pad the position as absent - so the user would be told a variant wasn't found
+    when it was found and discarded. It fails at LOAD instead (ADR 0010)
+    """
+    path, sample_path, idx_path = _write_allele_bgen(
+        tmp_path, [("1", 100, ["A", "C", "G"], [TRIALLELIC_HOM_REF] * 4)]
+    )
+
+    with pytest.raises(NotImplementedError, match=r"rs0.*1:100") as excinfo:
+        bgen_buffer_variants(
+            position_batch=[("1", 100)],
+            target_path=path,
+            cache_dir=tmp_path / "cache",
+            target_chroms=["1"],
+            idx_path=idx_path,
+            sampleset="test",
+            sample_path=sample_path,
+        )
+
+    # and it says what to do about it, because there's nothing the reader can do
+    assert "VCF" in str(excinfo.value)
+    assert "bcftools norm" in str(excinfo.value)
+
+
+def test_a_biallelic_bgen_loads_with_ref_as_the_first_allele(tmp_path):
+    """Hard calls are argmax indices into the bgen's own allele order, so REF is
+    allele 0 and a multiallelic record the query never asks for changes nothing
+    """
+    path, sample_path, idx_path = _write_allele_bgen(
+        tmp_path,
+        [
+            ("1", 100, ["A", "G"], [HOM_REF, HET, HOM_ALT, HOM_REF]),
+            ("1", 200, ["A", "C", "G"], [TRIALLELIC_HOM_REF] * 4),
+        ],
+    )
+
+    variants = bgen_buffer_variants(
+        position_batch=[("1", 100)],
+        target_path=path,
+        cache_dir=tmp_path / "cache",
+        target_chroms=["1"],
+        idx_path=idx_path,
+        sampleset="test",
+        sample_path=sample_path,
+    )
+
+    assert list(variants.variant_metadata.ref) == ["A"]
+    assert list(variants.variant_metadata.alts) == [["G"]]
+    assert np.array_equal(variants.genotypes[0], [[0, 0], [0, 1], [1, 1], [0, 0]])
 
 
 # Ploidy (ADR 0007). These read a bgen directly instead of going through bgenix,

@@ -378,6 +378,97 @@ def test_refalt_altref_matches_get_a_row_each(db_two_shards):
     )
 
 
+def _db_with_collision(effect_allele_idx: int | None) -> duckdb.DuckDBPyConnection:
+    """Two score variants of one accession on one target allele, plus a clean match.
+
+    (row_nr, target_row_nr, effect_allele_idx, effect_weight). Rows 0 and 1 are a
+    match collision: they carry different weights for the same dosage. MATCH excludes
+    both, which leaves their effect_allele_idx NULL - pass None to see what this
+    table looks like afterwards, and 0 to see what the pivot does when it isn't.
+    """
+    matches = [
+        (0, 0, effect_allele_idx, 0.1),
+        (1, 0, effect_allele_idx, 0.2),
+        (2, 1, 1, 0.3),
+    ]
+    conn = duckdb.connect(":memory:")
+    conn.execute("""
+        CREATE TABLE score_variant_table (
+            accession TEXT, effect_type TEXT, row_nr UBIGINT, effect_weight DOUBLE
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO score_variant_table VALUES ('PGS000001', 'additive', ?, ?)",
+        [(row_nr, weight) for row_nr, _, _, weight in matches],
+    )
+    conn.execute("""
+        CREATE TABLE allele_match_raw (
+            sampleset TEXT,
+            accession TEXT,
+            row_nr UBIGINT,
+            target_row_nr UBIGINT,
+            effect_allele_idx UINT8,
+            zarr_group TEXT
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO allele_match_raw VALUES ('test', 'PGS000001', ?, ?, ?, ?)",
+        [(row_nr, target, idx, SHARD_A) for row_nr, target, idx, _ in matches],
+    )
+    conn.execute("""
+        CREATE VIEW allele_match_table AS
+        SELECT sampleset, accession, row_nr,
+               struct_pack(effect_allele_idx := effect_allele_idx) AS match_result,
+               target_row_nr, zarr_group
+        FROM allele_match_raw;
+    """)
+    return conn
+
+
+def test_excluded_collisions_take_both_weights_with_them():
+    """An excluded collision has no effect allele index, so neither weight is pivoted.
+
+    This is what keeps the pivot's any_value honest: with both rows gone, every
+    group holds at most one weight per accession and any_value picks the only value
+    there is (docs/adr/0010).
+    """
+    conn = _db_with_collision(effect_allele_idx=None)
+
+    create_wide_weights_table(
+        conn, sampleset="test", accessions=["PGS000001"], zarr_group=SHARD_A
+    )
+
+    rows = conn.execute("""
+        SELECT weight_mat_row_nr, target_row_nr, effect_allele_idx, PGS000001
+        FROM wide_score_variants ORDER BY weight_mat_row_nr
+    """).fetchall()
+
+    # only the clean match at target row 1 survives, carrying its own weight. Neither
+    # 0.1 nor 0.2 reaches the matrix
+    assert rows == [(0, 1, 1, pytest.approx(0.3))]
+
+
+def test_a_collision_reaching_the_pivot_would_lose_a_weight():
+    """Why collisions are excluded upstream instead of being handled here.
+
+    The PIVOT groups on (target_row_nr, effect_allele_idx), so two colliding rows
+    become one row, and any_value keeps whichever weight it saw. The GROUP BY stops
+    the score being double counted, but the surviving weight is an unspecified choice
+    between two numbers a score author wrote deliberately.
+    """
+    conn = _db_with_collision(effect_allele_idx=0)
+
+    create_wide_weights_table(
+        conn, sampleset="test", accessions=["PGS000001"], zarr_group=SHARD_A
+    )
+
+    (weight,) = conn.execute("""
+        SELECT PGS000001 FROM wide_score_variants WHERE target_row_nr = 0
+    """).fetchone()
+
+    assert weight in (0.1, 0.2)
+
+
 def test_store_group_weight_arrays_raises_on_empty(empty_scoredb, zarr_group):
     """
     When no variants are available for the given sampleset/accessions,

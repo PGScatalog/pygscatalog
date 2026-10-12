@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Annotated
 import polars as pl
 from pydantic import AfterValidator, BaseModel, PositiveInt, RootModel, model_validator
 
-from pgscatalog.calc.lib.constants import NUMPY_STRING_DTYPE
+from pgscatalog.calc.lib.constants import NUMPY_STRING_DTYPE, is_unmatchable_allele
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -104,11 +104,30 @@ class ZarrVariantMetadata(BaseModel):
 def is_valid_allele(
     alleles: list[list[str] | None] | list[str | None],
 ) -> list[list[str] | None] | list[str | None]:
+    """Refuse a corrupt allele string at cache write, but keep the legal ones that
+    name no sequence.
+
+    A record's alleles are stored as written and in position, because a genotype call
+    names the allele it carries by index: dropping the spanning deletion from
+    `[C,*,G]` renumbers `G` and every dosage counted for it becomes another allele's
+    (docs/adr/0010). So `*` and symbolic alleles are cached and skipped at match time,
+    which is exactly what `is_unmatchable_allele` marks out - the matcher applies the
+    same predicate, so the two layers agree on what can't be matched rather than each
+    inventing a rule. What's left over is genuinely corrupt, and still raises.
+    """
     valid_alleles = {"A", "C", "T", "G"}
-    # get a flat list of non-missing alleles
-    flat = [x for sub in alleles if sub is not None for x in sub]
+    # a ref is one allele, an alts is a list of them: check whole allele strings, not
+    # the characters of a ref
+    flat = [
+        allele
+        for sub in alleles
+        if sub is not None
+        for allele in ([sub] if isinstance(sub, str) else sub)
+    ]
     for allele in flat:
-        if allele is not None and not set(allele).issubset(valid_alleles):
+        if allele is None or is_unmatchable_allele(allele):
+            continue
+        if not set(allele).issubset(valid_alleles):
             raise ValueError(f"Invalid allele: {allele}")
     return alleles
 

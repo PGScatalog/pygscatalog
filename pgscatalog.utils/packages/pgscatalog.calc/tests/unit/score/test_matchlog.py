@@ -4,12 +4,13 @@ import duckdb
 import pytest
 
 from pgscatalog.calc.lib.score._matchlog import (
-    add_complement_macro,
     add_match_log,
+    add_reverse_complement_macro,
     get_ok_accessions,
 )
 from pgscatalog.calc.lib.score._matchvariants import (
     _setup_enums,
+    reverse_complement,
     update_match_table,
 )
 from pgscatalog.calc.lib.scorefile import load_scoring_files
@@ -22,22 +23,36 @@ from pgscatalog.calc.lib.scorefile import load_scoring_files
         ("T", "A"),
         ("C", "G"),
         ("G", "C"),
-        ("ATGC", "TACG"),
+        ("ATGC", "GCAT"),
+        ("AT", "AT"),
         ("A" * 200, "T" * 200),
+        ("atgc", "cgta"),
     ],
     ids=[
-        "A complement is T",
-        "T complement is A",
-        "C complement is G",
-        "G complement is C",
-        "multiple mixed nts",
+        "A reverse complements to T",
+        "T reverse complements to A",
+        "C reverse complements to G",
+        "G reverse complements to C",
+        # a plain complement gives TACG here: the reversal is the whole bug
+        "multiple mixed nts are reversed as well as complemented",
+        "a self-reverse-complementary sequence is unchanged",
         "very long sequence",
+        # the macro used to upper() and the Python function never has. Neither does
+        # now: a lowercase allele can't reach a flipped match type, so upper-casing
+        # could only print a sequence the matcher never compared
+        "a lowercase allele is left alone, exactly as the matcher leaves it",
     ],
 )
-def test_complement_macro(input, result):
+def test_reverse_complement_macro(input, result):
+    """The SQL macro and the Python function have to give the same answer.
+
+    matched_effect_allele is derived with the macro, so if they disagree the match
+    log names a different allele from the match that produced it (docs/adr/0011).
+    """
     with duckdb.connect(":memory:") as conn:
-        add_complement_macro(conn)
-        assert conn.sql(f"SELECT complement('{input}')").fetchone() == (result,)
+        add_reverse_complement_macro(conn)
+        assert conn.sql(f"SELECT reverse_complement('{input}')").fetchone() == (result,)
+    assert reverse_complement(input) == result
 
 
 # Test if the add_match_log create the table score_log_table
@@ -85,6 +100,7 @@ def test_add_match_log_with_one_mapped_variants(sampleset_name, pgs000001):
         conn=conn,
         match_ambiguous=False,
         match_multiallelic=False,
+        match_flipped=True,
         sampleset="test",
     )
 
@@ -323,6 +339,7 @@ def _make_conn_from_rows(n_variants, match_rows) -> duckdb.DuckDBPyConnection:
             match_result STRUCT(is_matched BOOLEAN,
                                 match_type match_type_enum,
                                 match_summary match_summary_enum,
+                                exclusion_reason exclusion_reason_enum,
                                 is_ambiguous BOOLEAN,
                                 is_multiallelic BOOLEAN,
                                 match_priority UINTEGER),
@@ -337,6 +354,7 @@ def _make_conn_from_rows(n_variants, match_rows) -> duckdb.DuckDBPyConnection:
         INSERT INTO allele_match_table VALUES
         ('test', 'test', ?,
          {'is_matched': TRUE, 'match_type': ?, 'match_summary': 'matched',
+          'exclusion_reason': NULL,
           'is_ambiguous': ?, 'is_multiallelic': ?, 'match_priority': 6},
          0, 'test/ALL/file.vcf.gz', 'A', ['C']);
         """,
@@ -367,6 +385,130 @@ def test_match_rate_sums_unrounded_fractions():
     conn.close()
 
 
+# the summary log is where "217 variants excluded" has to become counts a user can
+# act on: raise --keep_multiallelic, raise --keep_ambiguous, drop
+# --ignore_strand_flips, or look at the scoring file (docs/adr/0010)
+
+_SHARD = "test/X/x.vcf.gz"
+_REASON_SCORE_ROWS = [
+    # two score variants resolving to the reference allele of target row 5
+    ("X", 100, "A", "C", 0.1, "additive", False, "PGS000001", 0),
+    ("X", 100, "A", "C", 0.2, "additive", False, "PGS000001", 1),
+    # a palindromic pairing, then a target carrying two alternative alleles
+    ("X", 200, "A", "T", 0.3, "additive", False, "PGS000001", 2),
+    ("X", 300, "A", "C", 0.4, "additive", False, "PGS000001", 3),
+    # a clean match, and a score variant that matches nothing
+    ("X", 400, "G", "T", 0.5, "additive", False, "PGS000001", 4),
+    ("X", 500, "A", "G", 0.6, "additive", False, "PGS000001", 5),
+    # matches target row 10 only when read complemented: revcomp(T/G) is A/C
+    ("X", 600, "T", "G", 0.7, "additive", False, "PGS000001", 6),
+]
+_REASON_TARGET_ROWS = [
+    (5, "X", 100, "A", ["C"], _SHARD, "test"),
+    (6, "X", 200, "A", ["T"], _SHARD, "test"),
+    (7, "X", 300, "A", ["C", "G"], _SHARD, "test"),
+    (8, "X", 400, "G", ["T"], _SHARD, "test"),
+    (9, "X", 500, "G", ["T"], _SHARD, "test"),
+    (10, "X", 600, "A", ["C"], _SHARD, "test"),
+]
+
+
+def _summary_of_every_reason(
+    *, match_multiallelic: bool, match_flipped: bool = True
+) -> list[tuple]:
+    """Match a scoring file that hits all four exclusion reasons, and summarise it"""
+    conn = duckdb.connect(":memory:")
+    conn.execute("""
+        CREATE TABLE score_variant_table (
+            chr_name VARCHAR,
+            chr_position UINTEGER,
+            effect_allele VARCHAR,
+            other_allele VARCHAR,
+            effect_weight DOUBLE,
+            effect_type VARCHAR,
+            is_duplicated BOOLEAN,
+            accession VARCHAR,
+            row_nr UINTEGER,
+            PRIMARY KEY(row_nr, accession)
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO score_variant_table VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        _REASON_SCORE_ROWS,
+    )
+    conn.execute("""
+        CREATE TABLE targetvariants (
+            geno_index UINTEGER,
+            chr_name TEXT,
+            chr_pos UINTEGER,
+            ref TEXT,
+            alts TEXT[],
+            zarr_group TEXT,
+            sampleset TEXT
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO targetvariants VALUES (?, ?, ?, ?, ?, ?, ?);",
+        _REASON_TARGET_ROWS,
+    )
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=match_multiallelic,
+        match_flipped=match_flipped,
+        sampleset="test",
+    )
+    add_match_log(conn, sampleset="test", min_overlap=0.1)
+
+    # cast to sort alphabetically: both columns are enums, so their natural order is
+    # the order they were declared in
+    summary = conn.execute("""
+        SELECT match_summary, exclusion_reason, is_multiallelic, count
+        FROM summary_log_table
+        ORDER BY match_summary::VARCHAR, exclusion_reason::VARCHAR, is_multiallelic;
+    """).fetchall()
+    conn.close()
+    return summary
+
+
+def test_summary_log_splits_exclusions_by_reason():
+    """One 'excluded' count is several decisions, and each has a different fix"""
+    assert _summary_of_every_reason(match_multiallelic=False) == [
+        ("excluded", "ambiguous", False, 1),
+        ("excluded", "collision", False, 2),
+        ("excluded", "multiallelic", True, 1),
+        ("matched", None, False, 2),
+        ("unmatched", None, False, 1),
+    ]
+
+
+def test_ignoring_strand_flips_adds_a_reason_of_its_own():
+    """A flipped match becomes an excluded row that names the flag that dropped it,
+    not an unmatched row: the variant was found, and policy discarded it
+    (docs/adr/0011)."""
+    assert _summary_of_every_reason(match_multiallelic=False, match_flipped=False) == [
+        ("excluded", "ambiguous", False, 1),
+        ("excluded", "collision", False, 2),
+        ("excluded", "multiallelic", True, 1),
+        ("excluded", "strand_flip", False, 1),
+        ("matched", None, False, 1),
+        ("unmatched", None, False, 1),
+    ]
+
+
+def test_keeping_multiallelics_leaves_the_other_reasons_alone():
+    """Raising the flag empties one reason's count without touching the others, and
+    the variant stays flagged multiallelic now that it's matched: the flag describes
+    the target variant, the reason describes the decision."""
+    assert _summary_of_every_reason(match_multiallelic=True) == [
+        ("excluded", "ambiguous", False, 1),
+        ("excluded", "collision", False, 2),
+        ("matched", None, False, 2),
+        ("matched", None, True, 1),
+        ("unmatched", None, False, 1),
+    ]
+
+
 def test_match_flipped_counts_strand_flips():
     """match_type_enum values are uppercase and duckdb's LIKE is case sensitive."""
     rows = [(0, "REFALT_FLIP", False, False), (1, "ALTREF_FLIP", False, False)]
@@ -379,3 +521,91 @@ def test_match_flipped_counts_strand_flips():
     ).fetchone() == (2,)
 
     conn.close()
+
+
+# matched_effect_allele goes through the SQL macro, and matching goes through the
+# Python function. These run the whole way from a scoring file row to a log row, so a
+# macro that disagreed with the matcher would show up here rather than in neither
+# test (docs/adr/0011).
+
+_FLIP_SCORE_ROWS = [
+    # a SNP read on the other strand: revcomp(A) = T is the reference allele
+    ("1", 100, "A", "C", 0.1, "additive", False, "PGS000001", 0),
+    # the same score variant where revcomp(A) = T is the *alternative* allele. Which
+    # target allele it resolved to differs, the score allele that was read does not
+    ("1", 200, "A", "C", 0.2, "additive", False, "PGS000001", 1),
+    # a genuine strand flip of a multi-base target: revcomp(AC) = GT, revcomp(CC) = GG
+    ("1", 300, "AC", "CC", 0.3, "additive", False, "PGS000001", 2),
+    # the plain complement of the same score variant, complement(AC) = TG. This used
+    # to match REFALT_FLIP, against a target that is not what the other strand carries
+    ("1", 400, "AC", "CC", 0.4, "additive", False, "PGS000001", 3),
+]
+_FLIP_TARGET_ROWS = [
+    (5, "1", 100, "T", ["G"], _SHARD, "test"),
+    (6, "1", 200, "G", ["T"], _SHARD, "test"),
+    (7, "1", 300, "GT", ["GG"], _SHARD, "test"),
+    (8, "1", 400, "TG", ["GG"], _SHARD, "test"),
+]
+
+
+def test_matched_effect_allele_names_the_allele_the_match_resolved_to():
+    conn = duckdb.connect(":memory:")
+    conn.execute("""
+        CREATE TABLE score_variant_table (
+            chr_name VARCHAR,
+            chr_position UINTEGER,
+            effect_allele VARCHAR,
+            other_allele VARCHAR,
+            effect_weight DOUBLE,
+            effect_type VARCHAR,
+            is_duplicated BOOLEAN,
+            accession VARCHAR,
+            row_nr UINTEGER,
+            PRIMARY KEY(row_nr, accession)
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO score_variant_table VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        _FLIP_SCORE_ROWS,
+    )
+    conn.execute("""
+        CREATE TABLE targetvariants (
+            geno_index UINTEGER,
+            chr_name TEXT,
+            chr_pos UINTEGER,
+            ref TEXT,
+            alts TEXT[],
+            zarr_group TEXT,
+            sampleset TEXT
+        );
+    """)
+    conn.executemany(
+        "INSERT INTO targetvariants VALUES (?, ?, ?, ?, ?, ?, ?);",
+        _FLIP_TARGET_ROWS,
+    )
+    update_match_table(
+        conn=conn,
+        match_ambiguous=False,
+        match_multiallelic=False,
+        match_flipped=True,
+        sampleset="test",
+    )
+    add_match_log(conn, sampleset="test", min_overlap=0.1)
+
+    log = conn.execute("""
+        SELECT row_nr, match_type, target_ref, target_alts, matched_effect_allele
+        FROM score_log_table ORDER BY row_nr;
+    """).fetchall()
+    conn.close()
+
+    assert log == [
+        # the effect allele resolved to the reference allele of the target
+        (0, "REFALT_FLIP", "T", ["G"], "T"),
+        # ...and here to its alternative allele. The macro used to read the *other*
+        # allele in this branch and report G, the allele this variant didn't match
+        (1, "ALTREF_FLIP", "G", ["T"], "T"),
+        (2, "REFALT_FLIP", "GT", ["GG"], "GT"),
+        # a plain complement is not a strand flip: the target variant is still logged,
+        # because the position matched, but no allele of it was resolved to
+        (3, "NO_MATCH", "TG", ["GG"], None),
+    ]

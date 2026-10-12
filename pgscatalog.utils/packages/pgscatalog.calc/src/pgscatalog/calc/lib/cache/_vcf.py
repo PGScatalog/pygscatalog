@@ -268,10 +268,19 @@ def run_bcftools_view(
     logger.info(f"Running bcftools view: {target_path} saved to {variant_buffer.name}")
     start = time.perf_counter()
     # variant buffer is a temporary uncompressed bcf file
-    # --exclude-types: excludes symbolic alleles (see man bcftools, basically not
-    #   snp / mnp / indel)
+    # --exclude-types other: drops a record only when none of its alleles is a
+    #   snp / mnp / indel (see man bcftools). It does not strip symbolic alleles from
+    #   a record that also carries a sequence allele - a `G,<NON_REF>` record passes
+    #   it untouched, verified against bcftools - so nothing here promises the allele
+    #   list is ACGT-only. The matcher skips alleles it can't read instead
     # --exclude-uncalled: only include sites with at least one non-missing genotype
     # --write-index: suppress annoying htslib warnings when working with the file
+    # --min-alleles 2: skip sites declaring no ALT at all, which carry no dosage.
+    #   There is deliberately no --max-alleles: multiallelic records are ingested
+    #   with their full allele list (ADR 0010). Filtering them here doesn't just lose
+    #   them, it misreports them - the position never enters seen_positions, so it's
+    #   padded with ref=None and the match log calls a variant that was found
+    #   unmatched
 
     # handle odd index cases https://github.com/samtools/bcftools/issues/984
     # e.g. symlinked to different directories
@@ -291,10 +300,7 @@ def run_bcftools_view(
         "other",
         "--exclude-uncalled",
         "--write-index",
-        # don't ingest multiallelics in RC1
         "--min-alleles",
-        "2",
-        "--max-alleles",
         "2",
         catch_stdout=False,
     )

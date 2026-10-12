@@ -29,6 +29,42 @@ NUMPY_STRING_DTYPE = StringDType()
 # further than the VCF reader, which can't tell a `.` from a missing Y
 VALID_CHROMOSOMES = {str(x) for x in range(1, 23)}.union({"X", "Y", "MT", None})
 
+# characters that can't appear in a plain base sequence, and so mark out the VCF
+# alleles that name no sequence at all: the spanning deletion (*), symbolic alleles
+# (<NON_REF>, <DEL>, ...), breakends (]13:123]T, T[2:456[, .TAGT) and the missing
+# allele (.). This is what separates a legal allele no score can match from a corrupt
+# one: XYZ contains none of these, so it stays a ValueError.
+_NON_SEQUENCE_CHARACTERS: frozenset[str] = frozenset("*<>[].")
+
+
+@cache
+def is_unmatchable_allele(allele: str) -> bool:
+    """Is this a legal VCF allele that names no sequence to match against?
+
+    Such alleles are kept in place and skipped at match time, never filtered away:
+    a genotype call names its alleles by index, so dropping one renames every allele
+    after it (docs/adr/0010).
+
+    Shared by the cache layer, which stores such an allele as written instead of
+    refusing the record, and by the matcher, which skips it. Both layers import it
+    from here so they agree on what is unmatchable by construction: the cache is the
+    portable interface below scoring, so it cannot import the rule from the matcher.
+
+    >>> is_unmatchable_allele("*")  # spanning deletion
+    True
+    >>> is_unmatchable_allele("<NON_REF>")  # symbolic allele
+    True
+    >>> is_unmatchable_allele("A"), is_unmatchable_allele("GATC")
+    (False, False)
+
+    Corrupt allele strings aren't unmatchable, they're wrong, and are left to raise:
+
+    >>> is_unmatchable_allele("XYZ")
+    False
+    """
+    return not _NON_SEQUENCE_CHARACTERS.isdisjoint(allele)
+
+
 # dialects that survive stripping a chr prefix and zero padding. XY collapses into X
 # because pseudoautosomal variants are ordinary X variants (ADR 0008), and 23-26 are
 # plink's numeric codes

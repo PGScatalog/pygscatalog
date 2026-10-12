@@ -2,15 +2,16 @@
 
 Open work only. A ticket is deleted when it lands — the commit that closes it is its record, and `git log -- docs/tickets/` finds the ones that are gone. Decisions that outlive the work belong in `docs/adr/`, not here.
 
-Derived from ADRs 0001, 0003, 0004, and 0007–0009. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
+Derived from ADRs 0001, 0003, 0004, and 0007–0011. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
 
 ## Open
 
-X, Y and MT support (0019–0025) has landed, along with 0026, the ploidy bug it uncovered. What's left is the other one.
+None. X, Y and MT support (0019–0025) landed first, leaving two bugs it uncovered
+(0026, 0027); multiallelic handling (ADR 0010) added 0028–0032; implementing those
+uncovered two more (0033, 0034), both crashes or wrong answers on `main`
+independently of multiallelic support; and 0035 ported v2's `--ignore_strand_flips`.
 
-| # | Ticket | Depends on |
-|---|---|---|
-| 0027 | [Two scoring variants at one canonical position silently lose a weight](0027-duplicate-canonical-position-loses-a-weight.md) | — |
+Two decisions taken while closing them are recorded rather than lost: a wholly missing VCF call keeps the ploidy its `GT` declares, guarded where nothing at the variant is hemizygous ([ADR 0007](../adr/0007-ploidy-is-observed-per-call.md)), and a strand flip is a reverse complement that an indel declines ([ADR 0011](../adr/0011-strand-flips-are-reverse-complements-and-optional.md)).
 
 ## Not in this repo
 

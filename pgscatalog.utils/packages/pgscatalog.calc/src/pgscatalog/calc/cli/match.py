@@ -65,6 +65,18 @@ def add_match_args(parser: argparse.ArgumentParser) -> None:
         """,
     )
     parser.add_argument(
+        "--ignore_strand_flips",
+        dest="match_flipped",
+        action="store_false",
+        help="""
+            Flag to not consider matched variants that may be reported on the
+            opposite strand. Default behaviour is to check whether unmatched
+            variants match a reverse complemented reading of themselves. Variants
+            that only match that way are excluded, and the match log says so.
+        """,
+        required=False,
+    )
+    parser.add_argument(
         "--batch_size",
         type=check_positive,
         default=5_000,
@@ -95,6 +107,7 @@ def match_cli(args: argparse.Namespace) -> None:
     chromosome = stage.match_variants(
         match_multiallelic=args.keep_multiallelic,
         match_ambiguous=args.keep_ambiguous,
+        match_flipped=args.match_flipped,
     )
 
     stage.export_match_table(out_dir / "matches.parquet")

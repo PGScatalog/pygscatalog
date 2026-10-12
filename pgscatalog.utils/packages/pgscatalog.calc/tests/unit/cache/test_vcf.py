@@ -1,6 +1,12 @@
+import gzip
+import pathlib
+from itertools import product
+
 import numpy as np
 import pysam
 import pytest
+import zarr
+import zarr.storage
 
 from pgscatalog.calc.lib.cache._vcf import (
     region_sort_key,
@@ -8,6 +14,8 @@ from pgscatalog.calc.lib.cache._vcf import (
     vcf_get_genotypes,
     vcf_get_sample_list,
 )
+from pgscatalog.calc.lib.cache.genotypecache import meta_group_path
+from pgscatalog.calc.lib.cache.targetgenome import TargetGenome
 from pgscatalog.calc.lib.cache.targetvariants import (
     TargetVariants,
 )
@@ -16,6 +24,7 @@ from pgscatalog.calc.lib.constants import (
     MISSING_GENOTYPE_TUPLE,
     NO_ALLELE_SENTINEL_VALUE,
 )
+from pgscatalog.calc.lib.score.match import MatchStage
 
 HEMIZYGOUS_NO_CALL = (MISSING_GENOTYPE_SENTINEL_VALUE, NO_ALLELE_SENTINEL_VALUE)
 
@@ -37,6 +46,51 @@ def one_variant(tmp_path, calls: list[str]) -> pysam.VariantRecord:
 
     with pysam.VariantFile(str(path)) as vcf:
         return next(iter(vcf))
+
+
+def indexed_target(
+    tmp_path,
+    calls: list[str],
+    alts: str = "C,G",
+    name: str = "multiallelic",
+    ref: str = "A",
+) -> tuple[pathlib.Path, pathlib.Path]:
+    """An indexed one-variant target holding `A -> {alts}` at 1:100
+
+    Written as text and indexed, so bcftools sees exactly the record a writer would
+    have emitted and the filters under test get a chance to drop it.
+    """
+    path = tmp_path / f"{name}.vcf"
+    samples = "\t".join(f"sample{i}" for i in range(len(calls)))
+    with path.open("w") as f:
+        f.write(VCF_HEADER.format(samples=samples))
+        f.write(f"1\t100\t.\t{ref}\t{alts}\t.\t.\t.\tGT\t" + "\t".join(calls) + "\n")
+
+    compressed = pathlib.Path(pysam.tabix_index(str(path), preset="vcf", force=True))
+    return compressed, pathlib.Path(str(compressed) + ".tbi")
+
+
+def multiallelic_target(
+    tmp_path, calls: list[str]
+) -> tuple[pathlib.Path, pathlib.Path]:
+    """An indexed one-variant target holding `A -> C,G` at 1:100"""
+    return indexed_target(tmp_path, calls)
+
+
+def scorefile_at_1_100(tmp_path) -> pathlib.Path:
+    """One score variant at 1:100, `A` with other allele `C`
+
+    The alleles are the ones a real scoring file would carry: the target record under
+    test declares no sequence to match them against.
+    """
+    path = tmp_path / "PGS999991.txt.gz"
+    with gzip.open(path, "wt") as f:
+        f.write(
+            "chr_name\tchr_position\teffect_allele\tother_allele\teffect_weight\t"
+            "effect_type\tis_duplicated\taccession\trow_nr\n"
+        )
+        f.write("1\t100\tA\tC\t1.0\tadditive\tFalse\tPGS999991\t0\n")
+    return path
 
 
 @pytest.fixture
@@ -251,3 +305,196 @@ def test_vcf_buffer_x_variants(
     assert {tuple(np.bincount(row, minlength=3)[1:]) for row in ploidy[genotyped]} == {
         (1599, 1603)
     }
+
+
+# Test 2.4: multiallelic records (ADR 0010)
+def test_a_multiallelic_record_reaches_the_cache(
+    tmp_path, tmp_path_factory, sampleset_name
+):
+    """`--max-alleles 2` dropped the record before the cache existed, which made
+    `--keep_multiallelic` unreachable code (ADR 0010).
+
+    Alleles are positional - a call names the allele it carries by index - so the
+    whole ALT column is kept in the order the record declared it, and a `2` still
+    means the second alternative allele.
+    """
+    target, index = multiallelic_target(tmp_path, ["0/0", "0/1", "1/2", "2/2"])
+
+    variants = vcf_buffer_variants(
+        position_batch=[("1", 100)],
+        target_path=target,
+        index_path=index,
+        cache_dir=tmp_path_factory.mktemp("cache"),
+        sampleset=sampleset_name,
+    )
+
+    assert len(variants) == 1
+    assert variants.variant_metadata.ref == ["A"]
+    assert variants.variant_metadata.alts == [["C", "G"]]
+    assert variants.variant_ids == ["1:100:A:C/G"]
+    np.testing.assert_array_equal(
+        variants.genotypes[0], [[0, 0], [0, 1], [1, 2], [2, 2]]
+    )
+
+
+def test_a_multiallelic_position_is_not_padded_absent(
+    tmp_path, tmp_path_factory, sampleset_name
+):
+    """A filtered record never entered `seen_positions`, so it was padded with
+    `ref=None` - and `update_match_table`'s `WHERE target.ref IS NOT NULL` then
+    dropped it, telling the user a variant wasn't found in data that held it.
+
+    A position genuinely absent from the target is still padded, which is the row
+    this has to be told apart from.
+    """
+    target, index = multiallelic_target(tmp_path, ["0/1", "1/2"])
+
+    variants = vcf_buffer_variants(
+        position_batch=[("1", 100), ("1", 200)],
+        target_path=target,
+        index_path=index,
+        cache_dir=tmp_path_factory.mktemp("cache"),
+        sampleset=sampleset_name,
+    )
+
+    metadata = variants.variant_metadata
+    assessed = metadata.chr_pos.index(100)
+    absent = metadata.chr_pos.index(200)
+
+    assert metadata.ref[assessed] == "A"
+    assert metadata.alts[assessed] == ["C", "G"]
+    assert metadata.ref[absent] is None
+    assert metadata.alts[absent] is None
+
+
+def test_a_multiallelic_call_round_trips_through_the_cache(
+    tmp_path, tmp_path_factory, sampleset_name
+):
+    """A `1/2` call has to survive the write to zarr and the read back out of it:
+    dosage counts calls equal to an allele index, so an index that shifts on the way
+    through would count a different allele"""
+    target, index = multiallelic_target(tmp_path, ["0/0", "1/2"])
+    cache_dir = tmp_path_factory.mktemp("cache")
+
+    genome = TargetGenome(
+        target_path=target,
+        target_index_path=index,
+        cache_dir=cache_dir,
+        sampleset=sampleset_name,
+    )
+    genome.cache_variants([("1", 100)])
+
+    store = zarr.storage.LocalStore(cache_dir / "genotypes.zarr")
+    group = zarr.open_group(store=store, path=f"{sampleset_name}/ALL/{target.name}")
+    meta = zarr.open_group(store=store, path=meta_group_path(group.path))
+
+    alts = [x.decode() if isinstance(x, bytes) else x for x in meta["alts"][...]]
+    assert alts == ["C/G"]
+    np.testing.assert_array_equal(group["genotypes"][...], [[[0, 0], [1, 2]]])
+
+
+# Test 2.5: alleles no score can match (ADR 0010, ticket 0033)
+def test_a_spanning_deletion_reaches_the_cache(
+    tmp_path, tmp_path_factory, sampleset_name
+):
+    """`is_valid_allele` refused anything outside ACGT at cache write, so a legal
+    `A/*` record raised before the matcher - which already skips such alleles - could
+    see it. The allele is stored as written instead"""
+    target, index = indexed_target(tmp_path, ["0/0", "0/1"], alts="*", name="spanning")
+
+    variants = vcf_buffer_variants(
+        position_batch=[("1", 100)],
+        target_path=target,
+        index_path=index,
+        cache_dir=tmp_path_factory.mktemp("cache"),
+        sampleset=sampleset_name,
+    )
+
+    assert variants.variant_metadata.ref == ["A"]
+    assert variants.variant_metadata.alts == [["*"]]
+
+
+def test_an_unmatchable_allele_keeps_its_position(
+    tmp_path, tmp_path_factory, sampleset_name
+):
+    """Dropping `*` from `A -> C,*` would renumber nothing here, but dropping it from
+    the middle of a longer list would: a call names its allele by index, so the whole
+    ALT column is kept in the order the record declared it and allele 2 still means
+    `*` rather than being renumbered onto `C` (ADR 0010)"""
+    target, index = indexed_target(
+        tmp_path, ["0/1", "1/2", "2/2"], alts="C,*", name="spanning_multiallelic"
+    )
+
+    variants = vcf_buffer_variants(
+        position_batch=[("1", 100)],
+        target_path=target,
+        index_path=index,
+        cache_dir=tmp_path_factory.mktemp("cache"),
+        sampleset=sampleset_name,
+    )
+
+    assert variants.variant_metadata.alts == [["C", "*"]]
+    np.testing.assert_array_equal(variants.genotypes[0], [[0, 1], [1, 2], [2, 2]])
+
+
+def test_a_spanning_deletion_loads_and_is_reported_unmatched(tmp_path, sampleset_name):
+    """Ticket 0028's second acceptance criterion, driven through LOAD and MATCH.
+
+    The matcher has skipped unmatchable alleles since 0028, but never saw one: LOAD
+    refused the record first, so the only way to reach the behaviour was to call
+    `update_match_table` directly. A record at a scoring file position now caches and
+    is reported unmatched, which is what the user needs to be told - the position was
+    interrogated and nothing there is a candidate for their score variant.
+    """
+    target, index = indexed_target(tmp_path, ["0/0", "0/1"], alts="*", name="spanning")
+    scorefile = scorefile_at_1_100(tmp_path)
+
+    out_dir = tmp_path / "match"
+    out_dir.mkdir()
+    scratch = out_dir / "scratch"
+    scratch.mkdir()
+
+    TargetGenome(
+        target_path=target,
+        target_index_path=index,
+        cache_dir=scratch,
+        sampleset=sampleset_name,
+    ).cache_variants([("1", 100)])
+
+    stage = MatchStage(out_dir=out_dir, max_memory_gb=1, threads=1)
+    stage.load_scores(scorefile)
+    stage.match_variants()
+
+    with stage._db.connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                match_result.match_type    AS match_type,
+                match_result.match_summary AS match_summary,
+                match_result.is_matched    AS is_matched
+            FROM allele_match_table;
+            """
+        ).fetchall()
+
+    assert rows == [("NO_MATCH", "unmatched", False)]
+
+
+@pytest.mark.parametrize("n_alts", [253, 254, 255])
+def test_multiallelic_indices_cannot_overlap_sentinels(tmp_path, n_alts):
+    alts = ["".join(bases) for bases in product("ACGT", repeat=4)][1 : n_alts + 1]
+    target, index = indexed_target(
+        tmp_path, [f"{n_alts}/{n_alts}", "0/0"], alts=",".join(alts), ref="AAAA"
+    )
+    kwargs = {
+        "position_batch": [("1", 100)],
+        "target_path": target,
+        "index_path": index,
+        "cache_dir": tmp_path,
+        "sampleset": "test",
+    }
+    if n_alts >= 254:
+        with pytest.raises(ValueError, match="reserved for genotype sentinels"):
+            vcf_buffer_variants(**kwargs)
+    else:
+        variants = vcf_buffer_variants(**kwargs)
+        assert variants.genotypes[0, 0].tolist() == [253, 253]
