@@ -287,15 +287,21 @@ def test_calculate_score_statistics_tiny(
             CREATE TABLE allele_match_raw (
                 sampleset TEXT,
                 accession TEXT,
+                row_nr UINTEGER,
+                zarr_group TEXT,
                 match_summary TEXT
             );
             """
         )
+        # one scoring variant matched in two shards: n_matched counts variants,
+        # not match rows, so it stays 1
         conn.sql(
             """
             INSERT INTO allele_match_raw VALUES
-                ('test', 'PGS000001', 'matched'),
-                ('test', 'PGS999999', 'matched');
+                ('test', 'PGS000001', 0, 'test/1/a.vcf.gz', 'matched'),
+                ('test', 'PGS000001', 0, 'test/1/b.vcf.gz', 'matched'),
+                ('test', 'PGS999999', 0, 'test/1/a.vcf.gz', 'matched'),
+                ('test', 'PGS999999', 0, 'test/1/b.vcf.gz', 'matched');
             """
         )
 
@@ -306,6 +312,8 @@ def test_calculate_score_statistics_tiny(
             SELECT
                 sampleset,
                 accession,
+                row_nr,
+                zarr_group,
                 struct_pack(match_summary := match_summary) AS match_result
             FROM allele_match_raw;
             """

@@ -5,12 +5,12 @@ import atexit
 import contextlib
 import logging
 import logging.handlers
+import pathlib
 import shutil
 import subprocess
 from dataclasses import dataclass
 from itertools import batched
 from shutil import rmtree
-from typing import TYPE_CHECKING
 
 import zarr
 import zarr.storage
@@ -26,9 +26,6 @@ from pgscatalog.calc import (
     TargetGenome,
 )
 from pgscatalog.calc.lib.config import config
-
-if TYPE_CHECKING:
-    import pathlib
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +56,31 @@ class AnnotatedGenomePath:
 
         return cls(path=path, chrom=chrom)
 
+    @property
+    def leaf_path(self) -> str:
+        """Where this input lands in the cache hierarchy, below the sampleset"""
+        return f"{self.chrom or 'ALL'}/{pathlib.Path(self.path).name}"
+
+
+def check_leaf_paths(targets: list[AnnotatedGenomePath]) -> None:
+    """Check inputs don't collide in the cache hierarchy before launching any work
+
+    Directories are stripped from input paths, so two files with the same basename
+    on the same chromosome share a zarr leaf group. LOAD is fanned out per shard,
+    so the collision would only appear when the per-shard archives are merged, and
+    one leaf would silently overwrite the other (ADR 0003).
+    """
+    seen: dict[str, str] = {}
+
+    for target in targets:
+        if (clash := seen.get(target.leaf_path)) is not None:
+            raise ValueError(
+                f"Target genomes {clash!r} and {target.path!r} both cache to "
+                f"{target.leaf_path!r}. Directories are stripped from input paths, "
+                "so rename one file or stage it with a unique name (stageAs)."
+            )
+        seen[target.leaf_path] = target.path
+
 
 def parse_genome_paths(
     target_genomes: list[str],
@@ -66,9 +88,12 @@ def parse_genome_paths(
     sampleset: str,
     bgen_sample_file: Pathish | None,
 ) -> list[TargetGenome]:
-    targets: list[AnnotatedGenomePath] = list(
-        {AnnotatedGenomePath.from_string(x) for x in target_genomes}
+    targets: list[AnnotatedGenomePath] = sorted(
+        {AnnotatedGenomePath.from_string(x) for x in target_genomes},
+        key=lambda x: (x.path, x.chrom or ""),
     )
+
+    check_leaf_paths(targets)
 
     genomes = []
 
@@ -91,19 +116,6 @@ def check_chromosomes(target_genomes: list[TargetGenome]) -> None:
     """Check chromosomes are valid before launching any work"""
     if not {x.chrom for x in target_genomes}.issubset(VALID_CHROMOSOMES):
         raise NotImplementedError("Chromosomes 1-22 supported but this will be fixed")
-
-    is_chrom_split = all(x.chrom is not None for x in target_genomes)
-
-    logger.info(f"{is_chrom_split=}")
-
-    if not is_chrom_split and len(target_genomes) > 1:
-        logger.critical(
-            "Unsplit chromosome detected but more than one VCF is set in "
-            f"--target_genomes {target_genomes=}"
-        )
-        raise TypeError(
-            "Missing chromosome information in file path (try --help for details)"
-        )
 
 
 def load_cli(args: argparse.Namespace) -> None:
@@ -177,6 +189,12 @@ def load_cli(args: argparse.Namespace) -> None:
                 f"Processing batch {i} of {len(position_batches)} ({args.batch_size=})"
             )
             target_genome.cache_variants(positions)
+
+        # record the declaration on the leaf, not the sampleset: LOAD is fanned out
+        # per shard and merging the zips is last-write-wins on an ancestor zarr.json,
+        # so a sampleset-level attr would swallow a contradictory declaration instead
+        # of letting MATCH detect it (docs/tickets/0006, ADR 0004)
+        target_genome.zarr_group.attrs["absence_semantics"] = args.absence_semantics
 
     # prepare to move the zarr array into a read-only single file archive
     logger.info("Packaging zarr zip store")
@@ -255,13 +273,11 @@ def unzip_zarr(
     if group_path is not None:
         logger.info(f"Only extracting {group_path=} from zip")
         cmd.append(f"-ir!{group_path}/*")
-        # also unzip the zarr.json file for the root and sampleset groups
+        # also unzip the zarr.json file of every ancestor group
         # otherwise the zarr hierarchy won't parse properly for downstream processes
-        root_zarr_json = group_path.split("/")[0] + "/zarr.json"
-        sampleset_zarr_json = "/".join(group_path.split("/")[0:2]) + "/zarr.json"
-
-        for x in (root_zarr_json, sampleset_zarr_json):
-            cmd.append(x)
+        parts = group_path.split("/")
+        for i in range(1, len(parts)):
+            cmd.append("/".join(parts[:i]) + "/zarr.json")
 
     logger.info(f"Running subprocess {cmd=}")
     result = subprocess.run(cmd, check=True, capture_output=True, text=True)

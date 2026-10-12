@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_wide_weights_table(
-    db_path: Pathish, sampleset: str, accessions: list[str]
+    db_path: Pathish, sampleset: str, accessions: list[str], zarr_group: str
 ) -> list[str]:
     """
     Create a weight matrix and supporting information in the wide_weights_table table.
@@ -34,6 +34,11 @@ def create_wide_weights_table(
         Path to the DuckDB database file.
     sampleset : str
         Identifier for the set of samples to pivot.
+    zarr_group : str
+        The shard being scored. The match table is genome-wide and holds one row
+        per scoring variant per shard, so scoping to this task's shard is what
+        keeps `long_scores_temp`'s (accession, row_nr) key valid and stops weights
+        being built for groups that aren't staged here.
 
     Notes
     -----
@@ -55,7 +60,7 @@ def create_wide_weights_table(
                 target_row_nr UBIGINT NOT NULL,
                 -- UINT8: indexes are always teeny tiny, save space in these big arrays
                 effect_allele_idx UINT8,
-                filename VARCHAR,
+                zarr_group VARCHAR,
                 effect_weight DOUBLE NOT NULL,
                 -- each score variant must only have one row
                 PRIMARY KEY (accession, row_nr)
@@ -73,17 +78,22 @@ def create_wide_weights_table(
                s.row_nr,
                m.target_row_nr,
                m.match_result.effect_allele_idx AS effect_allele_idx,
-               m.filename,
+               m.zarr_group,
                s.effect_weight
         FROM score_variant_table s
         JOIN allele_match_table m ON s.row_nr = m.row_nr
             AND s.accession = m.accession
             AND m.sampleset = $sampleset
+            AND m.zarr_group = $zarr_group
         WHERE effect_allele_idx IS NOT NULL AND
             m.accession IN $accession
         ORDER BY m.target_row_nr;
         """,
-            {"sampleset": sampleset, "accession": accessions},
+            {
+                "sampleset": sampleset,
+                "accession": accessions,
+                "zarr_group": zarr_group,
+            },
         )
 
         logger.info("Pivoting long scores to create weight matrix")
@@ -106,7 +116,7 @@ def create_wide_weights_table(
                 */
                 GROUP BY
                     sampleset,
-                    filename,
+                    zarr_group,
                     is_recessive,
                     is_dominant,
                     target_row_nr,
@@ -114,9 +124,18 @@ def create_wide_weights_table(
                 ORDER BY target_row_nr
             )
             SELECT
-                row_number() OVER ()  - 1 AS weight_mat_row_nr,
-                concat_ws('/', sampleset, filename) AS zarr_group,
-                * EXCLUDE(sampleset, filename)
+                /*
+                weight_mat_row_nr indexes rows of the dosage array, which is written
+                group-major. target_row_nr is shard-local (it's geno_index), so
+                ordering by it alone interleaves shards and the index stops pointing
+                at the row it names. effect_allele_idx breaks ties within a variant
+                (the REFALT/ALTREF case above), so this is a total order and agrees
+                with get_variant_metadata / get_weight_matrix.
+                */
+                row_number() OVER (
+                    ORDER BY zarr_group, target_row_nr, effect_allele_idx
+                ) - 1 AS weight_mat_row_nr,
+                * EXCLUDE(sampleset)
             FROM pivoted_scores;
             """)
 
@@ -139,15 +158,21 @@ def create_wide_weights_table(
         """)
 
         zarr_groups = conn.sql("""
+        -- same order as weight_mat_row_nr, so callers walk the groups group-major
         SELECT DISTINCT zarr_group
-        FROM wide_score_variants;
+        FROM wide_score_variants
+        ORDER BY zarr_group;
         """).fetchall()
 
         return [x for xs in zarr_groups for x in xs]
 
 
 def store_group_weight_arrays(
-    db_path: Pathish, sampleset: str, pgs_group: zarr.Group, accessions: list[str]
+    db_path: Pathish,
+    sampleset: str,
+    pgs_group: zarr.Group,
+    accessions: list[str],
+    zarr_group: str,
 ) -> dict[str, pl.DataFrame]:
     """Generate weight matrices for each zarr group by pivoting scoring file weights
     from long to wide form.
@@ -168,6 +193,8 @@ def store_group_weight_arrays(
         Writable zarr group for this sampleset
     accessions : list[str]
         List of accessions to pivot (must pass match rate)
+    zarr_group : str
+        The shard being scored
 
     Returns
     -------
@@ -176,7 +203,10 @@ def store_group_weight_arrays(
         which is used to calculate dosage.
     """
     group_paths = create_wide_weights_table(
-        db_path=db_path, sampleset=sampleset, accessions=accessions
+        db_path=db_path,
+        sampleset=sampleset,
+        accessions=accessions,
+        zarr_group=zarr_group,
     )
 
     metadata_dfs = []
@@ -211,8 +241,8 @@ def store_results_in_zarr(
     conn : duckdb.DuckDBPyConnection
         Active DuckDB connection containing the `wide_score_variants` table.
     group_path : str
-        Identifier for the Zarr group. This value corresponds to the
-        `sampleset/filename` combination used during pivoting.
+        Identifier for the Zarr group: the shard's path relative to the store
+        root (`sampleset/chromosome/filename`).
     """
     logger.info(f"Getting weight matrix for {group_path=}")
     logger.info(f"{config.ZARR_VARIANT_CHUNK_SIZE=} {config.ZARR_COMPRESSOR=}")
@@ -277,7 +307,7 @@ def get_variant_metadata(db_path: Pathish, group_path: str) -> pl.DataFrame:
                    is_dominant
             FROM wide_score_variants
             WHERE zarr_group = $zarr_group
-            ORDER BY target_row_nr
+            ORDER BY target_row_nr, effect_allele_idx
             """,
             {"zarr_group": group_path},
         ).pl()
@@ -319,7 +349,7 @@ def get_weight_matrix(
                 is_dominant)
             FROM wide_score_variants
             WHERE zarr_group = $zarr_group
-            ORDER BY target_row_nr
+            ORDER BY target_row_nr, effect_allele_idx
             """,
             {"zarr_group": group_path},
         ).fetchnumpy()

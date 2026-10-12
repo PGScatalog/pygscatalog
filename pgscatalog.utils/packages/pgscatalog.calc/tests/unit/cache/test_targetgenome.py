@@ -60,7 +60,8 @@ def test_targetgenome(
     assert target.chrom is None
 
     # zarr layout
-    assert target.zarr_group.path == f"{sampleset_name}/{target_path.name}"
+    # unsplit input lands under the ALL sentinel chromosome
+    assert target.zarr_group.path == f"{sampleset_name}/ALL/{target_path.name}"
     assert target._zarr_archive_name == cache_dir / "genotypes.zarr"
     assert target._zarr_archive_name.exists()
 

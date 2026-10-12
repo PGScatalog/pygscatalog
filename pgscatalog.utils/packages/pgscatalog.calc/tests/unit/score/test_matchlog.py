@@ -70,7 +70,7 @@ def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
             chr_pos UINTEGER,
             ref TEXT,
             alts TEXT[],
-            filename TEXT,
+            zarr_group TEXT,
             sampleset TEXT
         );
     """)
@@ -79,10 +79,10 @@ def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
     conn.execute(
         """
         INSERT INTO targetvariants
-        (geno_index, chr_name, chr_pos, ref, alts, filename, sampleset)
+        (geno_index, chr_name, chr_pos, ref, alts, zarr_group, sampleset)
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """,
-        [10, "11", 69516650, "T", ["C"], "file.bgen", "test"],
+        [10, "11", 69516650, "T", ["C"], "test/ALL/file.bgen", "test"],
     )
 
     return conn
@@ -222,7 +222,6 @@ def _make_conn_from_json(
     Create a DuckDB DB with:
     - score_variant_table (from JSON)
     - allele_match_table (from JSON)
-    - create an empty targetvariants table
     """
     conn = duckdb.connect(str(db_path))
     _setup_enums(conn)
@@ -238,29 +237,15 @@ def _make_conn_from_json(
     )
 
     # Load the pre-defined test data allele_match_table
+    # target alleles are carried on the match table now, and this fixture predates
+    # them, so they log as NULL (which is what the old targetvariants join gave)
     conn.execute(
         """
         CREATE TABLE allele_match_table AS
-        SELECT * 
+        SELECT *, NULL::TEXT AS target_ref, NULL::TEXT[] AS target_alts
         FROM read_json(?, format='nd');
         """,
         [str(allele_match_table)],
-    )
-
-    # targetvariants table is needed, but left empty at here, so only the pre-defined data is used.
-
-    conn.execute(
-        """
-       CREATE TABLE targetvariants (
-           geno_index UINTEGER,
-           chr_name TEXT,
-           chr_pos UINTEGER,
-           ref TEXT,
-           alts TEXT[],
-           filename TEXT,
-           sampleset TEXT
-       );
-       """
     )
 
     return conn

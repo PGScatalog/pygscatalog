@@ -233,7 +233,9 @@ def calculate_score_statistics(
         for accession in accessions:
             query = conn.execute(
                 """
-            SELECT COUNT(*)
+            -- the match table has one row per shard, so count scoring variants
+            -- (this is the genome-wide count SCORE_COMBINE carries through)
+            SELECT COUNT(DISTINCT row_nr)
             FROM allele_match_table
             WHERE match_result.match_summary='matched' AND
                 sampleset = $sampleset AND

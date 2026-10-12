@@ -475,7 +475,7 @@ def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
             chr_pos UINTEGER,
             ref TEXT,
             alts TEXT[],
-            filename TEXT,
+            zarr_group TEXT,
             sampleset TEXT
         );
     """)
@@ -484,10 +484,10 @@ def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
     conn.execute(
         """
         INSERT INTO targetvariants
-        (geno_index, chr_name, chr_pos, ref, alts, filename, sampleset)
+        (geno_index, chr_name, chr_pos, ref, alts, zarr_group, sampleset)
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """,
-        [10, "11", 69516650, "T", ["C"], "file.bgen", "test"],
+        [10, "11", 69516650, "T", ["C"], "test/ALL/file.bgen", "test"],
     )
 
     return conn
@@ -519,7 +519,7 @@ def test_update_match_table(tmp_path, pgs000001) -> None:
             match_result.is_matched        AS is_matched,
             match_result.is_multiallelic   AS is_multiallelic,
             target_row_nr,
-            filename
+            zarr_group
         FROM allele_match_table;
         """
     ).fetchall()
@@ -538,6 +538,6 @@ def test_update_match_table(tmp_path, pgs000001) -> None:
             True,  # is_matched
             False,  # is_multiallelic
             10,  # target_row_nr (geno_index)
-            "file.bgen",  # filename
+            "test/ALL/file.bgen",  # zarr_group
         )
     ]
