@@ -139,13 +139,13 @@ def test_missingness_is_a_documented_policy_difference(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "filename,error",
     [
-        ("all_uncalled.chr1.vcf.gz", "No scores passed matching threshold"),
+        ("all_uncalled.chr1.vcf.gz", "no called alleles across the sampleset"),
         ("too_small.chr1.vcf.gz", "n_samples=4 is less than n_minimum_samples=50"),
     ],
 )
 def test_imputation_rejects_unsupported_inputs(filename, error, tmp_path, monkeypatch):
-    # LOAD removes entirely uncalled VCF sites, so the score fails matching. Four
-    # samples with missing calls instead fail the minimum sample count at SCORE.
+    # Entirely uncalled sites must survive LOAD and fail imputation explicitly.
+    # Four samples with missing calls fail the minimum sample count.
     # Neither case may produce fabricated zero scores.
     with pytest.raises(ValueError, match=error):
         run_case(
@@ -154,7 +154,7 @@ def test_imputation_rejects_unsupported_inputs(filename, error, tmp_path, monkey
     assert not (tmp_path / "score/0/partial_scores.parquet").exists()
     assert not (tmp_path / "combined/scores.txt.gz").exists()
     if filename.startswith("all_uncalled"):
-        assert pl.read_parquet(tmp_path / "match/0/matches.parquet").is_empty()
+        assert not pl.read_parquet(tmp_path / "match/0/matches.parquet").is_empty()
 
 
 @pytest.mark.parametrize("case,n_files", [("missingness", 11), ("zero_weight", 7)])

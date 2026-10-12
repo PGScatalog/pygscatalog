@@ -22,7 +22,7 @@ def _inputs(tmp_path, n_samples=60, all_missing=False):
         record = header.new_record(contig=chrom, start=9, alleles=("A", alt))
         for i, sample in enumerate(header.samples):
             if all_missing or i < 10:
-                gt = (None, None) if i else (0, None)
+                gt = (None, None)
             else:
                 allele = int(i >= 20) if chrom == "1" else int(i < 20)
                 gt = (allele, allele)
@@ -59,7 +59,7 @@ def test_sample_partitions_preserve_scores_and_dosages(
             _write_vcf(path, header, [record])
             sources.append((path, record.chrom))
     for source, chrom in sources:
-        # Unequal batches; the first has no complete calls at either variant.
+        # Unequal batches; the first has no called alleles at either variant.
         for i, batch in enumerate((samples[:10], samples[10:20], samples[20:])):
             path = tmp_path / f"{chrom}.batch{i}.vcf.gz"
             _subset_samples(source, path, batch)
@@ -105,3 +105,18 @@ def test_no_called_alleles_across_sampleset_names_variant(tmp_path, monkeypatch)
         ValueError, match="no called alleles across the sampleset.*1:10:A:G"
     ):
         run_serial([target], tmp_path / "run", scorefile, monkeypatch)
+
+
+def test_uncalled_variant_cannot_hide_below_overlap_threshold(tmp_path, monkeypatch):
+    _, scorefile, header, records = _inputs(tmp_path, all_missing=True)
+    for sample in header.samples:
+        records[1].samples[sample]["GT"] = (0, 1)
+    target = tmp_path / "partly_called.vcf.gz"
+    _write_vcf(target, header, records)
+    with pytest.raises(
+        ValueError, match="no called alleles across the sampleset.*1:10:A:G"
+    ):
+        run_serial(
+            [target], tmp_path / "run", scorefile, monkeypatch, min_overlap="0.4"
+        )
+    assert not (tmp_path / "run/scores.txt.gz").exists()
