@@ -29,6 +29,34 @@ def test_two_files_per_chromosome(grid_targets, scorefile, tmp_path, monkeypatch
         assert any(n.startswith(prefix + "genotypes/") for n in names), names[:5]
 
 
+def test_leaf_paths_hold_canonical_names(
+    chr_prefixed_target, scorefile, tmp_path, monkeypatch
+):
+    """Whatever dialect the input used, the cache is keyed by canonical names: the
+    hierarchy stays legible to a domain expert inspecting the store (ADR 0008)"""
+    # chr-prefixed in the samplesheet *and* in the file's own contigs
+    zip_path = load_target(
+        f"{chr_prefixed_target}:chr1", tmp_path / "cache", scorefile, monkeypatch
+    )
+
+    names = zipfile.ZipFile(zip_path).namelist()
+    prefix = _leaf_prefix("1", chr_prefixed_target.name)
+    assert any(n.startswith(prefix + "genotypes/") for n in names), names[:5]
+
+    # and the variant metadata under it, which MATCH joins scoring files against
+    extract_dir = tmp_path / "extracted"
+    extract_dir.mkdir()
+    unzip_zarr(zip_path, extract_dir)
+    store = zarr.storage.LocalStore(root=extract_dir / "genotypes.zarr")
+    root = zarr.open_group(store=store, mode="r")
+    meta = root[f"{SAMPLESET}/1/{chr_prefixed_target.name}/meta"]
+
+    assert set(meta["chr_name"][:]) == {"1"}
+    # back-filled sentinel rows carry a canonical name too, so check the leaf holds
+    # variants the reader actually found
+    assert any(ref != "" for ref in meta["ref"][:])
+
+
 def test_unsplit_input_uses_all_sentinel(
     unsplit_target, scorefile, tmp_path, monkeypatch
 ):

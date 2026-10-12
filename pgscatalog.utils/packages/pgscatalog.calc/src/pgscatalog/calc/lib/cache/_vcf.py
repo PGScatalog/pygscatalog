@@ -13,13 +13,21 @@ import pysam
 import pysam.bcftools
 
 from pgscatalog.calc.lib.constants import (
+    MISSING_GENOTYPE_SENTINEL_VALUE,
     MISSING_GENOTYPE_TUPLE,
+    NO_ALLELE_SENTINEL_VALUE,
+    ZARR_MAX_PLOIDY,
+    canonicalise_chrom,
 )
 
-from .targetvariants import TargetVariants, add_missing_positions_to_lists
+from .targetvariants import (
+    TargetVariants,
+    add_missing_positions_to_lists,
+    collapse_mt_calls,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable, Sequence
+    from collections.abc import Iterable, Sequence
     from typing import IO
 
     from numpy import typing as npt
@@ -29,20 +37,82 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def vcf_get_genotypes(
-    record_samples: pysam.VariantRecordSamples,
-) -> Generator[tuple[int, int]]:
-    for sample in record_samples.values():
-        gt: tuple[int, int] | None = sample.get("GT", None)
-        if gt == (None,) or gt is None:
-            yield MISSING_GENOTYPE_TUPLE
+def vcf_get_genotypes(variant: pysam.VariantRecord) -> list[tuple[int, ...]]:
+    """Read ploidy from the length of the GT field, padding to the width of the
+    widest call (ADR 0007).
+
+    A hemizygous call keeps its one allele and fills the slot it doesn't have with
+    the no-allele sentinel. A wholly missing call is read the same way, because
+    pysam distinguishes the two spellings: `.` is `(None,)` and stored as a
+    hemizygous no-call [255, 254], `./.` is `(None, None)` and stored as a diploid
+    one [255, 255].
+
+    Trusting the length means trusting the writer, so it is checked against the rest
+    of the variant. If any call there is genuinely hemizygous, hemizygosity is real
+    at this position and a `.` is a plausible reading of it, so the length is taken
+    at face value. Only where no call in evidence is hemizygous - every non-missing
+    call is diploid - does a `.` have no legitimate explanation, and the variant is
+    rejected rather than read at half the ploidy the sample can carry.
+
+    The residual risk that buys: at a mixed-sex chrX variant, a woman's no-call
+    miswritten `.` by a non-conformant writer passes this check and is imputed at
+    half the dosage she can carry. Telling it from a man's `.` needs a declared
+    sample sex, which ADR 0007 refuses on principle, so it is accepted rather than
+    detected.
+    """
+    calls: list[tuple[int, ...]] = []
+    min_called_ploidy = ZARR_MAX_PLOIDY + 1
+    haploid_no_call = False
+
+    for sample in variant.samples.values():
+        gt: tuple[int | None, ...] | None = sample.get("GT", None)
+        if not gt:
+            # no GT at all: nothing here says how many alleles the sample carries
+            calls.append(MISSING_GENOTYPE_TUPLE)
+            continue
+
+        if len(gt) > ZARR_MAX_PLOIDY:
+            # keeping the first two alleles would turn a call the cache can't hold
+            # into a plausible score
+            raise ValueError(f"Ploidy {len(gt)} is greater than {ZARR_MAX_PLOIDY=}")
+
+        if all(allele is None for allele in gt):
+            haploid_no_call = haploid_no_call or len(gt) == 1
         else:
-            yield gt
+            min_called_ploidy = min(min_called_ploidy, len(gt))
+
+        alleles = tuple(
+            MISSING_GENOTYPE_SENTINEL_VALUE if allele is None else allele
+            for allele in gt
+        )
+        calls.append(
+            alleles + (NO_ALLELE_SENTINEL_VALUE,) * (ZARR_MAX_PLOIDY - len(alleles))
+        )
+
+    if haploid_no_call and 1 < min_called_ploidy <= ZARR_MAX_PLOIDY:
+        raise ValueError(
+            f"Non-conformant VCF: a `.` genotype at {variant.chrom}:{variant.pos} "
+            "where every call that isn't missing is diploid. Nothing at this "
+            "position is hemizygous, so a `.` has no reading here: a conformant "
+            "writer spells a diploid no-call `./.` (ADR 0007)"
+        )
+
+    return calls
 
 
 def vcf_get_sample_list(target_path: Pathish) -> list[str]:
     with pysam.VariantFile(str(target_path), mode="r") as vcf:
         return list(vcf.header.samples)
+
+
+def region_sort_key(region: tuple[str, int, int]) -> tuple[int, str, int]:
+    """Sort canonical regions by chromosome, then position.
+
+    Canonical names aren't all numeric (ADR 0008), so numbered chromosomes sort
+    numerically ahead of X, Y and MT instead of raising on int("X").
+    """
+    chrom, start, _ = region
+    return (int(chrom) if chrom.isdigit() else 99, chrom, start)
 
 
 def vcf_buffer_variants(
@@ -51,6 +121,7 @@ def vcf_buffer_variants(
     index_path: Pathish,
     cache_dir: Pathish,
     sampleset: str,
+    target_chroms: Sequence[str] = (),
 ) -> TargetVariants:
     """
     Query a target genome with a tabix subprocess, buffering results to a temporary
@@ -59,11 +130,17 @@ def vcf_buffer_variants(
     The temporary files are read to yield TargetVariants and automatically cleaned up
 
     The aim of this approach is to minimise RAM usage at the cost of some local storage
+
+    target_chroms are the contigs the VCF header declares. Positions arrive with
+    canonical chromosome names, so they're translated back into whatever dialect this
+    target uses before bcftools sees them - a chr-prefixed VCF asked for region "1"
+    returns nothing at all (ADR 0008).
     """
     regions: list[tuple[str, int, int]] = sorted(
-        [(x[0], x[1], x[1]) for x in position_batch],
-        key=lambda t: (int(t[0]), t[1]),
+        [(x[0], x[1], x[1]) for x in position_batch], key=region_sort_key
     )
+    dialect = {canonicalise_chrom(chrom): chrom for chrom in target_chroms}
+    query_regions = [(dialect.get(c, c), start, end) for c, start, end in regions]
     tmp_dir = pathlib.Path(cache_dir).resolve() / "tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -79,7 +156,7 @@ def vcf_buffer_variants(
         ):
             # query the indexed VCF, creating a temporary file
             run_bcftools_view(
-                regions=regions,
+                regions=query_regions,
                 region_file=region_file,
                 target_path=target_path,
                 index_path=index_path,
@@ -115,21 +192,32 @@ def parse_target_variants(
 
         i = 0
         for i, variant in enumerate(records.fetch()):
-            seen_positions.add((variant.chrom, variant.pos))
-            try:
-                gt_tuples: Iterable[tuple[int, int]] = list(
-                    vcf_get_genotypes(variant.samples)
+            # the cache stores canonical names only (ADR 0008)
+            chrom = canonicalise_chrom(variant.chrom)
+            seen_positions.add((chrom, variant.pos))
+            # every call is padded to the same width, so the array stays rectangular
+            gts: npt.NDArray[np.uint8] = np.fromiter(
+                vcf_get_genotypes(variant),
+                dtype=(np.uint8, ZARR_MAX_PLOIDY),
+            )
+
+            if chrom == "MT":
+                collapse_mt_calls(gts, variant.pos, target_path)
+
+            if chrom == "Y" and np.any(gts == MISSING_GENOTYPE_SENTINEL_VALUE):
+                # a male-only chrY file is unambiguous - every call in it is
+                # hemizygous - but a `.` is not: VCF writes it for a no-call and for
+                # a sample that has no Y alike, and nothing here can tell them apart
+                raise ValueError(
+                    f"Missing chrY call at Y:{variant.pos} in {target_path}. VCF "
+                    "writes `.` for both a no-call and a sample that has no Y, so "
+                    "this pipeline can't tell which this is. Reading ploidy needs a "
+                    "format that records it, like bgen (ADR 0007)"
                 )
-                gts: npt.NDArray[np.uint8] = np.fromiter(gt_tuples, dtype=(np.uint8, 2))
-            except ValueError as e:
-                # happens when some samples are haploid
-                raise NotImplementedError(
-                    "Sex chromosome genotypes not supported"
-                ) from e
 
             alts = list(variant.alts) if variant.alts is not None else None
 
-            chroms.append(variant.chrom)
+            chroms.append(chrom)
             positions.append(variant.pos)
             ref_alleles.append(variant.ref)
             alt_alleles.append(alts)

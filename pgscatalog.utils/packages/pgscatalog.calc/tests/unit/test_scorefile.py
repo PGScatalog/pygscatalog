@@ -111,6 +111,57 @@ def test_load_scoring_files(pgs000001, pgs001229):
     assert res == frozenset([("PGS001229", 51183), ("PGS000001", 77)])
 
 
+@pytest.fixture
+def xy_scorefile(tmp_path) -> str:
+    """One XY variant and one X variant at the same position, plus a chr-prefixed
+    autosome"""
+    path = tmp_path / "PGS999997.txt"
+    path.write_text(
+        "chr_name\tchr_position\teffect_allele\tother_allele\teffect_weight\t"
+        "effect_type\tis_duplicated\taccession\trow_nr\n"
+        "XY\t2781479\tA\tG\t0.1\tadditive\tFalse\tPGS999997\t0\n"
+        "X\t2781479\tA\tG\t0.2\tadditive\tFalse\tPGS999997\t1\n"
+        "chr7\t1000\tA\tG\t0.3\tadditive\tFalse\tPGS999997\t2\n"
+    )
+    return str(path)
+
+
+def test_scoring_file_chromosomes_are_canonicalised(xy_scorefile):
+    """The scoring file loader is a boundary, so MATCH only ever sees canonical
+    names (ADR 0008)"""
+    from pgscatalog.calc.lib.scorefile import load_scoring_files
+
+    with duckdb.connect(":memory:") as conn:
+        load_scoring_files(conn=conn, scorefile_paths=[xy_scorefile])
+        # documented as re-runnable, and the UDF registration mustn't break that
+        load_scoring_files(conn=conn, scorefile_paths=[xy_scorefile])
+        rows = conn.sql(
+            """
+            SELECT chr_name, chr_position, is_duplicated, row_nr
+            FROM score_variant_table ORDER BY row_nr
+            """
+        ).fetchall()
+
+    # recorded behaviour, not a policy (ADR 0008 leaves this open): XY and X at one
+    # position become two rows at one canonical position. Nothing collapses them and
+    # nothing raises, and is_duplicated stays whatever the scoring file said, because
+    # pgscatalog-format computed it before XY became X
+    assert rows == [
+        ("X", 2781479, False, 0),
+        ("X", 2781479, False, 1),
+        ("7", 1000, False, 2),
+    ]
+
+
+def test_unique_positions_collapse_xy_into_x(xy_scorefile):
+    """Position queries are DISTINCT, so the target genome is only asked once"""
+    from pgscatalog.calc import Scorefiles
+
+    positions = Scorefiles(xy_scorefile).get_unique_positions(chrom="X")
+
+    assert positions == [("X", 2781479)]
+
+
 def test_position_df_with_meta(tmp_path):
     from pgscatalog.calc.lib.scorefile import get_position_df
 

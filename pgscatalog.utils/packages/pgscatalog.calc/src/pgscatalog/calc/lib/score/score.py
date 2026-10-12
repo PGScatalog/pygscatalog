@@ -152,7 +152,7 @@ class ScoreStage:
         # connection covers the rest of the shard
         with self._db.read_only() as conn:
             # calculate and adjust dosage with dask
-            is_missing_zarr, dosage_zarr = make_dosage_arrays(
+            is_missing_zarr, dosage_zarr, ploidy_zarr = make_dosage_arrays(
                 genotypes_group=self._cache.root,
                 df=variant_metadata,
                 zarr_group=shard.path,
@@ -181,6 +181,7 @@ class ScoreStage:
                     sampleset=sampleset,
                     sample_ids=sample_ids,
                     is_missing_array=is_missing_zarr,
+                    ploidy_array=ploidy_zarr,
                 )
 
         # insert scores into duckdb for final cleanup and export

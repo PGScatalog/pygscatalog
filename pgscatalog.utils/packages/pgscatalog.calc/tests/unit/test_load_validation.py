@@ -91,6 +91,17 @@ def test_two_unsplit_genomes_are_accepted():
     ]
 
 
+def test_the_load_gate_accepts_x_y_and_mt_but_not_an_unplaced_contig():
+    """Every canonical chromosome is scorable now (ADR 0007), so what the gate is
+    left guarding is input that names something outside the vocabulary"""
+    check_chromosomes(
+        _targets("/run/chrX.vcf.gz:X", "/run/chrY.vcf.gz:Y", "/run/chrM.vcf.gz:MT")
+    )
+
+    with pytest.raises(ValueError, match="not supported yet"):
+        check_chromosomes(_targets("/run/decoy.vcf.gz:chrUn_KI270302v1"))
+
+
 def test_absence_semantics_default_is_accepted():
     assert absence_semantics("unobserved") == "unobserved"
 

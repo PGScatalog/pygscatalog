@@ -54,17 +54,28 @@ import numpy as np
 import numpy.typing as npt
 from bgen import BgenReader  # type: ignore[import-untyped]
 
-from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
+from pgscatalog.calc.lib.constants import (
+    MISSING_GENOTYPE_SENTINEL_VALUE,
+    NO_ALLELE_SENTINEL_VALUE,
+    ZARR_MAX_PLOIDY,
+    canonicalise_chrom,
+)
 
-from .targetvariants import TargetVariants, add_missing_positions_to_lists
+from .targetvariants import (
+    TargetVariants,
+    add_missing_positions_to_lists,
+    collapse_mt_calls,
+)
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Iterable
 
     from pgscatalog.calc.lib.types import Pathish
 
+
+AUTOSOMES = {str(x) for x in range(1, 23)}
 
 GT_LOOKUP_TABLE = np.array(
     [
@@ -77,7 +88,7 @@ GT_LOOKUP_TABLE = np.array(
 )
 
 
-def unphased_to_hardcall(probs: npt.NDArray[np.float64]) -> npt.NDArray[np.uint8]:
+def unphased_to_hardcall(probs: npt.NDArray[np.floating]) -> npt.NDArray[np.uint8]:
     """
     Convert unphased probabilities to hard call genotypes, like in a VCF file
 
@@ -97,7 +108,7 @@ def unphased_to_hardcall(probs: npt.NDArray[np.float64]) -> npt.NDArray[np.uint8
     )
 
 
-def phased_to_hardcall(probs: npt.NDArray[np.float64]) -> npt.NDArray[np.uint8]:
+def phased_to_hardcall(probs: npt.NDArray[np.floating]) -> npt.NDArray[np.uint8]:
     """
     Convert phased probabilities to hard call genotypes, like in a VCF file
 
@@ -116,6 +127,59 @@ def phased_to_hardcall(probs: npt.NDArray[np.float64]) -> npt.NDArray[np.uint8]:
     return np.column_stack((hap1, hap2))
 
 
+def bgen_to_hardcall(
+    probs: npt.NDArray[np.floating],
+    ploidy: npt.NDArray[np.uint8],
+    is_phased: bool,
+) -> npt.NDArray[np.uint8]:
+    """
+    Convert one variant's genotype probabilities to hard calls, padded to the width
+    of the widest call (ADR 0007)
+
+    Args:
+        probs: probabilities of shape (n_samples, n_probabilities)
+        ploidy: per-sample ploidy, from BgenVar.ploidy
+        is_phased: whether this variant is phased (a per-variant property)
+
+    Returns:
+        A numpy array of shape (n_samples, ZARR_MAX_PLOIDY), where a hemizygous call
+        fills the allele slot it doesn't have with the no-allele sentinel
+
+    Notes:
+        Ploidy is read from the accessor, never inferred from probs: a ploidy 0
+        sample and a missing sample have identical all-NaN rows. The hard-call path
+        is chosen on (phased, ploidy), because a biallelic haploid call has two
+        probabilities under both representations - which conveniently means haploid
+        hard-calling is one argmax over two columns either way.
+    """
+    if (found := int(ploidy.max(initial=0))) > ZARR_MAX_PLOIDY:
+        # keeping the first two alleles would turn a call the cache can't hold into
+        # a plausible score
+        raise ValueError(f"Ploidy {found} is greater than {ZARR_MAX_PLOIDY=}")
+
+    gts = np.full(
+        (len(ploidy), ZARR_MAX_PLOIDY), NO_ALLELE_SENTINEL_VALUE, dtype=np.uint8
+    )
+
+    haploid = ploidy == 1
+    gts[haploid, 0] = np.argmax(probs[haploid, :2], axis=1)
+
+    diploid = ploidy == 2
+    if diploid.any():
+        hardcall = phased_to_hardcall if is_phased else unphased_to_hardcall
+        gts[diploid] = hardcall(probs[diploid])
+
+    # no missingness flag is exposed, so a missing call is a wholly NaN row. Safe
+    # because ploidy padding is trailing only, so a padded row keeps a real value
+    missing = np.isnan(probs).all(axis=1)
+    gts[missing] = np.where(
+        np.arange(ZARR_MAX_PLOIDY) < ploidy[missing, None],
+        MISSING_GENOTYPE_SENTINEL_VALUE,
+        NO_ALLELE_SENTINEL_VALUE,
+    )
+    return gts
+
+
 def bgen_get_sample_list(target_path: Pathish, sample_path: Pathish) -> list[str]:
     with BgenReader(str(target_path), str(sample_path), delay_parsing=True) as bfile:
         return list(bfile.samples)
@@ -126,21 +190,15 @@ def prepare_region_query(
 ) -> list[tuple[str, int, int]]:
     logger.info(f"Preparing regions for bgenix query, {target_chroms=}")
 
-    # set up transform function for chromosome
-    transform: Callable
-    if any(x.startswith("0") for x in target_chroms):
-        # are they padded? e.g. UK Biobank
-        logger.info("Padded chromosomes detected")
-        transform = add_chrom_padding
-    elif any(x.startswith("chr") for x in target_chroms):
-        logger.info("Prefixed chromosones detected")
-        # are they prefixed? e.g. some imputation servers
-        transform = add_chrom_prefix
-    else:
-        logger.info("PGS Catalog format chromosomes detected")
-        transform = lambda x: x  # noqa: E731
-
-    return [(transform(chrom), pos, pos) for chrom, pos in regions]
+    # Query the actual index names, including aliases such as chrM, 23, and 0X.
+    dialects: dict[str, list[str]] = {}
+    for chrom in dict.fromkeys(target_chroms):
+        dialects.setdefault(canonicalise_chrom(chrom), []).append(chrom)
+    return [
+        (native, pos, pos)
+        for chrom, pos in regions
+        for native in dialects.get(chrom, [chrom])
+    ]
 
 
 def run_bgenix_subprocess(
@@ -179,17 +237,6 @@ def is_snp(alleles: tuple[str]) -> bool:
     return set("".join(alleles)).issubset({"A", "C", "G", "T"})
 
 
-@cache
-def normalise_chrom(chrom: str | int) -> str:
-    """
-    Some bgen files encode chromosomes with a leading 0 or chr prefix
-    """
-    s = str(chrom)
-    if s.startswith("chr"):
-        s = s[3:]
-    return s.lstrip("0")
-
-
 def parse_target_variants(
     *,
     target_path: Pathish,
@@ -215,6 +262,9 @@ def parse_target_variants(
         samples: list[str] = bgenfile.samples
         n_samples = len(samples)
         logger.info(f"{buffered_path=} opened, {n_samples} present")
+        # layout 1 has no per-sample ploidy field at all, so every call it holds is
+        # diploid by assumption - fine on an autosome, a guess anywhere else
+        is_layout_1 = bgenfile.header.layout == 1
 
         i = 0  # initialise enumerate in case there's no variants in the file
         for i, variant in enumerate(bgenfile):
@@ -230,8 +280,13 @@ def parse_target_variants(
             if is_multiallelic and not skip_multiallelic:
                 raise NotImplementedError("Can't handle multiallelic variants")
 
-            # use PGS Catalog style chromosomes (no padding or prefix) to build cache
-            fetched_chrom = normalise_chrom(variant.chrom)
+            # the cache stores canonical names only (ADR 0008)
+            fetched_chrom = canonicalise_chrom(variant.chrom)
+            if is_layout_1 and fetched_chrom not in AUTOSOMES:
+                raise ValueError(
+                    f"{target_path} is a layout 1 bgen, which can't record ploidy, "
+                    f"so chromosome {fetched_chrom} can't be read from it (ADR 0007)"
+                )
             fetched_pos = variant.pos
             ref: str = variant.alleles[0] if ref_first else variant.alleles[1]
             # store as a list for future multiallelic support
@@ -239,10 +294,14 @@ def parse_target_variants(
             seen_positions.add((fetched_chrom, fetched_pos))
 
             # convert probabilities to uint8 genotypes ASAP
-            if variant.is_phased:
-                gts = phased_to_hardcall(variant.probabilities)
-            else:
-                gts = unphased_to_hardcall(variant.probabilities)
+            gts = bgen_to_hardcall(
+                probs=variant.probabilities,
+                ploidy=variant.ploidy,
+                is_phased=variant.is_phased,
+            )
+
+            if fetched_chrom == "MT":
+                collapse_mt_calls(gts, fetched_pos, target_path)
 
             # update all the lists
             chroms.append(fetched_chrom)

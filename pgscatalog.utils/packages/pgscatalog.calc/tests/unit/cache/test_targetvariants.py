@@ -7,7 +7,10 @@ from pgscatalog.calc.lib.cache.targetvariants import (
     add_missing_positions_to_lists,
 )
 from pgscatalog.calc.lib.cache.zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
-from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
+from pgscatalog.calc.lib.constants import (
+    MISSING_GENOTYPE_SENTINEL_VALUE,
+    NO_ALLELE_SENTINEL_VALUE,
+)
 
 
 @pytest.fixture
@@ -97,6 +100,27 @@ def test_variant_invalid_genotypes_construction(valid_args: dict):
 
     with pytest.raises(ValueError, match="Genotypes contain invalid values"):
         TargetVariants(**invalid_gts_args)
+
+
+def test_hemizygous_calls_without_missingness_are_accepted(valid_args: dict):
+    """A mixed-sex chrX variant with complete calls is ordinary data"""
+    hemizygous_args = valid_args.copy()
+    hemizygous_args["gts"] = [
+        valid_args["gts"][0],
+        np.array(
+            [
+                [1, NO_ALLELE_SENTINEL_VALUE],
+                [0, NO_ALLELE_SENTINEL_VALUE],
+                [0, 1],
+            ],
+            dtype=np.uint8,
+        ),
+    ]
+
+    variants = TargetVariants(**hemizygous_args)
+
+    ploidy = np.sum(variants.genotypes != NO_ALLELE_SENTINEL_VALUE, axis=2)
+    np.testing.assert_array_equal(ploidy, [[2, 2, 2], [1, 1, 2]])
 
 
 # Test 3: test_write_zarr_writes_expected_structure
