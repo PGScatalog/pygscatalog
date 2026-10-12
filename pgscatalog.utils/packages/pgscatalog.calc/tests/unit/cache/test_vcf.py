@@ -485,13 +485,13 @@ def test_multiallelic_indices_cannot_overlap_sentinels(tmp_path, n_alts):
     target, index = indexed_target(
         tmp_path, [f"{n_alts}/{n_alts}", "0/0"], alts=",".join(alts), ref="AAAA"
     )
-    kwargs = dict(
-        position_batch=[("1", 100)],
-        target_path=target,
-        index_path=index,
-        cache_dir=tmp_path,
-        sampleset="test",
-    )
+    kwargs = {
+        "position_batch": [("1", 100)],
+        "target_path": target,
+        "index_path": index,
+        "cache_dir": tmp_path,
+        "sampleset": "test",
+    }
     if n_alts >= 254:
         with pytest.raises(ValueError, match="reserved for genotype sentinels"):
             vcf_buffer_variants(**kwargs)
