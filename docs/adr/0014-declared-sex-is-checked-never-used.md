@@ -1,98 +1,265 @@
-# Declared sex is checked against observed ploidy, never used to derive it
+# Check declared sex against observed ploidy without deriving ploidy from it
 
 ## Status
 
-Accepted. Amends [ADR 0007](0007-ploidy-is-observed-per-call.md), which rejected a sample sex declaration outright; it stays rejected as an *input to scoring*, and is admitted here as an input to a check.
+Accepted. This amends [ADR 0007](0007-ploidy-is-observed-per-call.md), which rejected
+a sample sex declaration. The declaration remains excluded from scoring inputs.
+This decision permits it only as input to a check.
 
 ## Context
 
-[ADR 0007](0007-ploidy-is-observed-per-call.md) observes ploidy per call and states plainly that "no pipeline-wide sample sex column is introduced". That was the right call for scoring and it is untouched here. But it leaves a real gap: nothing in the pipeline ever notices that the sample labelled female is hemizygous across chrX. A sample swap, a mislabelled cohort, or a sex map keyed on the wrong ID space all score cleanly and silently, and X variants now contribute to those scores.
+[ADR 0007](0007-ploidy-is-observed-per-call.md) observes ploidy per call and states
+that "no pipeline-wide sample sex column is introduced". This remains the correct
+scoring policy. However, nothing detects a sample labelled female that is
+hemizygous across chrX.
 
-The users who care most about this run in clinical and biobank settings, where an unverified sex label is not an acceptable input to a reported score.
+Several errors can therefore produce scores without a warning:
 
-Two facts about this codebase shape every decision below.
+- A sample swap.
+- A mislabelled cohort.
+- A sex map that uses the wrong sample identifiers.
 
-**The Cache holds only the positions the scoring files asked for.** That is deliberate (see `CONTEXT.md`, *Cache*) and it is narrower than the source files. So the material available to any sex check is however many X variants a PGS happens to carry — often a handful, frequently none. Loading more X variants to strengthen the check would break what the Cache is.
+X variants now contribute to those scores. Clinical and biobank users need to
+check declared sex before accepting a reported score.
 
-**Ploidy is already stored per call.** `ADR 0007`'s encoding puts the no-allele sentinel in unused slots, so `(gt != NO_ALLELE).sum(axis=2)` is the ploidy of every call in the shard. Whether a sample is hemizygous on X is a read, not an estimate.
+Two properties of the codebase constrain the check.
+
+**The Cache holds only positions requested by scoring files.** This is deliberate
+(see `CONTEXT.md`, *Cache*). The Cache contains fewer positions than the source
+files. A sex check therefore sees only the X variants present in the PGS. There
+are often few such variants, and frequently none. Loading additional X variants
+would violate the Cache contract.
+
+**The Cache already stores ploidy per call.** ADR 0007 places the no-allele
+sentinel in unused slots. Therefore, `(gt != NO_ALLELE).sum(axis=2)` gives each
+call's ploidy. The check reads hemizygosity on X directly, rather than estimating
+it.
 
 ## Decision
 
-**A declared sex is QC input only.** It never derives ploidy, never fills a ploidy a format could not express, and never reaches a dosage or a score. ADR 0007's rejection of "declared sex plus a PAR coordinate map" stands in full, and no PAR coordinates enter the repository.
+**Declared sex is QC input only.** It never determines ploidy or supplies ploidy
+that an input format cannot express. It never contributes to dosage or score.
+ADR 0007 still rejects declared sex combined with a PAR coordinate map. No PAR
+coordinates enter the repository.
 
-This is what keeps the two decisions coherent. A declaration that can be *used* is a second answer free to disagree with the file, with no principled way to resolve the conflict — 0007's argument, still sound. A declaration that can only be *checked* has the opposite property: disagreement is the point of it.
+Using a declaration to determine ploidy would create a second answer that could
+conflict with the file. There is no principled way to resolve that conflict, as
+ADR 0007 explains. Checking the declaration has a different purpose. The check is
+supposed to detect disagreement.
 
-**The check is an observed hemizygous fraction, not plink's F coefficient.** For each sample, over the informative X variants in its shard: the fraction of its called genotypes that are hemizygous. Declared male expects 1, declared female expects 0, and the sample is classified on the **majority**.
+**The check uses an observed hemizygous fraction, not plink's F coefficient.**
+For each sample, it considers informative X variants in that sample's shard. The
+fraction counts hemizygous called genotypes divided by all called genotypes at
+those variants. Declared male expects 1, and declared female expects 0. The check
+classifies the sample by the **majority**.
 
-F was rejected on four counts, the first of which is disqualifying on its own:
+F was rejected for four reasons. The first is sufficient by itself.
 
-- F would be estimated from whatever X variants the scoring files asked for. plink's `--check-sex` defaults assume thousands of LD-pruned markers; a dozen produces a confident-looking number that is noise. The Cache cannot supply more without ceasing to be the Cache.
-- F needs allele frequencies, which under [ADR 0009](0009-pooled-allele-frequency-for-imputation.md) are pooled across ploidy — a sex-blended input to a test for sex.
-- F needs non-PAR, which needs the build-specific PAR map ADR 0007 declined to maintain.
-- F exists because plink's `.bed` has no ploidy dimension at all and heterozygosity is the only signal available. That limitation is not ours.
+- F would use only X variants requested by the scoring files. Plink's
+  `--check-sex` defaults assume thousands of LD-pruned markers. A dozen markers
+  produces an apparently precise number that is noise. Supplying more markers
+  would violate the Cache contract.
+- F needs allele frequencies.
+  [ADR 0009](0009-pooled-allele-frequency-for-imputation.md) pools these across
+  ploidy. A sex check would therefore use frequencies pooled across sexes.
+- F needs non-PAR variants. This requires the build-specific PAR map that ADR
+  0007 rejected.
+- Plink's `.bed` has no ploidy dimension, so heterozygosity is its only signal.
+  This explains its use of F. Our cache does not have that limitation.
 
-**PAR is excluded without coordinates, by requiring hemizygosity to be in evidence.** A variant is **informative** when at least one call in the shard is hemizygous. A variant diploid in every sample is excluded, because it is either pseudoautosomal or a cohort with no hemizygous samples in it and nothing distinguishes those two without coordinates.
+**Evidence of hemizygosity excludes PAR without coordinates.** A variant is
+**informative** if at least one call in the shard is hemizygous. The check
+excludes a variant that is diploid in every sample. Such a variant could be
+pseudoautosomal, or the cohort could lack hemizygous samples. Without coordinates,
+these cases cannot be distinguished.
 
-Excluding them is not a refinement. A scoring file whose X variants are mostly pseudoautosomal makes a man diploid at most of them, landing his fraction near 0 and reading him as female. Without this rule the check is wrong rather than weak.
+This exclusion is necessary for correctness. If most X variants in a scoring
+file are pseudoautosomal, a man's calls are mostly diploid. His fraction would
+approach 0, and the check would classify him as female. Without the exclusion,
+the check would be wrong rather than merely weak.
 
-The consequence is that an all-female shard has no informative variants and cannot be checked. That is correct: it is genuinely indistinguishable from an all-PAR variant set, and reporting either answer would be inventing one.
+An all-female shard therefore has no informative variants and cannot support the
+check. It is indistinguishable from an all-PAR variant set. Reporting either
+classification would invent evidence.
 
-**Below ten informative variants the check does not conclude, and warns loudly.** Hemizygosity is deterministic rather than estimated, so the floor is not sizing for statistical power — it is tolerance to bad calls. At one informative variant a single miswritten no-call inverts the fraction and stops a run over a sample that is fine. Ten with a majority rule tolerates four.
+**Below ten informative variants, the check warns and does not conclude.**
+Hemizygosity is deterministic, so the floor protects against incorrect calls
+rather than setting statistical power. With one informative variant, one
+miswritten no-call can invert the fraction and stop a valid sample's run. Ten
+variants with a majority rule tolerate four incorrect calls.
 
-Not concluding is a warning, not a failure: the alternative is refusing to score every cohort whose PGS lacks X coverage, which is most of them, and would make the mandate self-defeating.
+Failure to conclude produces a warning, not an exception. Otherwise, most cohorts
+would fail because their PGS lacks X coverage. That would defeat the check's
+purpose.
 
-**A mismatch is a hard exception, and `0` is the override.** Where a sample is declared male or female and the majority of its informative calls says otherwise, LOAD raises. Users exempt individual samples by declaring them `0` (unknown).
+**A mismatch raises an exception, and `0` provides an override.** LOAD raises
+when a sample's declared male or female sex contradicts its majority of
+informative calls. Users exempt individual samples by declaring them `0`
+(unknown).
 
-This reverses an earlier position in this design session and the reason it was reversed should be recorded, because the argument against it is real. Sex chromosome aneuploidy is not rare — Klinefelter (XXY) reads as diploid X, Turner (XO) reads as hemizygous — so a biobank-scale cohort contains correctly declared, correctly genotyped samples that will mismatch. UK Biobank publishes field 31 and field 22001 side by side rather than reconciling them for exactly this reason.
+This reverses an earlier design choice despite a valid objection. Sex chromosome
+aneuploidy is not rare. Klinefelter (XXY) produces diploid X calls, while Turner
+(XO) produces hemizygous calls. Biobank-scale cohorts therefore contain correctly
+declared and correctly genotyped samples that will mismatch. For this reason, UK
+Biobank publishes field 31 and field 22001 separately rather than reconciling
+them.
 
-Report-only was rejected anyway, because a warning in a log next to a successful exit code is not a quality check in the setting this feature exists for. Stopping and requiring an explicit per-sample exemption makes the decision a human's, records it in an input file, and keeps it out of the pipeline's hands. The cost is that a legitimate aneuploid sample requires a user to declare it unknown — which is a fair description of what the pipeline knows about it.
+A report-only check was still rejected. A warning beside a successful exit code
+is insufficient quality control for these users. Stopping requires a human to
+record each exemption in an input file. The pipeline does not decide the
+exemption. A legitimate aneuploid sample must consequently be declared unknown,
+which accurately describes the pipeline's knowledge.
 
-**The map is mandatory when a scoring file carries sex chromosome variants**, and is supplied only as `--sex_map`. Keyed on the scoring files rather than on the target genomes because the scoring files are what decide whether the Cache will hold anything to check, and because `Scorefiles.get_unique_positions` (`lib/scorefile.py:70`) can answer it during argument validation, before any genome is read. MT does not trigger it — MT is hemizygous in everyone and says nothing about sex.
+**A scoring file with sex chromosome variants requires `--sex_map`.** This is
+the only input route for the map. The requirement depends on scoring files,
+because they determine which positions the Cache contains.
+`Scorefiles.get_unique_positions` (`lib/scorefile.py:70`) can detect the
+requirement during argument checks, before reading any genome. MT does not
+trigger it. MT is hemizygous in everyone and supplies no information about sex.
 
-**Only the map is read.** No VCF header field records sex. A bgen `.sample` file's `sex` column is deliberately ignored, even where one exists (`tests/data/bgen/phased/tiny1000G.sample` has one). Matching a column by name and reading it under an assumed `0`/`1`/`2` coding is two stacked inferences, and nothing inferred should sit upstream of an exception that stops a run. A mis-read coding would invert every sample and fail the whole cohort, which the user would reasonably read as corrupt genotypes rather than a bad guess by the parser.
+**The check reads only the map.** No VCF header field records sex. The pipeline
+deliberately ignores a bgen `.sample` file's `sex` column, even when it exists.
+`tests/data/bgen/phased/tiny1000G.sample` contains such a column.
 
-This binds the pipeline, not the test suite. The integration fixtures *do* read that column, to write the map the pipeline is then handed. That is the point of them: a map derived from the same genotypes the check reads would make the passing case a tautology, and the `.sample` column is the only declaration in this repository that is independent of the calls.
+Inferring a column's meaning from its name and assuming its `0`/`1`/`2` coding
+would combine two assumptions. Neither belongs before an exception that stops a
+run. Incorrect coding could invert every sample and fail the whole cohort. A
+user could reasonably interpret that as corrupt genotypes rather than an
+incorrect parser assumption.
 
-**LOAD throws after writing the zip, not when the mismatch is found.** The sex map influences nothing that gets cached, so a cache written before the exception is valid and complete. The user fixes the map, re-runs with `--zarr_zip_file`, and `get_unique_positions` returns nothing (`cli/load.py:313`) — the retry costs a check rather than a re-load.
+This restriction applies to the pipeline, not its tests. Integration fixtures
+read the `.sample` column and create the map supplied to the pipeline. The
+column is this repository's only sex declaration independent of genotype calls.
+A map derived from the same calls under check would make a passing test a
+tautology.
 
-The consequence for the implementation is that the calls are read *before* `shutil.rmtree` deletes the directory store, and the verdict is held until after `zip_zarr`. The check reads the store rather than the `TargetVariants` produced while caching, because on a re-run nothing is cached and that loop never runs.
+**LOAD raises after writing the zip, not when it first detects a mismatch.**
+The sex map changes nothing in the cache. The cache remains valid and complete
+when the exception occurs. The user can correct the map and repeat LOAD with
+`--zarr_zip_file`. Then `get_unique_positions` returns nothing
+(`cli/load.py:313`), so the retry repeats only the check.
 
-This looks backwards, which is why it is written down: LOAD deliberately finishes work it is about to reject. Throwing at the point of discovery would make each iteration of an override loop re-read chrX, over a biobank hours at a time, against a workflow this ADR has *designed* to iterate.
+The implementation reads calls before `shutil.rmtree` deletes the directory
+store. It retains the verdict until after `zip_zarr`. The check reads the store,
+not the `TargetVariants` created during caching. A retry caches nothing, so that
+loop does not run.
 
-**The exception names every mismatching sample at once.** Failing on the first would make a cohort with four hundred mismatches four hundred round trips.
+LOAD deliberately completes work before rejecting the declaration. An earlier
+exception would force every exemption retry to read chrX again. This could cost
+hours per retry in a biobank. The workflow deliberately supports repeated
+checks.
 
-**Map coverage is asymmetric.** A genotyped sample missing from the map is a hard error, because a mandatory declaration that is silently incomplete is not a declaration. A sample in the map that this shard does not hold is fine and expected: sample batches see a subset of the cohort ([ADR 0003](0003-shards-are-zarr-leaf-groups.md)), so one cohort-wide map is the normal way to run this, and rejecting extra rows would make the map a function of how the cohort was chopped up.
+**The exception names every mismatching sample together.** Reporting only the
+first mismatch would require four hundred retries for four hundred mismatches.
+
+**Map coverage is asymmetric.** A genotyped sample missing from the map causes
+an error. A mandatory declaration cannot silently omit samples. Extra map
+samples absent from this shard are allowed and expected. Sample batches contain
+only part of the cohort ([ADR 0003](0003-shards-are-zarr-leaf-groups.md)). A
+cohort-wide map must therefore remain valid regardless of how the cohort is
+partitioned.
 
 ## Considered and rejected
 
-**Declared sex as a ploidy source of last resort**, for formats that cannot express it — layout-1 bgen, mixed-sex chrY VCF. Rejected: it spends ADR 0007's strongest guarantee to buy back cases 0007 already documents refusing as a deliberate limit, and it drags the PAR coordinate map back in.
+**Declared sex as a fallback source of ploidy.** Some formats cannot express the
+required ploidy, including layout-1 bgen and mixed-sex chrY VCF. ADR 0007 already
+accepts those limits. Using declared sex would violate its strongest guarantee
+and require the rejected PAR coordinate map.
 
-**plink's F coefficient.** Four reasons above; the marker count is the disqualifying one.
+**Plink's F coefficient.** The four reasons appear above. The insufficient marker
+count is enough to reject it.
 
-**Report-only, never fatal.** The honest option for aneuploidy, and rejected because a clean exit code that quietly means "unverified" is the failure mode this feature exists to remove. The `0` exemption is what makes stopping tolerable.
+**Report-only checks without exceptions.** This would accommodate aneuploidy,
+but a successful exit could silently mean "unverified". Preventing that outcome
+is the feature's purpose. The `0` exemption makes stopping acceptable.
 
-**A new sex-check stage.** Unnecessary: `CONTEXT.md` guarantees every `(sample, variant)` pair appears in at most one shard, and multiple files under one chromosome are sample batches with disjoint samples, so one chrX shard holds every cached X call for its samples. The check is complete inside a single LOAD and needs no combine. [ADR 0006](0006-one-module-per-stage-no-base-class.md) is not engaged.
+**A separate sex-check stage.** `CONTEXT.md` guarantees that each
+`(sample, variant)` pair appears in at most one shard. Files within one
+chromosome represent sample batches with disjoint samples. Each chrX shard
+therefore contains every cached X call for its samples. One LOAD can complete
+the check without a combine step. No new stage is needed under
+[ADR 0006](0006-one-module-per-stage-no-base-class.md).
 
-**Using chrY as a second signal.** Only bgen can express the nullploidy that would make a female's chrY informative ([ADR 0007](0007-ploidy-is-observed-per-call.md)), so it would make the check's strength format-dependent — a thing to explain forever. X carries it.
+**ChrY as a second signal.** Only bgen can express the nullploidy that would make
+a female's chrY informative ([ADR 0007](0007-ploidy-is-observed-per-call.md)).
+Using it would make check strength depend on input format and require a lasting
+explanation. X supplies the signal instead.
 
-**Separating "declared unknown" from "deliberately exempted" into distinct codes.** Rejected for the MVP: `0` is plink and UK Biobank convention and users already know it. The overload is mitigated by reporting, not by a new code.
+**Separate codes for unknown sex and deliberate exemptions.** The MVP retains
+`0`, which users know from plink and UK Biobank. Reporting explains the two
+meanings without another code.
 
 ## Consequences
 
-- **The escape hatch can disable the entire check, and only reporting will show it.** A user facing four hundred hard failures will set the column to `0` and re-run, and the pipeline then exits cleanly having verified almost nothing — worse than report-only ever was, because the exit code now asserts something. Every run must therefore report how many samples were exempted by declaration alongside how many were checked. A run that checked 3 of 500,000 samples has to say so in the same breath as it says it passed.
-- **The fraction must be NULL, never `0.0`, when there are no informative variants.** `0/0` computed naively is `0.0`, which reads as diploid, which reads as female-consistent: every woman passes silently and every man is flagged, on a check that never ran. This is the same class of error as `sentinel_to_nan` in ADR 0007 — an arithmetic accident that produces a plausible answer.
-- **A scoring file with X variants and a target with no chrX loaded skips the check with a warning.** The map was still mandatory, so the user supplied a file that was never read. Accepted as the price of enforcing the mandate up front rather than deciding requirements from data not yet read. The same applies to a scoring file carrying only chrY variants: the mandate fires, the check has no X to run on.
-- **`pgsc_calc run` forwards `--sex_map`** alongside `--bgen_sample_file` (`cli/run.py:96`), because without it `run` cannot score any X-carrying PGS once the mandate lands. Each target is a separate LOAD with its own cache directory, so each writes its own report.
-- **Existing chrX integration tests need a sex map**: `test_haploid_chrx.py`, `test_pooled_imputation.py`, and the chrX cases in `test_bgen.py`. `test_male_only_chry.py` needs one too — its scoring file carries chrY, and the mandate keys on X *or* Y — so those tests supply a map and then take the skip-and-warn path. This is the accepted cost of the mandate.
-- The flag is `--sex_map`, underscored, matching `--bgen_sample_file`, `--absence_semantics`, `--score_paths` and the rest of `add_load_input_args`.
-- A per-sample TSV (`sample_id`, `declared`, `hemizygous_fraction`, `n_informative`, `outcome`) is written whether or not the run throws. It lands at `cache_dir/sex_check.tsv`, beside the archive: LOAD is the one stage with no `--out_dir`, and adding one for a single file would be new surface for Nextflow to thread through. Under Nextflow, LOAD is fanned out and each task reports only its own batch; because batches are disjoint the union is the full picture, but no single log holds it.
-- Two outcomes for the MVP — consistent and mismatch. An intermediate fraction (mosaicism, or a broken file) collapses into mismatch rather than getting its own category; the fraction is in the TSV, so it remains diagnosable. Worth splitting later, since it is not actually a finding about sex.
-- **A fraction of exactly `0.5` is a mismatch**, not a pass and not an abstention. "Classify on the majority" has no answer there, and it is reachable — ten informative variants, five hemizygous. It is treated as contradictory evidence rather than the absent evidence the floor of ten covers: half the calls say male and half say female, so the sample or the file is wrong either way, and `0` is available to a user who disagrees.
-- **A hemizygous no-call (`[255, 254]`) makes a variant informative but appears in neither half of a sample's own fraction.** The file declared ploidy one there, which is the signal informativeness asks about; the fraction's denominator is *called* genotypes, so the sample contributes nothing to its own ratio at that variant.
-- **The map needs a header naming `sample_id` and `sex`, and is refused otherwise.** Detecting an optional header would mean deciding from the data whether line 1 is a declaration, which is the same stacked inference this ADR refuses when it declines to read the bgen `sex` column.
-- **Coverage is enforced on every target once the mandate fires**, autosomes included, rather than only where the check will run. A map keyed on the wrong sample ID space is one of the three failures this feature exists to catch, and enforcing everywhere makes it fail at the first target instead of whenever chrX happens to be dispatched.
-- The whole implementation is one module, `lib/sexcheck.py`, called from `load_cli`. No new stage and no new CLI subcommand — see the rejection above.
-- The check reads ploidy the readers already produce, so it adds no format-specific code and inherits ADR 0007's guarantees on both paths. It also inherits 0007's known VCF weakness: a woman's no-call miswritten `.` at a mixed-sex chrX variant is stored hemizygous, so a cohort with enough of them could push a fraction across the majority line. The floor of ten is the only thing standing against that, and it is a real limit rather than a theoretical one.
+- **The override can disable the whole check, and only reporting reveals this.**
+  A user facing four hundred failures will set the column to `0` and retry. The
+  pipeline then exits successfully while checking almost nothing. This is worse
+  than report-only behaviour because the exit code implies a successful check.
+  Every run must report both exempted and checked sample counts. A run checking
+  3 of 500,000 samples must state that beside its pass result.
+- **With no informative variants, the fraction must be NULL, never `0.0`.**
+  Naive handling of `0/0` produces `0.0`, which appears diploid and consistent
+  with declared female sex. Every woman would pass and every man would fail a
+  check that never ran. This resembles the `sentinel_to_nan` error in ADR 0007.
+  An arithmetic error creates a plausible answer.
+- **X score variants without loaded chrX cause a warning and no check.** The map
+  remains mandatory even though the check never reads it. This is the accepted
+  cost of enforcing requirements before reading data. The same applies when a
+  scoring file contains only chrY variants. The requirement applies, but no X
+  variants support the check.
+- **`pgsc_calc run` forwards `--sex_map`** with `--bgen_sample_file`
+  (`cli/run.py:96`). Otherwise, the new requirement would prevent `run` from
+  scoring any PGS with X variants. Each target uses a separate LOAD and cache
+  directory. Each LOAD therefore writes its own report.
+- **Existing chrX integration tests need a sex map.** These include
+  `test_haploid_chrx.py`, `test_pooled_imputation.py` and the chrX cases in
+  `test_bgen.py`. `test_male_only_chry.py` also needs a map because its scoring
+  file contains chrY. The requirement applies to X or Y. These chrY tests supply
+  the map and expect a warning without a check. This is an accepted cost.
+- The flag uses underscores: `--sex_map`. This matches `--bgen_sample_file`,
+  `--absence_semantics`, `--score_paths` and the other `add_load_input_args` flags.
+- LOAD writes a per-sample TSV whether or not it raises an exception. Its columns
+  are `sample_id`, `declared`, `hemizygous_fraction`, `n_informative` and `outcome`.
+  The file is `cache_dir/sex_check.tsv`, beside the archive. LOAD alone has no
+  `--out_dir`. Adding that argument for one file would require another Nextflow
+  interface.
+
+  Nextflow runs LOAD separately for each batch. Each task reports only its own
+  samples. The batches are disjoint, so their reports together describe the
+  cohort. No single log contains the complete result.
+- The MVP has two outcomes: consistent and mismatch. An intermediate fraction,
+  from mosaicism or a broken file, counts as a mismatch. The TSV retains the
+  fraction for diagnosis. A separate category could be useful later because
+  this is not actually a finding about sex.
+- **A fraction of exactly `0.5` is a mismatch, not a pass or abstention.** Ten
+  informative variants with five hemizygous calls can produce this result. A
+  majority rule cannot classify it. Half the calls indicate male and half
+  indicate female, so the sample or file is wrong. This is contradictory
+  evidence, unlike insufficient evidence below the floor of ten. A disagreeing
+  user can apply `0`.
+- **A hemizygous no-call (`[255, 254]`) makes a variant informative.** Its
+  declared ploidy is one, which supplies the required evidence. However, this
+  call contributes to neither part of its sample's fraction. The denominator
+  counts only called genotypes.
+- **The map must have a header naming `sample_id` and `sex`.** The check refuses
+  a map without it. Detecting an optional header would require inferring whether
+  line 1 declares a sample. This repeats the assumptions rejected for the bgen
+  `sex` column.
+- **Once required, map coverage applies to every target, including autosomes.**
+  It does not depend on whether that target supports the check. Incorrect sample
+  identifiers are one of the three errors this feature must detect. Checking
+  coverage everywhere exposes that error at the first target, rather than when
+  chrX happens to run.
+- The implementation occupies one module, `lib/sexcheck.py`, called from
+  `load_cli`. It adds no stage or CLI subcommand, as explained above.
+- The check reads ploidy produced by existing readers. It adds no format-specific
+  code and inherits ADR 0007's guarantees on both input paths. It also inherits
+  ADR 0007's known VCF weakness.
+
+  A woman's no-call miswritten as `.` at a mixed-sex chrX variant becomes
+  hemizygous. Enough such calls could move the fraction across the majority
+  threshold. The floor of ten is the only protection. This is an actual limit,
+  not a theoretical concern.
 
 ## Review corrections
 

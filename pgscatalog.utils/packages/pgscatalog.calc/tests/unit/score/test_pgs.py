@@ -313,54 +313,18 @@ def test_hemizygous_samples_count_one_allele_per_variant(
     assert np.array_equal(result, np.array([2, 4, 4], dtype=np.int64))
 
 
+@pytest.mark.parametrize("zero_weights", [False, True])
 def test_calculate_score_statistics_tiny(
     tiny_dosage_zarr,
     tiny_is_missing_zarr,
     tiny_ploidy_zarr,
     tiny_sample_ids,
+    zero_weights,
 ):
     # an in-memory connection is enough, so this test needs no database on disk
     conn = duckdb.connect(":memory:")
 
-    # 1) Raw table with plain match_summary
-    conn.sql(
-        """
-        CREATE TABLE allele_match_raw (
-            sampleset TEXT,
-            accession TEXT,
-            row_nr UINTEGER,
-            zarr_group TEXT,
-            match_summary TEXT
-        );
-        """
-    )
-    # one scoring variant matched in two shards: n_matched counts variants,
-    # not match rows, so it stays 1
-    conn.sql(
-        """
-        INSERT INTO allele_match_raw VALUES
-            ('test', 'PGS000001', 0, 'test/1/a.vcf.gz', 'matched'),
-            ('test', 'PGS000001', 0, 'test/1/b.vcf.gz', 'matched'),
-            ('test', 'PGS999999', 0, 'test/1/a.vcf.gz', 'matched'),
-            ('test', 'PGS999999', 0, 'test/1/b.vcf.gz', 'matched');
-        """
-    )
-
-    # 2) View with struct field 'match_result.match_summary'
-    conn.sql(
-        """
-        CREATE VIEW allele_match_table AS
-        SELECT
-            sampleset,
-            accession,
-            row_nr,
-            zarr_group,
-            struct_pack(match_summary := match_summary) AS match_result
-        FROM allele_match_raw;
-        """
-    )
-
-    # 3) wide_score_variants defining membership of each variant
+    # Wide coefficients include zeros for accessions absent from a variant.
     conn.sql(
         """
         CREATE TABLE wide_score_variants (
@@ -379,6 +343,32 @@ def test_calculate_score_statistics_tiny(
             (3, 0.0, 1.0);  -- v3 in PGS999999
         """
     )
+    # Membership is explicit, not inferred from coefficients. Both score
+    # statistics must survive changing every coefficient to zero.
+    conn.sql("""
+        ALTER TABLE wide_score_variants ADD target_row_nr INTEGER;
+        ALTER TABLE wide_score_variants ADD effect_allele_idx INTEGER DEFAULT 1;
+        ALTER TABLE wide_score_variants ADD zarr_group TEXT DEFAULT 'test/1/a.vcf.gz';
+        ALTER TABLE wide_score_variants ADD is_dominant BOOLEAN DEFAULT false;
+        ALTER TABLE wide_score_variants ADD is_recessive BOOLEAN DEFAULT false;
+        UPDATE wide_score_variants SET target_row_nr = weight_mat_row_nr;
+        CREATE TABLE score_variant_table AS
+        SELECT 'PGS000001' AS accession, unnest([0, 1, 2]) AS row_nr,
+               'additive' AS effect_type
+        UNION ALL SELECT 'PGS999999', 0, 'additive';
+        CREATE TABLE allele_match_table AS
+        SELECT 'test' AS sampleset, accession, row_nr,
+               'test/1/a.vcf.gz' AS zarr_group,
+               CASE WHEN accession='PGS999999' THEN 3 ELSE row_nr END AS target_row_nr,
+               struct_pack(match_summary := 'matched',
+                           effect_allele_idx := 1) AS match_result
+        FROM score_variant_table;
+        INSERT INTO allele_match_table
+        SELECT * REPLACE ('test/1/b.vcf.gz' AS zarr_group)
+        FROM allele_match_table;
+    """)
+    if zero_weights:
+        conn.sql('UPDATE wide_score_variants SET "PGS000001" = 0, "PGS999999" = 0')
 
     accessions = ["PGS000001", "PGS999999"]
 
@@ -421,7 +411,7 @@ def test_calculate_score_statistics_tiny(
             "accession": ["PGS000001"] * 3 + ["PGS999999"] * 3,
             "dosage_sum": [3.0, 2.0, 3.0] + [2.0, 2.0, 2.0],
             "allele_count": [4, 4, 4] + [0, 2, 2],
-            "n_matched": [1] * 6,  # one row per accession in allele_match_raw
+            "n_matched": [3] * 3 + [1] * 3,
             "sample_id": tiny_sample_ids + tiny_sample_ids,
             "score": [0.1, 0.3, 0.5] + [0.2, 0.4, 0.6],
             "sampleset": ["test"] * 6,

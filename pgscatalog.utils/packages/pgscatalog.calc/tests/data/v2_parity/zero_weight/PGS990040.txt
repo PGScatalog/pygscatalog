@@ -1,0 +1,7 @@
+#pgs_id=PGS990040
+#pgs_name=ZeroWeights
+#trait_reported=Synthetic test fixture
+#genome_build=GRCh38
+chr_name	chr_position	effect_allele	other_allele	effect_weight
+1	1000	C	A	0
+1	2000	C	A	2

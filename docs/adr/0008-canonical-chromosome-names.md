@@ -1,4 +1,4 @@
-# Chromosome names are canonicalised at the boundary; `XY` collapses into `X`
+# Chromosome names become canonical at the boundary. `XY` becomes `X`
 
 ## Status
 
@@ -6,21 +6,23 @@ Accepted. Enables [ADR 0007](0007-ploidy-is-observed-per-call.md).
 
 ## Context
 
-Chromosome names are load-bearing in two places that must agree: the zarr hierarchy is `/{sampleset}/{chromosome}/{filename}/genotypes` ([ADR 0003](0003-shards-are-zarr-leaf-groups.md)), and matching joins scoring file variants to target variants on `(chr_name, chr_pos)`. While everything was 1–22 the dialects happened to line up. X, Y and MT break that.
+Chromosome names must agree between the zarr hierarchy and matching. The hierarchy is `/{sampleset}/{chromosome}/{filename}/genotypes` ([ADR 0003](0003-shards-are-zarr-leaf-groups.md)). Matching joins scoring variants to target variants on `(chr_name, chr_pos)`. The naming conventions agreed while every chromosome was 1–22. X, Y and MT break that agreement.
 
-The three vocabularies in play are all different:
+The three sources use different names:
 
-- **PGS Catalog scoring files** use `X`, `XY`, `MT`. This is not inferred — `add_chrom_padding`'s docstring names those exact values as the non-numeric cases it must pass through (`lib/cache/_bgen.py:404`).
-- **Target genomes** use `X` or `chrX`, `MT` or `chrM` or `M`, with or without zero padding.
-- **plink**, a format the reader interface is expected to grow, uses numeric codes: 23 = X, 24 = Y, 25 = XY (pseudoautosomal), 26 = MT.
+- **PGS Catalog scoring files** use `X`, `XY`, `MT`. The `add_chrom_padding` docstring explicitly lists these non-numeric values (`lib/cache/_bgen.py:404`). This is evidence, not an inference.
+- **Target genomes** use `X` or `chrX`, and `MT`, `chrM` or `M`. They can also use zero padding.
+- **plink** uses numeric codes: 23 = X, 24 = Y, 25 = XY (pseudoautosomal), 26 = MT. The reader interface is expected to support plink later.
 
-Handling today is asymmetric and only half exists. The bgen path normalises target names — `normalise_chrom` strips a `chr` prefix and leading zeros (`_bgen.py:183`), with `add_chrom_padding` and `add_chrom_prefix` translating back into the target's dialect. The VCF path normalises **nothing**: it passes scoring-file chromosome names straight to `bcftools view -R`, so a VCF using `chrX` returns no regions and reports the variants as unmatched rather than failing.
+At this decision, only the bgen path normalises target names. `normalise_chrom` removes a `chr` prefix and leading zeros (`_bgen.py:183`). `add_chrom_padding` and `add_chrom_prefix` restore the target's naming convention.
 
-`XY` is the sharp edge, and it is purely a naming problem. Under ADR 0007 a pseudoautosomal variant needs no biological special-casing — it is diploid in the file because it is diploid, and ploidy is observed. But a scoring file variant labelled `XY` still has to *match* a target genome that calls that locus `X`, and no amount of correct ploidy handling makes two different strings join.
+The VCF path normalises nothing. It passes scoring-file chromosome names directly to `bcftools view -R`. A VCF using `chrX` returns no regions and reports unmatched variants instead of an error.
+
+`XY` presents a naming problem. Under ADR 0007, pseudoautosomal variants need no separate biological handling because the file records their diploidy. A score variant labelled `XY` must still match a target locus labelled `X`. Correct ploidy handling cannot make different strings join.
 
 ## Decision
 
-There is one internal chromosome vocabulary: **`1`–`22`, `X`, `Y`, `MT`**. Names are canonicalised **once, at the boundary** — every `GenomeFileHandler` on the way in, and the scoring file loader on the way in — and the Cache stores canonical names only.
+The internal chromosome names are **`1`–`22`, `X`, `Y`, `MT`**. Every `GenomeFileHandler` and the scoring file loader canonicalise names once, when they read inputs. The Cache stores only canonical names.
 
 ```
 scoring file   XY, X, MT      ->  X, X, MT
@@ -29,18 +31,30 @@ bgen           0X, chrX       ->  X
 plink          23, 25, 26     ->  X, X, MT
 ```
 
-`XY` collapses into `X`. `M` and `chrM` collapse into `MT`. `VALID_CHROMOSOMES` becomes `{1..22, X, Y, MT}` and stops being a list of what is implemented.
+`XY` becomes `X`. `M` and `chrM` become `MT`. `VALID_CHROMOSOMES` becomes `{1..22, X, Y, MT}` rather than a list of implemented chromosomes.
 
-This is the same principle [ADR 0003](0003-shards-are-zarr-leaf-groups.md) already applies to genotypes: after LOAD, no stage knows what the input looked like. Extending it to chromosome names means MATCH never compares across dialects, and the zarr hierarchy stays legible to a domain expert inspecting the store — `/{sampleset}/X/...` regardless of whether the input said `chrX`, `0X` or `23`.
+[ADR 0003](0003-shards-are-zarr-leaf-groups.md) already applies this principle to genotypes. After LOAD, no stage needs to know the input representation. MATCH therefore compares only canonical names. A domain expert sees `/{sampleset}/X/...` in the store whether the input used `chrX`, `0X` or `23`.
 
-**Keeping `XY` as a distinct internal chromosome was rejected.** It preserves a distinction plink models, but every target genome that calls the pseudoautosomal region `X` would then need its PAR variants relabelled, which requires exactly the build-specific PAR coordinate map ADR 0007 declined to ship. The distinction buys nothing once ploidy is observed rather than derived, because PAR's only significance was telling you where a man is diploid — and the file already says.
+**This ADR rejects a distinct internal `XY` chromosome.** This preserves a distinction in plink, but requires relabelling PAR variants in targets that use `X`. Relabelling needs the build-specific PAR coordinate map that ADR 0007 rejected. The distinction adds no information when the file already records where a man is diploid.
 
-**Per-reader normalisation only** — extending the bgen approach and leaving the cache to hold whatever the target used — was rejected because it pushes dialect reconciliation into MATCH, which then has to compare `chrX` against `X` against `23` for every sampleset.
+**This ADR rejects normalisation only within readers.** This would extend the bgen approach and let the Cache retain target names. MATCH would then need to reconcile `chrX`, `X` and `23` for every sampleset.
 
 ## Consequences
 
-- The VCF path's total absence of normalisation is fixed as a side effect rather than as separate work. A `chr`-prefixed VCF silently matching nothing is a pre-existing bug for chromosomes 1–22 too, not something X introduced.
-- `vcf_buffer_variants` sorts regions with `key=lambda t: (int(t[0]), t[1])` (`lib/cache/_vcf.py:65`), which raises on any non-numeric canonical name. The sort key has to become dialect-aware; canonicalising does not save it, because `X` stays `X`.
-- Canonical names are baked into the zarr hierarchy, so a cache written before this decision and one written after are not interchangeable. As with [ADR 0003](0003-shards-are-zarr-leaf-groups.md)'s depth change, alpha caches are discarded rather than migrated.
-- A scoring file carrying both an `XY` variant and an `X` variant at the same position now produces two rows at one canonical position. **Measured rather than left open:** it is neither collapsed as a duplicate nor rejected as an error. `score_variant_table` holds both rows with their two different weights; `is_duplicated` stays `False` on both, because pgscatalog-format computes it before `XY` becomes `X` and nothing recomputes it afterwards. `allele_match_table` matches both against the same `target_row_nr` — the PK is `(sampleset, accession, row_nr, zarr_group)`, so nothing dedups them. `create_wide_weights_table`'s PIVOT then groups on a key identical for both rows and aggregates with `coalesce(any_value(effect_weight), 0)`, yielding **one weight-matrix row carrying one of the two weights, with which one unspecified** — both tie on the insert's `ORDER BY`. So the `GROUP BY` prevents a double count in the score, but a weight is discarded silently and the `min_overlap` numerator counts one locus twice. `is_duplicated` is therefore the wrong place to look; a `(accession, chr_name, chr_position)` uniqueness check on `score_variant_table` is the natural fix if the answer is "reject". Any two variants that canonicalise to one position hit this — `XY`/`X` is just the first way to reach it. Worth noting that `_weight_matrix.py` states the broken assumption in a comment beside the aggregation — *"the pivoted values (effect weights) are unique on accession, any_value is a workaround, it's no-op"* — which was true before canonicalisation and is what this decision invalidates.
-- Collapsing `XY` into `X` is not reversible from the cache. If a future decision needs PAR as a distinct region — a PAR-aware quality check, say — it must come from a coordinate map, not from a chromosome name.
+- This also corrects the VCF path's missing normalisation. A `chr`-prefixed VCF already silently matched nothing on chromosomes 1–22. X did not introduce that defect.
+- `vcf_buffer_variants` uses `key=lambda t: (int(t[0]), t[1])` to sort regions (`lib/cache/_vcf.py:65`). This fails for non-numeric canonical names. The sort key must handle those names because canonicalisation leaves `X` as `X`.
+- The zarr hierarchy contains canonical names. Caches from before and after this decision are not interchangeable. As with [ADR 0003](0003-shards-are-zarr-leaf-groups.md)'s depth change, discard alpha caches instead of migrating them.
+
+### Recorded collision behaviour
+
+Measurements during this decision established the following behaviour. A scoring file with `XY` and `X` variants at the same position produces two rows at one canonical position. The implementation neither merges them as duplicates nor rejects them.
+
+`score_variant_table` retains both rows and their different weights. Both retain `is_duplicated = False`. pgscatalog-format computes this flag before `XY` becomes `X`, and nothing recomputes it afterwards.
+
+`allele_match_table` matches both rows to the same `target_row_nr`. Its primary key is `(sampleset, accession, row_nr, zarr_group)`, so it removes neither row. The PIVOT in `create_wide_weights_table` groups both rows under the same key. It applies `coalesce(any_value(effect_weight), 0)` and produces one weight-matrix row with one unspecified weight. Both rows tie under the insert's `ORDER BY`.
+
+The `GROUP BY` prevents a double score contribution, but silently discards one weight. The `min_overlap` numerator counts the locus twice. Checking `is_duplicated` cannot detect this problem. If the decision is to reject it, the natural check is uniqueness of `(accession, chr_name, chr_position)` in `score_variant_table`.
+
+Any two variants that canonicalise to one position can cause this problem. `XY` and `X` provide the first example. A comment beside the aggregation in `_weight_matrix.py` states the invalid assumption: *"the pivoted values (effect weights) are unique on accession, any_value is a workaround, it's no-op"*. That assumption held before canonicalisation, which invalidates it.
+
+Collapsing `XY` into `X` cannot be reversed from the Cache. Any future PAR-specific decision, such as a quality check, must use a coordinate map rather than a chromosome name.

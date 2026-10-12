@@ -15,6 +15,9 @@ from pgscatalog.calc import Scorefiles, TargetGenome
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 from pgscatalog.calc.lib.score._dosage import calculate_effect_allele_dosage
 
+# Reference generators are standalone commands, not importable doctest modules.
+collect_ignore = ["data"]
+
 
 @pytest.fixture
 def test_positions() -> list[tuple[str, int]]:

@@ -1,4 +1,4 @@
-# `pgsc_calc run` executes the four stages in sequence, as a convenience entry point
+# `pgsc_calc run` executes the four stages sequentially for convenience
 
 ## Status
 
@@ -6,23 +6,55 @@ Accepted
 
 ## Context
 
-[ADR 0006](0006-one-module-per-stage-no-base-class.md) rejected "an orchestrator that runs all four stages in one process", on two grounds: it contradicts [ADR 0001](0001-nextflow-fanout-for-split-apply.md), where fan-out belongs to Nextflow because a dask-distributed scheduler needs inter-node reachability that TREs often forbid; and it would be a second definition of the stage graph, free to diverge from `main.nf`.
+[ADR 0006](0006-one-module-per-stage-no-base-class.md) rejected an orchestrator
+that runs all four stages in one process. It gave two reasons.
 
-The first ground does not reach a *sequential* runner. It is an argument against a second scaling mechanism, and running stages one after another on one machine introduces no cluster, no scheduler, and no network requirement. The second ground stands, and gets sharper the moment such a runner is shipped rather than confined to a test fixture.
+The first reason concerned scaling.
+[ADR 0001](0001-nextflow-fanout-for-split-apply.md) assigns fan-out to Nextflow.
+A dask-distributed scheduler needs connections between nodes, which TREs often
+forbid. The second reason concerned maintenance. Another orchestrator would define
+the stage graph again and could diverge from `main.nf`.
 
-What has changed is the demand. Nextflow needs a JVM and its own configuration, which is a real obstacle in locked-down environments, and its fan-out is overhead rather than help when there is nothing to fan out to. There is also a dogfooding argument: this repo's stages are currently exercised end-to-end only by `run_pipeline` in `tests/integration/conftest.py`, which is itself the second definition ADR 0006 tolerated on the grounds that it was not shipped.
+The first reason does not apply to a sequential runner. Sequential execution on
+one machine adds no cluster, scheduler or network requirement. The maintenance
+risk remains. It increases when the runner becomes a shipped feature instead of a
+test fixture.
+
+Demand changed. Nextflow requires a JVM and its own configuration, which can block
+use in restricted environments. Fan-out adds overhead when no other execution
+resources exist.
+
+There is also a reason to test the entry point that users receive. Currently,
+only `run_pipeline` in `tests/integration/conftest.py` exercises the repository's
+stages end to end. This helper already defines the graph a second time. ADR 0006
+accepted that duplication because the helper did not ship.
 
 ## Decision
 
-A fifth subcommand, `pgsc_calc run`, executes MATCH → MATCH_COMBINE → SCORE → SCORE_COMBINE in sequence in one process, after LOADing each target genome. `CONTEXT.md` names this a **Serial run**. It is a convenience entry point, not a scaling mechanism: `pgsc_calc` remains the supported path, and this is expected to serve a small minority of users.
+A fifth subcommand, `pgsc_calc run`, loads each target genome. It then executes
+MATCH → MATCH_COMBINE → SCORE → SCORE_COMBINE sequentially in one process.
+`CONTEXT.md` calls this a **Serial run**. It provides convenience, not another
+scaling mechanism. `pgsc_calc` remains the supported path. The serial entry point
+is expected to serve a small minority of users.
 
-**It is not a second stage graph, because `run_pipeline` is deleted.** The integration tests drive `pgsc_calc run`, so the count of stage-graph definitions in this repo stays at one, and the one that ships is the one the tests exercise.
+**The change deletes `run_pipeline`, so it does not add another stage graph.**
+Integration tests drive `pgsc_calc run`. The repository still has one stage-graph
+definition, and tests exercise the shipped definition.
 
-**Stages are invoked by composing argv and dispatching through the parser `main()` builds**, not by importing stage functions and hand-building a `Namespace`. Argparse then validates that `run` still speaks each stage's documented argument language: a renamed or newly-required argument fails with a clean error naming the flag, rather than an `AttributeError` part-way through a stage.
+**The runner composes argv and dispatches through the parser that `main()`
+builds.** It does not import stage functions and construct a `Namespace` manually.
+Argparse checks that `run` uses each stage's documented arguments. A renamed or
+newly required argument produces an error that names the flag. It does not cause
+an `AttributeError` during the stage.
 
-**Stages exchange the same on-disk artefacts they exchange under Nextflow.** Passing polars frames between stages in memory was rejected: the artefact contract is what binds this repo to `main.nf`, and it is the thing worth dogfooding. A serial run also archives and re-extracts the cache like a Nextflow task does, keeping the LOAD → MATCH/SCORE seam covered.
+**Stages exchange the same disk artefacts as they do under Nextflow.** Passing
+polars frames between stages in memory was rejected. The serial runner exercises
+the artefact contract that binds this repository to `main.nf`. A serial run
+also archives and extracts the cache again, as a Nextflow task does. This keeps
+the LOAD → MATCH/SCORE boundary under test.
 
-Each stage gets its own directory under `out_dir/stages/`, and the final `scores.txt.gz` is copied to the `out_dir` root:
+Each stage has a directory under `out_dir/stages/`. The runner copies the final
+`scores.txt.gz` to the `out_dir` root:
 
 ```
 out_dir/
@@ -35,16 +67,47 @@ out_dir/
     combine/{scores.txt.gz, scratch/}
 ```
 
-This tree is `run`'s output, not its scratch. [ADR 0005](0005-scratch-lives-under-out-dir.md) governs what a Nextflow `publishDir` sees and continues to hold *within* each stage directory; it does not govern the root of a serial run, which is not a Nextflow task.
+This tree is `run`'s output, not its scratch.
+[ADR 0005](0005-scratch-lives-under-out-dir.md) governs what a Nextflow
+`publishDir` sees. It still applies within each stage directory. It does not
+govern a serial run's root, because a serial run is not a Nextflow task.
 
-**`run` aborts on the first stage failure.** SCORE_COMBINE sums the partial scores it is handed and cannot know how many shards existed, so continuing past a failed SCORE would produce quietly low scores for every sample — the failure mode this pipeline refuses elsewhere. `run` asserts it has one partial score per shard before invoking SCORE_COMBINE, because it is the only component that knows the expected count.
+**`run` aborts at the first stage failure.** SCORE_COMBINE sums the supplied
+partial scores. It cannot know how many shards existed. Continuing after a failed
+SCORE would silently reduce every sample's score. The pipeline refuses that
+failure elsewhere too.
 
-**Resume is out of scope.** A failure costs the whole run. The completed stages' outputs are left on disk and the failing stage's argv is logged, so that stage can be rerun by hand against them.
+Before SCORE_COMBINE, `run` asserts that it has one partial score per shard. Only
+`run` knows the expected count.
+
+**Resume is outside scope.** A failure requires the whole run again. Outputs from
+completed stages remain on disk. The runner logs the failing stage's argv. A user
+can run that stage manually against those outputs.
 
 ## Consequences
 
-- A serial run's peak memory is the maximum over single stages, not their sum, because SCORE still holds one shard ([ADR 0003](0003-shards-are-zarr-leaf-groups.md)) and MATCH still sees one chromosome. What a serial run gives up is wall-clock. **Its limit is therefore shard count, not dataset size** — big-but-few shards are a good fit, and many-small-shards is the miserable case. There is deliberately no size guard, because any threshold would be measuring the wrong quantity.
-- One process means "peak = max over stages" only if each stage releases what it held. A leaked store or an open connection turns max into sum, which Nextflow gets right for free by ending the process. Worth a test that pins peak RSS against a single SCORE task.
-- `--max_memory_gb` and `--threads` are declared once and apply to every stage, where Nextflow sets them per task.
-- **Nothing detects a fifth stage.** Argparse catches a changed argument, but a stage added to `main.nf` and never wired into `run` will keep passing every test here. This is an accepted risk, mitigated only by `run` iterating a declared list of stages that a test pins, so adding one is a choice rather than an oversight. A coverage gate was considered and rejected: a new stage's own tests would cover its lines, so the gate would report healthy for precisely this failure.
-- The tests that assert stage output layout keep asserting it — only their prefix moves, to `out_dir/stages/`. They are not re-pointed at a scratch path, which ADR 0005 declares unstable.
+- A serial run's peak memory is the maximum across stages, not their sum. SCORE
+  still holds one shard ([ADR 0003](0003-shards-are-zarr-leaf-groups.md)), and MATCH
+  still sees one chromosome. Sequential execution increases elapsed time.
+  **Shard count therefore limits serial use, rather than dataset size.** A few
+  large shards suit it better than many small shards.
+
+  There is deliberately no size guard. A size threshold would measure the wrong
+  quantity.
+- Peak memory equals the largest stage only if each stage releases its resources.
+  Leaked stores or open connections can make usage accumulate across stages.
+  Nextflow avoids this accumulation by ending each process. A test comparing peak
+  RSS with one SCORE task would be useful.
+- The runner declares `--max_memory_gb` and `--threads` once and applies them to
+  every stage. Nextflow sets these resources per task.
+- **Nothing detects a fifth stage.** Argparse catches changed arguments. It cannot
+  detect a stage added to `main.nf` but omitted from `run`. Every test here would
+  continue to pass. This is an accepted risk.
+
+  The only mitigation is a declared stage list that `run` iterates and a test
+  checks. Adding a stage then requires an explicit choice. A coverage gate was
+  rejected. The new stage's own tests would cover its lines while the serial
+  runner still omitted it.
+- Tests continue to assert the stage output layout. Only their prefix changes to
+  `out_dir/stages/`. They do not use scratch paths, which ADR 0005 declares
+  unstable.

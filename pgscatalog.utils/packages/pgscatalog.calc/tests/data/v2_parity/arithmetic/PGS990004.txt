@@ -1,0 +1,11 @@
+#pgs_id=PGS990004
+#pgs_name=ArithmeticParity
+#trait_reported=Synthetic test fixture
+#genome_build=GRCh38
+chr_name	chr_position	effect_allele	other_allele	effect_weight	is_dominant	is_recessive
+1	1000	C	A	0.13	False	False
+1	2000	A	C	-0.29	True	False
+1	3000	C	A	0.37	False	True
+2	1000	C	A	0.13	False	False
+2	2000	A	C	-0.29	True	False
+2	3000	C	A	0.37	False	True

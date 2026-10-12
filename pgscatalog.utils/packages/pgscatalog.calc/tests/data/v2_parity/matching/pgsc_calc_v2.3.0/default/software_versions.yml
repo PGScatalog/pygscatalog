@@ -1,0 +1,18 @@
+DUMPSOFTWAREVERSIONS:
+  python: 3.10.9
+  yaml: '6.0'
+FORMAT_SCOREFILES:
+  pgscatalog.core: 1.1.1
+MATCH_COMBINE:
+  pgscatalog.match: 0.4.0
+MATCH_VARIANTS:
+  pgscatalog.match: 0.4.0
+PGSCATALOG_PGSCCALC:PGSCCALC:MAKE_COMPATIBLE:PLINK2_VCF:
+  plink2: 2.00a5.10
+PLINK2_SCORE:
+  plink2: 2.00a5.10
+SCORE_AGGREGATE:
+  pgscatalog.calc: 0.3.1
+Workflow:
+  Nextflow: 25.10.0
+  pgscatalog/pgsc_calc: 2.3.0

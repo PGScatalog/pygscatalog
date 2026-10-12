@@ -171,7 +171,7 @@ def calculate_score_statistics(
     For each accession, the function:
 
       - Retrieves the number of matched variants from the allele match table
-      - Selects variants with non-zero effect weights for that accession
+      - Selects matched variants belonging to that accession, including zero weights
       - Computes the sum of effect allele dosages across variants (per sample)
       - Computes the number of alleles carried at non-missing calls (per sample),
         which depends on each sample's own ploidy (ADR 0007)
@@ -203,10 +203,9 @@ def calculate_score_statistics(
 
     Notes
     -----
-    To grab variants in an accession any rows with an effect weight of 0 are filtered
-    from the accession column. If an accession contains variants with effect weights
-    of zero (which would be very weird), these would get filtered out before calculating
-    these statistics.
+    Membership comes from matched scoring rows, not the pivoted coefficients.
+    Explicit zero weights still contribute observed alleles and dosage statistics;
+    zeros inserted by the pivot for an absent score row do not (ADR 0015).
     """
     logger.info(f"{config.ZARR_VARIANT_CHUNK_SIZE=} {config.ZARR_COMPRESSOR=}")
     logger.info("Calculating dosage statistics")
@@ -239,12 +238,28 @@ def calculate_score_statistics(
             raise ValueError(f"{accession=} can't count matches")
         n_matched = query[0]
 
-        # slice the weight matrix to include variants with non-zero effect weights
-        accession_idx = conn.sql(f"""
-        SELECT weight_mat_row_nr
-        FROM wide_score_variants
-        WHERE "{accession}" != 0
-        """).fetchnumpy()["weight_mat_row_nr"]
+        # Pivoted zero coefficients mean either an absent score row or an
+        # explicitly zero-weight matched row. Only the original membership can
+        # distinguish them; observed allele statistics include the latter (ADR 0015).
+        accession_idx = conn.execute(
+            """
+            SELECT w.weight_mat_row_nr
+            FROM wide_score_variants w
+            WHERE EXISTS (
+                SELECT 1 FROM allele_match_table m
+                JOIN score_variant_table s USING (accession, row_nr)
+                WHERE m.accession = $accession AND m.sampleset = $sampleset
+                  AND m.match_result.match_summary = 'matched'
+                  AND m.zarr_group = w.zarr_group
+                  AND m.target_row_nr = w.target_row_nr
+                  AND m.match_result.effect_allele_idx = w.effect_allele_idx
+                  AND (s.effect_type = 'dominant') = w.is_dominant
+                  AND (s.effect_type = 'recessive') = w.is_recessive
+            )
+            ORDER BY w.weight_mat_row_nr
+            """,
+            {"accession": accession, "sampleset": sampleset},
+        ).fetchnumpy()["weight_mat_row_nr"]
 
         accession_dosage = calculate_effect_allele_dosage(
             dosage_array=dosage_array, accession_idx=accession_idx

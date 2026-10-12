@@ -1,46 +1,85 @@
 # alpha2 tickets
 
-Open work only. A ticket is deleted when it lands — the commit that closes it is its record, and `git log -- docs/tickets/` finds the ones that are gone. Decisions that outlive the work belong in `docs/adr/`, not here.
+This directory contains open work only.
+Delete a ticket when its implementation is complete.
+The closing commit preserves the ticket's record.
+Use `git log -- docs/tickets/` to find deleted tickets.
+Record decisions that remain relevant after implementation in `docs/adr/`.
 
-Derived from ADRs 0001, 0003, 0004, and 0007–0014. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
+The tickets derive from ADRs 0001, 0003, 0004 and 0007–0014.
+Read `CONTEXT.md` and those ADRs before work starts.
+The glossary and ADRs explain the decisions. Tickets describe the required work.
 
 ## Open
 
-Nothing open.
+No tickets are open.
 
-The last to land was the Sex check ([ADR 0014](../adr/0014-declared-sex-is-checked-never-used.md)),
-which amends ADR 0007 without reversing it: a **Declared sex** is checked and never used,
-so ploidy stays observed per call and no PAR coordinates enter the repository. 0039 was
-the declaration and the mandate, provable without genotypes; 0040 was the comparison,
-which raises on a mismatch and is exempted per sample by declaring `0`.
+## Completed work
 
-Before it, a Serial run (ADR 0013) landed: a convenience entry point for environments
-where Nextflow cannot run, not a second scaling mechanism — `pgsc_calc` remains the
-supported path. 0036 built `pgsc_calc run`, 0037 made it the thing the integration tests
-exercise (which is the dogfooding argument for having built it), and 0038 measured the
-property that makes it usable on real data.
+The latest completed work was the Sex check in
+[ADR 0014](../adr/0014-declared-sex-is-checked-never-used.md).
+It amends ADR 0007 without reversing its ploidy decision.
+The pipeline checks Declared sex but never uses it to determine ploidy.
+Ploidy remains observed per call, and the repository contains no PAR coordinates.
 
-Before it, X, Y and MT support (0019–0025) landed, leaving two bugs it uncovered
-(0026, 0027); multiallelic handling (ADR 0010) added 0028–0032; implementing those
-uncovered two more (0033, 0034), both crashes or wrong answers on `main`
-independently of multiallelic support; and 0035 ported v2's `--ignore_strand_flips`.
+- Ticket 0039 added the declaration and its requirement, which tests can check without genotypes.
+- Ticket 0040 added the comparison. A mismatch raises an error. Declaring `0` exempts a sample.
 
-Two decisions taken while closing them are recorded rather than lost: a wholly missing VCF call keeps the ploidy its `GT` declares, guarded where nothing at the variant is hemizygous ([ADR 0007](../adr/0007-ploidy-is-observed-per-call.md)), and a strand flip is a reverse complement that an indel declines ([ADR 0011](../adr/0011-strand-flips-are-reverse-complements-and-optional.md)).
+The preceding work added Serial run in ADR 0013.
+It provides an entry point for environments where Nextflow cannot run.
+It does not add another scaling mechanism. `pgsc_calc` remains the supported path.
 
-## Not in this repo
+- Ticket 0036 added `pgsc_calc run`.
+- Ticket 0037 changed integration tests to use that command. This tests the public entry point directly.
+- Ticket 0038 measured the memory property that makes serial execution usable with real data.
 
-Nextflow module wiring lives in `pgsc_calc` (`workflows/pgsc_calc/main.nf`, `modules/local/`): four processes replacing the single `PGSC_CALC_SCORE` task, chromosome-grouped channels for MATCH, shard-level channels for SCORE.
+Earlier work proceeded in this order:
 
-A pre-flight validation process reading VCF headers and bgen `.sample` files would fail faster than the cache shape invariants do — an invariant breach at MATCH_COMBINE means every LOAD task has already run, which over a biobank is hours. Purely a compute optimisation; the authoritative check still belongs at MATCH.
+1. Tickets 0019–0025 added X, Y and MT support.
+2. That work exposed two defects, recorded as tickets 0026 and 0027.
+3. ADR 0010 introduced multiallelic handling and tickets 0028–0032.
+4. That implementation exposed tickets 0033 and 0034. Both described crashes or incorrect results on `main`, independently of multiallelic support.
+5. Ticket 0035 added v2's `--ignore_strand_flips` option.
 
-## Deferred
+Two decisions from that work remain documented:
 
-`homref` absence semantics (sparse-called WGS, ragged batches) — design recorded in ADR 0004, strictly additive on top of alpha2.
+- A wholly missing VCF call retains the ploidy declared by its GT. A guard applies when no call at the variant is hemizygous.
+  See [ADR 0007](../adr/0007-ploidy-is-observed-per-call.md).
+- A strand flip uses a reverse complement. Indels do not support that inference.
+  See [ADR 0011](../adr/0011-strand-flips-are-reverse-complements-and-optional.md).
 
-Reference-database backfill for variants absent from the whole sampleset — needs its own ADR, because it decouples "matched" from "has a dosage" and would otherwise drive the match rate to 100% by construction and kill `min_overlap`.
+## Work outside this repository
 
-`_score_shard` in `tests/integration/test_bgen.py` is a third definition of the stage graph, and 0037 deliberately left it alone. It takes an already-loaded zip rather than target genomes, so `pgsc_calc run` doesn't drop into it without teaching `run` to accept a pre-built cache — which is a decision about the subcommand, not a test cleanup.
+Nextflow module configuration belongs in `pgsc_calc`, under `workflows/pgsc_calc/main.nf` and `modules/local/`.
+Four processes replace the single `PGSC_CALC_SCORE` task.
+MATCH channels group inputs by chromosome. SCORE channels group inputs by shard.
 
-One finding from the alpha2 architecture review is still unticketed: deciding whether a run has one sampleset. It is asserted three ways and iterated once, with a `_matchlog.py` TODO recording that the multi-sampleset path is untested.
+A validation process could read VCF headers and bgen `.sample` files before LOAD.
+It would detect invalid layouts earlier than the cache checks.
+An error at MATCH_COMBINE occurs after every LOAD task completes, which can take hours for a biobank.
+This proposed process would reduce wasted computation.
+The authoritative check would remain at MATCH.
 
-Validating chrX scores against plink2 is deliberately unticketed — integration tests for this are planned manually. It is worth doing eventually: ADR 0007's decision that a hemizygous effect allele contributes a dosage of 1 rests on matching plink2 `--score`'s default, and nothing in 0020–0025 checks that claim against the reference implementation (0020 checks the dosage against the target VCF's own calls, which is a different thing).
+## Deferred work
+
+`homref` absence semantics supports sparse-called WGS and ragged batches.
+ADR 0004 records its design as an addition to alpha2.
+
+Using a reference database for variants absent from the whole sampleset needs a separate ADR.
+It separates a match from the availability of a dosage.
+Without a separate decision, such matches could force the match rate to 100% and make `min_overlap` ineffective.
+
+`_score_shard` in `tests/integration/test_bgen.py` defines the stage sequence for a third time.
+Ticket 0037 deliberately retained it.
+It receives a cache zip instead of target genomes.
+Replacing it with `pgsc_calc run` would require that command to accept an existing cache.
+That is a subcommand decision, not only a test cleanup.
+
+The alpha2 architecture review left one finding without a ticket: whether a run contains one sampleset.
+The code asserts this in three places and iterates over samplesets in another.
+A TODO in `_matchlog.py` records that the path for multiple samplesets lacks tests.
+
+The alpha2 plan also left chrX comparisons with plink2 without tickets and planned integration tests manually.
+ADR 0007 based dosage 1 for a hemizygous effect allele on an assumption about the default for plink2 `--score`.
+Tickets 0020–0025 did not check that assumption against plink2.
+Ticket 0020 checked dosage against the target VCF calls, which is a different check.

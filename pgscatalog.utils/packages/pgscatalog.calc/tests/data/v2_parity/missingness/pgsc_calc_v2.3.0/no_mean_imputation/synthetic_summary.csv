@@ -1,0 +1,2 @@
+dataset,accession,score_pass,match_status,ambiguous,is_multiallelic,duplicate_best_match,duplicate_ID,match_flipped,match_IDs,count,percent
+synthetic,PGS990010,true,matched,false,false,false,false,false,NA,4,100.0

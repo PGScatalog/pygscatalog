@@ -62,6 +62,43 @@ def tests(session):
     )
 
 
+@nox.session(default=False, python="3.12")
+def v2_parity(session):
+    """Run only the PLINK 2 and pgsc_calc v2.3.0 score parity integration tests."""
+    package = "pgscatalog.calc"
+    config_file = "packages/pgscatalog.calc/pyproject.toml"
+    test_paths = sorted(
+        pathlib.Path("packages/pgscatalog.calc/tests/integration").glob(
+            "test_v2_parity*.py"
+        )
+    )
+
+    session.run_install(
+        "uv",
+        "sync",
+        "--group",
+        "test",
+        "--package",
+        package,
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+    session.run(
+        "uv",
+        "run",
+        "--group",
+        "test",
+        "--exact",
+        "--package",
+        package,
+        "pytest",
+        "-c",
+        config_file,
+        *map(str, test_paths),
+        external=True,
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+
 @nox.session
 def lint(session):
     """Run linting checks"""
