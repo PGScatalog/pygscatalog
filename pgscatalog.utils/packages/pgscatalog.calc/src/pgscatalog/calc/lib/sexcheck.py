@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 import numpy.typing as npt
 
-from pgscatalog.calc.lib.cache.genotypecache import GenotypeCache
+from pgscatalog.calc.lib.cache.genotypecache import GenotypeCache, meta_group_path
 from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import (
     MISSING_GENOTYPE_SENTINEL_VALUE,
@@ -158,8 +158,10 @@ class SexCheckMismatch(ValueError):
 
 
 def _shard_fractions(
-    genotypes: zarr.Array, samples: list[str]
-) -> tuple[list[float | None], int]:
+    genotypes: zarr.Array,
+    samples: list[str],
+    x_variants: npt.NDArray[np.bool_] | None = None,
+) -> tuple[list[float | None], list[int]]:
     """Per sample, the fraction of its called genotypes that are hemizygous.
 
     A variant is **informative** when at least one call in the shard is hemizygous.
@@ -171,6 +173,9 @@ def _shard_fractions(
     pseudoautosomal makes a man diploid at most of them, landing his fraction near 0 and
     reading him as female - without the rule the check is wrong, not weak.
 
+    Returns each sample's fraction and number of called informative X variants.
+    Whole-genome shards supply a mask so autosomal and Y calls cannot contribute.
+
     Informativeness counts a hemizygous no-call ([255, 254]): the file declared ploidy
     one there, which is the signal being read. The fraction's denominator does not, so
     that call contributes to neither side of the sample's own ratio.
@@ -178,24 +183,26 @@ def _shard_fractions(
     n_samples = len(samples)
     hemizygous_called = np.zeros(n_samples, dtype=np.int64)
     n_called = np.zeros(n_samples, dtype=np.int64)
-    n_informative = 0
 
     # read in variant-axis slices rather than whole: a biobank chrX shard is
     # (n_variants, n_samples, 2) uint8, and a PGS can carry thousands of X positions
     for start in range(0, genotypes.shape[0], config.ZARR_VARIANT_CHUNK_SIZE):
+        stop = start + config.ZARR_VARIANT_CHUNK_SIZE
+        selected = x_variants[start:stop] if x_variants is not None else None
+        if selected is not None and not selected.any():
+            continue
         # asarray, not the bare slice: a zarr read is typed loosely enough that the
         # comparisons below lose their ndarray-ness
-        gt: npt.NDArray[np.uint8] = np.asarray(
-            genotypes[start : start + config.ZARR_VARIANT_CHUNK_SIZE]
-        )
+        gt: npt.NDArray[np.uint8] = np.asarray(genotypes[start:stop])
+        if selected is not None:
+            gt = gt[selected]
 
         # ploidy is derived from the genotype array, never stored (ADR 0007)
         ploidy = (gt != NO_ALLELE_SENTINEL_VALUE).sum(axis=2)
-        called = ~(gt == MISSING_GENOTYPE_SENTINEL_VALUE).any(axis=2)
+        called = (~(gt == MISSING_GENOTYPE_SENTINEL_VALUE).any(axis=2)) & (ploidy > 0)
         hemizygous = ploidy == 1
 
         informative = hemizygous.any(axis=1)
-        n_informative += int(informative.sum())
         hemizygous_called += (hemizygous & called)[informative].sum(axis=0)
         n_called += called[informative].sum(axis=0)
 
@@ -207,7 +214,7 @@ def _shard_fractions(
         for i in range(n_samples)
     ]
 
-    return fractions, n_informative
+    return fractions, n_called.tolist()
 
 
 def check_sex(
@@ -220,7 +227,7 @@ def check_sex(
     samples (ADR 0003), so one chrX shard holds every cached X call for its samples.
     """
     cache = GenotypeCache(cache_dir / "genotypes.zarr", sampleset=sampleset)
-    shards = [shard for shard in cache.shards if shard.chromosome == "X"]
+    shards = [shard for shard in cache.shards if shard.chromosome in {"X", "ALL"}]
 
     if not shards:
         # the map was still mandatory and goes unread: the mandate is decided from the
@@ -237,18 +244,27 @@ def check_sex(
 
     for shard in shards:
         samples = shard.samples
-        fractions, n_informative = _shard_fractions(
-            cast("zarr.Array", root[f"{shard.path}/genotypes"]), samples
+        x_variants = None
+        if shard.chromosome == "ALL":
+            chromosomes = cast(
+                "zarr.Array", root[f"{meta_group_path(shard.path)}/chr_name"]
+            )
+            x_variants = np.asarray(chromosomes[:]) == "X"
+        fractions, called_counts = _shard_fractions(
+            cast("zarr.Array", root[f"{shard.path}/genotypes"]), samples, x_variants
         )
 
-        if n_informative < MIN_INFORMATIVE_VARIANTS:
+        below_floor = sum(n < MIN_INFORMATIVE_VARIANTS for n in called_counts)
+        if below_floor:
             logger.warning(
-                f"{shard.path}: {n_informative} informative X variants, fewer than "
-                f"{MIN_INFORMATIVE_VARIANTS}, so the sex check does not conclude for "
-                f"any of its {len(samples)} samples. Not concluding is not a pass."
+                f"{shard.path}: {below_floor} samples have fewer than "
+                f"{MIN_INFORMATIVE_VARIANTS} called informative X variants, so the "
+                "sex check does not conclude for them. Not concluding is not a pass."
             )
 
-        for sample_id, fraction in zip(samples, fractions, strict=True):
+        for sample_id, fraction, n_informative in zip(
+            samples, fractions, called_counts, strict=True
+        ):
             declared = sex_map[sample_id]
             results.append(
                 SampleResult(

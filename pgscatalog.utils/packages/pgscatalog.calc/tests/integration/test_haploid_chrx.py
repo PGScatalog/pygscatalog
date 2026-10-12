@@ -239,8 +239,9 @@ def test_declarations_that_agree_with_the_calls_load_cleanly(
     assert {fractions[s] for s, d in declared.items() if d == 2} == {0.0}
 
 
+@pytest.mark.parametrize("annotation", [":X", ""])
 def test_a_flipped_declaration_fails_the_load_naming_the_sample(
-    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch
+    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch, annotation
 ):
     """The point of the feature: a sample swap is not scored silently"""
     flipped = flip_sex_map(sex_map, tmp_path / "flipped.tsv", {"HG00096": 2})
@@ -248,7 +249,11 @@ def test_a_flipped_declaration_fails_the_load_naming_the_sample(
 
     with pytest.raises(ValueError) as excinfo:
         load_target(
-            f"{chrx_target}:X", cache_dir, chrx_scorefile, monkeypatch, sex_map=flipped
+            f"{chrx_target}{annotation}",
+            cache_dir,
+            chrx_scorefile,
+            monkeypatch,
+            sex_map=flipped,
         )
 
     assert "HG00096" in str(excinfo.value)
