@@ -574,7 +574,7 @@ def test_unmatched_chromosome_contributes_an_empty_partial(
     )
     modified = tmp_path / "unmatched.txt"
     score_rows.write_csv(modified, separator="\t")
-    scores = run_pipeline(
+    scores = run_serial(
         chromosome_targets,
         tmp_path / "work",
         modified,
@@ -585,4 +585,6 @@ def test_unmatched_chromosome_contributes_an_empty_partial(
         pl.col("chr_name").cast(pl.String) != unmatched_chrom
     ).height
     assert scores["n_matched"].unique().to_list() == [expected]
-    assert pl.read_parquet(tmp_path / "work/score/1/partial_scores.parquet").is_empty()
+    assert pl.read_parquet(
+        tmp_path / "work/stages/score/1/partial_scores.parquet"
+    ).is_empty()
