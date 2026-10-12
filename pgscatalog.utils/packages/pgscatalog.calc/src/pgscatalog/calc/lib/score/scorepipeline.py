@@ -493,6 +493,7 @@ class ScorePipeline:
                         """
                         SELECT DISTINCT accession FROM allele_match_table
                         WHERE sampleset = ? AND zarr_group = ?
+                          AND match_result.match_summary = 'matched'
                         ORDER BY accession
                         """,
                         [sampleset, self.shard],
@@ -500,7 +501,10 @@ class ScorePipeline:
                 ]
 
             if not accessions_to_calculate:
-                raise ValueError(f"No accessions matched any variant in {self.shard!r}")
+                logger.info(
+                    f"No matched variants in {self.shard!r}; exporting no contributions"
+                )
+                continue
 
             # get wide effect weights (a matrix) for each zarr genotype group
             grouped_dfs: dict[str, pl.DataFrame] = store_group_weight_arrays(

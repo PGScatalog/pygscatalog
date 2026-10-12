@@ -246,8 +246,7 @@ def test_accession_below_min_overlap_is_rejected_genome_wide(
         # enough unmatchable variants to put the rate under 75%
         for i in range(len(chrom_1)):
             f.write(
-                f"8\t{9_000_000 + i}\tA\tC\t0.1\tadditive\tFalse\t"
-                f"PGS999997\t{row_nr}\n"
+                f"8\t{9_000_000 + i}\tA\tC\t0.1\tadditive\tFalse\tPGS999997\t{row_nr}\n"
             )
             row_nr += 1
 
@@ -448,3 +447,30 @@ def test_match_logs_are_written(grid_targets, scorefile, tmp_path, monkeypatch):
 
     assert summary["is_match_rate_ok"].unique().to_list() == [True]
     assert any(pathlib.Path(logs).rglob("*.csv.gz"))
+
+
+def test_unmatched_chromosome_contributes_an_empty_partial(
+    chromosome_targets, scorefile, tmp_path, monkeypatch
+):
+    score_rows = pl.read_csv(scorefile, separator="\t")
+    unmatched_chrom = chromosome_targets[-1][1]
+    score_rows = score_rows.with_columns(
+        pl.when(pl.col("chr_name").cast(pl.String) == unmatched_chrom)
+        .then(pl.lit("AAA"))
+        .otherwise(pl.col("effect_allele"))
+        .alias("effect_allele")
+    )
+    modified = tmp_path / "unmatched.txt"
+    score_rows.write_csv(modified, separator="\t")
+    scores = run_pipeline(
+        chromosome_targets,
+        tmp_path / "work",
+        modified,
+        monkeypatch,
+        min_overlap="0.01",
+    )
+    expected = score_rows.filter(
+        pl.col("chr_name").cast(pl.String) != unmatched_chrom
+    ).height
+    assert scores["n_matched"].unique().to_list() == [expected]
+    assert pl.read_parquet(tmp_path / "work/score/1/partial_scores.parquet").is_empty()
