@@ -1,6 +1,7 @@
 import shutil
 import sqlite3
 import struct
+import subprocess
 import zlib
 
 import numpy as np
@@ -13,6 +14,7 @@ from pgscatalog.calc.lib.cache._bgen import (
     bgen_buffer_variants,
     bgen_to_hardcall,
     parse_target_variants,
+    prepare_region_query,
 )
 from pgscatalog.calc.lib.constants import (
     MISSING_GENOTYPE_SENTINEL_VALUE,
@@ -562,3 +564,29 @@ def test_layout_1_bgen_still_reads_an_autosome(tmp_path):
     variants = _parse(path, sample_path, [("1", 100)])
 
     assert np.array_equal(variants.genotypes[0], [[0, 0], [0, 1]])
+
+
+@pytest.mark.parametrize("native,canonical", [("chrM", "MT"), ("23", "X"), ("0X", "X")])
+def test_bgen_queries_actual_chromosome_aliases(tmp_path, native, canonical):
+    path, sample_path = _write_bgen(
+        tmp_path, [(native, 100, [HAP_ALT] * 4, [1] * 4, False)]
+    )
+    subprocess.run(["bgenix", "-index", "-clobber", "-g", str(path)], check=True)
+    variants = bgen_buffer_variants(
+        position_batch=[(canonical, 100)],
+        target_path=path,
+        sample_path=sample_path,
+        sampleset="test",
+        cache_dir=tmp_path / "cache",
+        idx_path=path.with_suffix(".bgen.bgi"),
+        target_chroms=[native],
+    )
+    assert variants.variant_ids == [f"{canonical}:100:A:G"]
+    assert np.all(variants.genotypes[0, :, 0] == 1)
+
+
+def test_bgen_queries_all_aliases_of_one_chromosome():
+    assert prepare_region_query([("X", 100)], ["X", "XY", "X"]) == [
+        ("X", 100, 100),
+        ("XY", 100, 100),
+    ]
