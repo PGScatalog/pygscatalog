@@ -93,3 +93,7 @@ This looks backwards, which is why it is written down: LOAD deliberately finishe
 - **Coverage is enforced on every target once the mandate fires**, autosomes included, rather than only where the check will run. A map keyed on the wrong sample ID space is one of the three failures this feature exists to catch, and enforcing everywhere makes it fail at the first target instead of whenever chrX happens to be dispatched.
 - The whole implementation is one module, `lib/sexcheck.py`, called from `load_cli`. No new stage and no new CLI subcommand — see the rejection above.
 - The check reads ploidy the readers already produce, so it adds no format-specific code and inherits ADR 0007's guarantees on both paths. It also inherits 0007's known VCF weakness: a woman's no-call miswritten `.` at a mixed-sex chrX variant is stored hemizygous, so a cohort with enough of them could push a fraction across the majority line. The floor of ten is the only thing standing against that, and it is a real limit rather than a theoretical one.
+
+## Review corrections
+
+The floor and reported `n_informative` apply to each sample's called informative X variants. Missing calls cannot supply the evidence required to make a conclusion. Whole-genome (`ALL`) shards select X rows from cached chromosome metadata; other chromosomes do not contribute to this check.
