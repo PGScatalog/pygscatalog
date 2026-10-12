@@ -1,5 +1,6 @@
 import gzip
 import pathlib
+from itertools import product
 
 import numpy as np
 import pysam
@@ -472,3 +473,24 @@ def test_a_spanning_deletion_loads_and_is_reported_unmatched(tmp_path, sampleset
         ).fetchall()
 
     assert rows == [("NO_MATCH", "unmatched", False)]
+
+
+@pytest.mark.parametrize("n_alts", [253, 254, 255])
+def test_multiallelic_indices_cannot_overlap_sentinels(tmp_path, n_alts):
+    alts = ["".join(bases) for bases in product("ACGT", repeat=4)][:n_alts]
+    target, index = indexed_target(
+        tmp_path, [f"{n_alts}/{n_alts}", "0/0"], alts=",".join(alts)
+    )
+    kwargs = dict(
+        position_batch=[("1", 100)],
+        target_path=target,
+        index_path=index,
+        cache_dir=tmp_path,
+        sampleset="test",
+    )
+    if n_alts >= 254:
+        with pytest.raises(ValueError, match="reserved for genotype sentinels"):
+            vcf_buffer_variants(**kwargs)
+    else:
+        variants = vcf_buffer_variants(**kwargs)
+        assert variants.genotypes[0, 0].tolist() == [253, 253]
