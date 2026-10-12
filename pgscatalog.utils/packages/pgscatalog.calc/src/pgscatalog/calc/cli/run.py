@@ -20,7 +20,12 @@ from rich import print
 
 from pgscatalog.calc.cli._stage import add_stage_args, configure_logging
 from pgscatalog.calc.cli._utils import zero_one_float
-from pgscatalog.calc.cli.load import AnnotatedGenomePath, add_load_input_args
+from pgscatalog.calc.cli.load import (
+    AnnotatedGenomePath,
+    add_load_input_args,
+    check_leaf_paths,
+)
+from pgscatalog.calc.lib.scorefile import Scorefiles
 
 if TYPE_CHECKING:
     import argparse
@@ -109,7 +114,19 @@ def run_cli(args: argparse.Namespace) -> None:
     zips: list[pathlib.Path] = []
     chromosomes: list[str] = []
 
-    for i, target in enumerate(args.target_genomes):
+    targets = [
+        AnnotatedGenomePath.from_string(target) for target in args.target_genomes
+    ]
+    check_leaf_paths(targets, args.sampleset)
+    score_chromosomes = {
+        chrom for chrom, _ in Scorefiles(args.score_paths).get_unique_positions()
+    }
+    for i, (target, annotated) in enumerate(
+        zip(args.target_genomes, targets, strict=True)
+    ):
+        if annotated.chrom is not None and annotated.chrom not in score_chromosomes:
+            logger.info(f"Skipping {target}: no scoring positions on this chromosome")
+            continue
         cache_dir = stages_dir / "load" / str(i)
         _dispatch(
             [
@@ -149,7 +166,10 @@ def run_cli(args: argparse.Namespace) -> None:
         zips.append(zip_path)
         # the same parse LOAD uses, so chr1 and 1 group together exactly as they
         # land in one leaf of the cache
-        chromosomes.append(AnnotatedGenomePath.from_string(target).chrom or "ALL")
+        chromosomes.append(annotated.chrom or "ALL")
+
+    if not zips:
+        raise ValueError("No target chromosomes have requested scoring positions")
 
     # MATCH sees one chromosome whole: every shard of it, and only it
     shards_by_chromosome: dict[str, list[pathlib.Path]] = {}

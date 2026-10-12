@@ -6,6 +6,7 @@ tree it publishes and the two ways it's allowed to stop: a stage that failed, an
 shard whose partial score never arrived.
 """
 
+import polars as pl
 import pytest
 
 from pgscatalog.calc.cli import run, score
@@ -93,3 +94,31 @@ def test_a_stage_missing_from_the_declared_list_is_refused(
 
     with pytest.raises(ValueError, match="must execute every stage"):
         run_serial(chromosome_targets, tmp_path, scorefile, monkeypatch)
+
+
+def test_serial_run_rejects_colliding_leaf_paths_before_loading(
+    scorefile, tmp_path, monkeypatch
+):
+    targets = [
+        (tmp_path / "first/same.vcf.gz", "1"),
+        (tmp_path / "second/same.vcf.gz", "1"),
+    ]
+    with pytest.raises(ValueError, match="both cache to"):
+        run_serial(targets, tmp_path / "work", scorefile, monkeypatch)
+    assert not (tmp_path / "work/stages/load").exists()
+
+
+def test_serial_run_skips_chromosomes_without_scoring_positions(
+    chromosome_targets, scorefile, tmp_path, monkeypatch
+):
+    chrom = chromosome_targets[0][1]
+    rows = pl.read_csv(scorefile, separator="\t").filter(
+        pl.col("chr_name").cast(pl.String) == chrom
+    )
+    filtered = tmp_path / "one-chromosome.txt"
+    rows.write_csv(filtered, separator="\t")
+    scores = run_serial(chromosome_targets, tmp_path / "work", filtered, monkeypatch)
+    assert scores["n_matched"].unique().to_list() == [rows.height]
+    assert not (tmp_path / "work/stages/load/1").exists()
+    with pytest.raises(ValueError, match="No target chromosomes"):
+        run_serial(chromosome_targets[1:], tmp_path / "unused", filtered, monkeypatch)
