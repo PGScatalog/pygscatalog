@@ -1,4 +1,6 @@
-import os, sys, gc
+import gc
+import os
+import sys
 import gzip
 import csv
 import pathlib
@@ -8,7 +10,11 @@ from typing import List
 import pandas as pd
 import pandas_schema
 import warnings
-from .schemas import *
+from .schemas import (
+    BUILD_LIST,
+    GENERIC_VALIDATORS,
+    VALID_FILE_EXTENSIONS,
+)
 
 '''
 PGS Catalog file validator
@@ -271,7 +277,7 @@ class ValidatorBase:
             # Compare number of rows with Scoring file
             if self.score_dir:
                 row_comparison_status = self.compare_number_of_rows()
-                if row_comparison_status == False:
+                if not row_comparison_status:
                     comparison_status = row_comparison_status
             else:
                 self.logger.info("Comparison of the number of rows between Harmonized and Scoring file skipped!")

@@ -102,7 +102,12 @@ warn_unused_ignores = true
 
 [tool.ruff]
 fix = true
-extend-exclude = ["src/pgscatalog/calc/lib/legacy", "src/pgscatalog/calc/cli/legacy/"]
+# the legacy pipeline is bugfix-only, and its tests are excluded with it
+extend-exclude = [
+    "src/pgscatalog/calc/lib/legacy",
+    "src/pgscatalog/calc/cli/legacy/",
+    "tests/legacy",
+]
 
 [tool.ruff.lint]
 extend-select = [

@@ -1,10 +1,10 @@
 """MATCH: match scoring file variants against one chromosome's shards.
 
-Fanning out per chromosome rather than per shard is the load-bearing choice
-(docs/tickets/0003): a chromosome-level task holds every shard's variant metadata
-for that chromosome, so it matches against a complete variant list and no shard
-has a partial view. It reads 1D metadata only, never the 3D genotype arrays, so
-peak memory doesn't scale with sample count.
+Fanning out per chromosome rather than per shard is the load-bearing choice: a
+chromosome-level task holds every shard's variant metadata for that chromosome,
+so it matches against a complete variant list and no shard has a partial view. It
+reads 1D metadata only, never the 3D genotype arrays, so peak memory doesn't
+scale with sample count.
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 
 from rich import print
 
-from pgscatalog.calc import ScorePipeline
 from pgscatalog.calc.cli._stage import (
     add_score_paths_arg,
     add_stage_args,
@@ -24,6 +23,8 @@ from pgscatalog.calc.cli._stage import (
 )
 from pgscatalog.calc.cli._utils import check_positive
 from pgscatalog.calc.lib.config import config
+from pgscatalog.calc.lib.score.match import MatchStage
+from pgscatalog.calc.lib.score.stage import scratch_dir
 
 from .load import unzip_zarr
 
@@ -77,25 +78,26 @@ def match_cli(args: argparse.Namespace) -> None:
     out_dir = setup_stage(args)
     config.ZARR_VARIANT_CHUNK_SIZE = args.batch_size
 
+    # the cache is scratch: this task publishes two parquet files and nothing else
     for zip_file in check_paths_exist(args.zarr_zip_file):
-        unzip_zarr(zip_file, out_dir)
+        unzip_zarr(zip_file, scratch_dir(out_dir))
 
-    pipeline = ScorePipeline(
+    stage = MatchStage(
         max_memory_gb=args.max_memory_gb,
         threads=args.threads,
         out_dir=out_dir,
     )
 
-    pipeline.load_scores(scorefile_paths=args.score_paths)
+    stage.load_scores(scorefile_paths=args.score_paths)
 
     # no min_overlap here: the match rate is genome-wide, so only MATCH_COMBINE
-    # can decide it (docs/tickets/0003)
-    chromosome = pipeline.match_variants(
+    # can decide it
+    chromosome = stage.match_variants(
         match_multiallelic=args.keep_multiallelic,
         match_ambiguous=args.keep_ambiguous,
     )
 
-    pipeline.export_match_table(out_dir / "matches.parquet")
-    pipeline.export_samples(out_dir / "samples.parquet", chromosome=chromosome)
+    stage.export_match_table(out_dir / "matches.parquet")
+    stage.export_samples(out_dir / "samples.parquet", chromosome=chromosome)
 
     print(f"Finished matching chromosome {chromosome} :tada:")

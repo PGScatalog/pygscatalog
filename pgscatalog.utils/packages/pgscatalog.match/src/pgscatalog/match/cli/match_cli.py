@@ -76,12 +76,15 @@ def run_match():
     }
 
     # start doing the work
-    with ScoringFileFrame(
-        paths=Config.SCOREFILE,
-        chrom=Config.CHROM,
-        cleanup=Config.CLEANUP,
-        tmpdir=Config.TMPDIR,
-    ) as score_df, pl.StringCache():
+    with (
+        ScoringFileFrame(
+            paths=Config.SCOREFILE,
+            chrom=Config.CHROM,
+            cleanup=Config.CLEANUP,
+            tmpdir=Config.TMPDIR,
+        ) as score_df,
+        pl.StringCache(),
+    ):
         matchresults = []
         for target_f in args.target:
             ipc_path = get_match_candidates(

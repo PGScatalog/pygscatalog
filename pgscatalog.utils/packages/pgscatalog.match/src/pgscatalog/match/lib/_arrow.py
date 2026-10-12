@@ -1,9 +1,10 @@
-""" This module contains functions for streaming text files to arrow IPC files
+"""This module contains functions for streaming text files to arrow IPC files
 
 It reimplements CSV reading using the polars API directly to be fast.
 
 pgscatalog.core's implementation with csv.DictReader is slow with hundreds of millions of lines.
 """
+
 import pathlib
 import tempfile
 from typing import Optional

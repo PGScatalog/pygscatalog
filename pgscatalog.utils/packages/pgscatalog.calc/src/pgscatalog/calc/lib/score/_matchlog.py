@@ -3,10 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import duckdb
-
 if TYPE_CHECKING:
-    from pgscatalog.calc.lib.types import Pathish
+    import duckdb
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +108,8 @@ def add_match_log(
                    is_multiallelic,
                    COUNT(match_summary) AS count,
                    -- count any match types which flipped the effect allele
-                   COUNT(*) FILTER (WHERE match_type LIKE '%flip') AS match_flipped
+                   -- (match_type_enum values are uppercase, LIKE is case sensitive)
+                   COUNT(*) FILTER (WHERE match_type ILIKE '%flip') AS match_flipped
             FROM score_log_table
             GROUP BY sampleset,
                      accession,
@@ -119,8 +118,10 @@ def add_match_log(
                      is_multiallelic
         )
         SELECT *,
-               CAST(count / sum(count) OVER (PARTITION BY sampleset, accession)
-                   AS DECIMAL(5, 2)) AS fraction
+               -- kept raw here: rounding is for display only, and rounding each
+               -- subgroup before summing can move the match rate across min_overlap
+               count / sum(count) OVER (PARTITION BY sampleset, accession)
+                   AS fraction
         FROM match_counts;
         """
     )
@@ -151,8 +152,8 @@ def add_match_log(
             is_multiallelic,
             match_flipped,
             count,
-            fraction,
-            match_rate,
+            CAST(fraction AS DECIMAL(5, 2)) AS fraction,
+            CAST(match_rate AS DECIMAL(5, 2)) AS match_rate,
             is_match_rate_ok
         FROM temp_summary_log_table
         JOIN temp_match_rates_ok
@@ -161,20 +162,21 @@ def add_match_log(
     )
 
 
-def get_ok_accessions(db_path: Pathish, sampleset: str) -> list[str]:
+def get_ok_accessions(conn: duckdb.DuckDBPyConnection, sampleset: str) -> list[str]:
     """Get accessions that have passed the match rate threshold.
+
+    Takes a connection to the score database (read-only is enough).
 
     Raises a ValueError if no accessions pass the match rate threshold.
     """
-    with duckdb.connect(str(db_path), read_only=True) as conn:
-        accessions: list[tuple[str, bool, float]] = conn.execute(
-            """
-            SELECT DISTINCT accession, is_match_rate_ok, match_rate
-            FROM summary_log_table
-            WHERE sampleset = ?
-        """,
-            [sampleset],
-        ).fetchall()
+    accessions: list[tuple[str, bool, float]] = conn.execute(
+        """
+        SELECT DISTINCT accession, is_match_rate_ok, match_rate
+        FROM summary_log_table
+        WHERE sampleset = ?
+    """,
+        [sampleset],
+    ).fetchall()
     passed: list[tuple[str, bool, float]] = list(
         filter(lambda x: x[1] is True, accessions)
     )

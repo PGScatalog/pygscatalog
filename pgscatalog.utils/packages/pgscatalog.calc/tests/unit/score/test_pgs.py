@@ -88,16 +88,6 @@ def tiny_effect_weights_zarr():
 
 
 @pytest.fixture
-def tiny_effect_weights_zarr():
-    """
-    Simple effect weights for 4 variants (variants, 1) : all 1.0.
-    """
-    weights = np.ones((4, 1), dtype=np.float64)
-    store = zarr.storage.MemoryStore()
-    return zarr.create_array(store=store, data=weights)
-
-
-@pytest.fixture
 def zero_dosage():
     return np.zeros(shape=(4, 3))  # 4 variants, 3 samples
 
@@ -196,11 +186,11 @@ def test_calculate_scores_tiny(tiny_dosage_zarr, tiny_effect_weights_zarr):
     assert np.array_equal(scores, expected)
 
 
-def test_create_score_table(tmp_path):
-    db_path = tmp_path / "test.db"
-    create_score_table(db_path)
+def test_create_score_table():
+    """Nothing here needs the database on disk"""
+    with duckdb.connect(":memory:") as conn:
+        create_score_table(conn)
 
-    with duckdb.connect(str(db_path)) as conn:
         cols = conn.sql(
             "SELECT column_name, column_type FROM (DESCRIBE TABLE score_table);"
         ).fetchall()
@@ -273,71 +263,70 @@ def test_calculate_nonmissing_allele_count_tiny(tiny_dosage_zarr, tiny_is_missin
 
 
 def test_calculate_score_statistics_tiny(
-    tmp_path,
     tiny_dosage_zarr,
     tiny_is_missing_zarr,
     tiny_sample_ids,
 ):
-    db_path = tmp_path / "tiny_scores.db"
+    # an in-memory connection is enough, so this test needs no database on disk
+    conn = duckdb.connect(":memory:")
 
-    with duckdb.connect(str(db_path)) as conn:
-        # 1) Raw table with plain match_summary
-        conn.sql(
-            """
-            CREATE TABLE allele_match_raw (
-                sampleset TEXT,
-                accession TEXT,
-                row_nr UINTEGER,
-                zarr_group TEXT,
-                match_summary TEXT
-            );
-            """
-        )
-        # one scoring variant matched in two shards: n_matched counts variants,
-        # not match rows, so it stays 1
-        conn.sql(
-            """
-            INSERT INTO allele_match_raw VALUES
-                ('test', 'PGS000001', 0, 'test/1/a.vcf.gz', 'matched'),
-                ('test', 'PGS000001', 0, 'test/1/b.vcf.gz', 'matched'),
-                ('test', 'PGS999999', 0, 'test/1/a.vcf.gz', 'matched'),
-                ('test', 'PGS999999', 0, 'test/1/b.vcf.gz', 'matched');
-            """
-        )
+    # 1) Raw table with plain match_summary
+    conn.sql(
+        """
+        CREATE TABLE allele_match_raw (
+            sampleset TEXT,
+            accession TEXT,
+            row_nr UINTEGER,
+            zarr_group TEXT,
+            match_summary TEXT
+        );
+        """
+    )
+    # one scoring variant matched in two shards: n_matched counts variants,
+    # not match rows, so it stays 1
+    conn.sql(
+        """
+        INSERT INTO allele_match_raw VALUES
+            ('test', 'PGS000001', 0, 'test/1/a.vcf.gz', 'matched'),
+            ('test', 'PGS000001', 0, 'test/1/b.vcf.gz', 'matched'),
+            ('test', 'PGS999999', 0, 'test/1/a.vcf.gz', 'matched'),
+            ('test', 'PGS999999', 0, 'test/1/b.vcf.gz', 'matched');
+        """
+    )
 
-        # 2) View with struct field 'match_result.match_summary'
-        conn.sql(
-            """
-            CREATE VIEW allele_match_table AS
-            SELECT
-                sampleset,
-                accession,
-                row_nr,
-                zarr_group,
-                struct_pack(match_summary := match_summary) AS match_result
-            FROM allele_match_raw;
-            """
-        )
+    # 2) View with struct field 'match_result.match_summary'
+    conn.sql(
+        """
+        CREATE VIEW allele_match_table AS
+        SELECT
+            sampleset,
+            accession,
+            row_nr,
+            zarr_group,
+            struct_pack(match_summary := match_summary) AS match_result
+        FROM allele_match_raw;
+        """
+    )
 
-        # 3) wide_score_variants defining membership of each variant
-        conn.sql(
-            """
-            CREATE TABLE wide_score_variants (
-                weight_mat_row_nr INTEGER,
-                "PGS000001" DOUBLE,
-                "PGS999999" DOUBLE
-            );
-            """
-        )
-        conn.sql(
-            """
-            INSERT INTO wide_score_variants VALUES
-                (0, 1.0, 0.0),  -- v0 in PGS000001
-                (1, 1.0, 0.0),  -- v1 in PGS000001
-                (2, 1.0, 0.0),  -- v2 in PGS000001
-                (3, 0.0, 1.0);  -- v3 in PGS999999
-            """
-        )
+    # 3) wide_score_variants defining membership of each variant
+    conn.sql(
+        """
+        CREATE TABLE wide_score_variants (
+            weight_mat_row_nr INTEGER,
+            "PGS000001" DOUBLE,
+            "PGS999999" DOUBLE
+        );
+        """
+    )
+    conn.sql(
+        """
+        INSERT INTO wide_score_variants VALUES
+            (0, 1.0, 0.0),  -- v0 in PGS000001
+            (1, 1.0, 0.0),  -- v1 in PGS000001
+            (2, 1.0, 0.0),  -- v2 in PGS000001
+            (3, 0.0, 1.0);  -- v3 in PGS999999
+        """
+    )
 
     accessions = ["PGS000001", "PGS999999"]
 
@@ -354,7 +343,7 @@ def test_calculate_score_statistics_tiny(
 
     # Run the function under test
     result = calculate_score_statistics(
-        db_path=db_path,
+        conn=conn,
         accessions=accessions,
         dosage_array=tiny_dosage_zarr,
         is_missing_array=tiny_is_missing_zarr,
@@ -410,14 +399,13 @@ def test_calculate_score_statistics_tiny(
             assert result_sorted[col].to_list() == expected_sorted[col].to_list()
 
 
-def test_insert_scores_tiny(tmp_path, random_score_table_rows):
-    db_path = tmp_path / "tiny_scores.db"
-    create_score_table(db_path)
+def test_insert_scores_tiny(random_score_table_rows):
+    with duckdb.connect(":memory:") as conn:
+        create_score_table(conn)
 
-    # Insert using the function under test
-    insert_scores(db_path=db_path, _score_df=random_score_table_rows)
+        # Insert using the function under test
+        insert_scores(conn=conn, _score_df=random_score_table_rows)
 
-    with duckdb.connect(str(db_path)) as conn:
         result = conn.sql(
             """
             SELECT sampleset, accession, n_matched, sample_id,
@@ -442,17 +430,16 @@ def test_insert_scores_tiny(tmp_path, random_score_table_rows):
             assert result_sorted[col].to_list() == expected[col].to_list()
 
 
-def test_write_scores(tmp_path, tmp_path_factory, random_score_table_rows):
-    db_path = tmp_path / "test.db"
+def test_write_scores(tmp_path_factory, random_score_table_rows):
     out_path = tmp_path_factory.mktemp("out")
-    create_score_table(db_path)
 
-    with duckdb.connect(db_path) as conn:
+    with duckdb.connect(":memory:") as conn:
+        create_score_table(conn)
         conn.sql(
             """
             INSERT INTO score_table
-            SELECT sampleset, 
-                   accession, 
+            SELECT sampleset,
+                   accession,
                    n_matched,
                    sample_id,
                    allele_count,
@@ -462,7 +449,7 @@ def test_write_scores(tmp_path, tmp_path_factory, random_score_table_rows):
             """
         )
 
-    write_scores(db_path=db_path, out_dir=out_path, max_memory_gb="1GB", threads=1)
+        write_scores(conn=conn, out_dir=out_path)
 
     # test hive partitioning
     out_csv = out_path / "scores.txt.gz"

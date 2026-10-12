@@ -1,4 +1,6 @@
-import os, glob, re
+import glob
+import os
+import re
 import argparse
 import logging
 import textwrap

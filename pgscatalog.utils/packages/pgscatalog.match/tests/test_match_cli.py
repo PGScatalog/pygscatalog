@@ -80,9 +80,11 @@ def test_filter_match(tmp_path_factory, good_variants, good_scorefile, filter_id
     with patch("sys.argv", flargs):
         run_match()
 
-    with gzip.open(
-        outdir / "test_ALL_additive_0.scorefile.gz", mode="rt"
-    ) as out_f, open(good_scorefile) as f1, open(filter_ids) as f2:
+    with (
+        gzip.open(outdir / "test_ALL_additive_0.scorefile.gz", mode="rt") as out_f,
+        open(good_scorefile) as f1,
+        open(filter_ids) as f2,
+    ):
         n_out_score = len(list(csv.DictReader(out_f, delimiter="\t")))
         n_scorefile = sum(1 for _ in f1)
         n_filt = sum(1 for _ in f2)
@@ -123,9 +125,10 @@ def test_duplicated(tmp_path_factory, good_variants, duplicated_scorefile):
     assert (outdir / "test_ALL_additive_1.scorefile.gz").exists()
 
     # test the split happened
-    with gzip.open(
-        outdir / "test_ALL_additive_0.scorefile.gz", mode="rt"
-    ) as f1, gzip.open(outdir / "test_ALL_additive_1.scorefile.gz", mode="rt") as f2:
+    with (
+        gzip.open(outdir / "test_ALL_additive_0.scorefile.gz", mode="rt") as f1,
+        gzip.open(outdir / "test_ALL_additive_1.scorefile.gz", mode="rt") as f2,
+    ):
         f1variants = list(csv.DictReader(f1, delimiter="\t"))
         f2variants = list(csv.DictReader(f2, delimiter="\t"))
 

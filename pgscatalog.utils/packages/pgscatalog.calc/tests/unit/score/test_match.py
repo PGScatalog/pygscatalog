@@ -13,7 +13,9 @@ from pgscatalog.calc.lib.score._matchvariants import (
 )
 from pgscatalog.calc.lib.scorefile import load_scoring_files
 
-# Test functions of: update_match_table,_setup_enums, match_variant, get_variant_match_priority, is_biallelic_variant_ambiguous, classify_match(complement ,complement_table)
+# Test functions of: update_match_table, _setup_enums, match_variant,
+# get_variant_match_priority, is_biallelic_variant_ambiguous,
+# classify_match (complement, complement_table)
 
 
 @pytest.mark.parametrize(
@@ -454,18 +456,12 @@ def test_setup_enums() -> None:
     assert type_values == [e.name for e in MatchPriority]
 
 
-def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
-    db_path = tmp_path / "test.duckdb"
+def _make_test_conn(pgs000001) -> duckdb.DuckDBPyConnection:
+    # nothing here needs the database on disk
+    conn = duckdb.connect(":memory:")
 
     # score_variant_table loading via load_scoring_files functions from Scorefiles
-    load_scoring_files(
-        db_path=db_path,
-        scorefile_paths=[pgs000001],
-        threads=1,
-        max_memory_gb="4GB",
-    )
-
-    conn = duckdb.connect(db_path)
+    load_scoring_files(conn=conn, scorefile_paths=[pgs000001])
 
     # minimal targetvariants table matching your SQL in update_match_table
     conn.execute("""
@@ -493,8 +489,8 @@ def _make_test_conn(tmp_path, pgs000001) -> duckdb.DuckDBPyConnection:
     return conn
 
 
-def test_update_match_table(tmp_path, pgs000001) -> None:
-    conn = _make_test_conn(tmp_path, pgs000001)
+def test_update_match_table(pgs000001) -> None:
+    conn = _make_test_conn(pgs000001)
 
     # This calls _setup_enums and registers match_variant UDF internally
     update_match_table(

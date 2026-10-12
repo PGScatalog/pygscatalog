@@ -4,7 +4,6 @@ import logging
 import pathlib
 from typing import TYPE_CHECKING
 
-import duckdb
 import numpy as np
 import polars as pl
 from dask import array as da
@@ -14,6 +13,7 @@ from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import ZARR_PLOIDY
 
 if TYPE_CHECKING:
+    import duckdb
     import zarr
 
     from pgscatalog.calc.lib.types import Pathish
@@ -24,50 +24,48 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def create_score_table(db_path: Pathish) -> None:
+def create_score_table(conn: duckdb.DuckDBPyConnection) -> None:
     """Create the score table, which contains one row per sample per score
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the score database
+    conn : duckdb.DuckDBPyConnection
+        A writable connection to the score database
     """
     logger.info("Creating or replacing score table")
-    with duckdb.connect(str(db_path)) as conn:
-        # allele_count * 2 will break when X / Y / MT added
-        conn.sql("""
-        CREATE OR REPLACE TABLE score_table (
-            sampleset TEXT NOT NULL,
-            accession TEXT NOT NULL,
-            n_matched UINTEGER NOT NULL,
-            sample_id TEXT NOT NULL,
-            allele_count UINTEGER NOT NULL,
-            score DOUBLE NOT NULL,
-            dosage_sum DOUBLE NOT NULL,
-            score_avg GENERATED ALWAYS AS (score / allele_count) VIRTUAL,
-            PRIMARY KEY (accession, sampleset, sample_id)
-        );
-        """)
+    # allele_count * 2 will break when X / Y / MT added
+    conn.sql("""
+    CREATE OR REPLACE TABLE score_table (
+        sampleset TEXT NOT NULL,
+        accession TEXT NOT NULL,
+        n_matched UINTEGER NOT NULL,
+        sample_id TEXT NOT NULL,
+        allele_count UINTEGER NOT NULL,
+        score DOUBLE NOT NULL,
+        dosage_sum DOUBLE NOT NULL,
+        score_avg GENERATED ALWAYS AS (score / allele_count) VIRTUAL,
+        PRIMARY KEY (accession, sampleset, sample_id)
+    );
+    """)
 
 
-def insert_scores(db_path: Pathish, _score_df: pl.DataFrame) -> None:
+def insert_scores(conn: duckdb.DuckDBPyConnection, _score_df: pl.DataFrame) -> None:
     # _ used because duckdb scans the polars dataframe variable but linters complain
-    with duckdb.connect(str(db_path)) as conn:
-        conn.sql("""
-                 INSERT INTO score_table
-                 SELECT sampleset,
-                        accession,
-                        n_matched,
-                        sample_id,
-                        allele_count,
-                        score,
-                        dosage_sum
-                 FROM _score_df
-                 """)
+    conn.sql("""
+             INSERT INTO score_table
+             SELECT sampleset,
+                    accession,
+                    n_matched,
+                    sample_id,
+                    allele_count,
+                    score,
+                    dosage_sum
+             FROM _score_df
+             """)
 
 
 def write_scores(
-    db_path: Pathish, out_dir: Pathish, max_memory_gb: str, threads: int, scale: int = 6
+    conn: duckdb.DuckDBPyConnection, out_dir: Pathish, scale: int = 6
 ) -> None:
     """Write the score table to a compressed TSV file
 
@@ -77,57 +75,49 @@ def write_scores(
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the score database
+    conn : duckdb.DuckDBPyConnection
+        A connection to the score database
     out_dir : Pathish
         Path to the output directory.
-    max_memory_gb : str
-        Maximum RAM that duckdb can use before intermediate results spilling to disk
-    threads : int
-        Maximum number of threads duckdb can use
     scale : int
         Number of digits after the decimal point for score columns
     """
     logger.info(f"Copying score table to {out_dir}")
     logger.info(f"Score columns will have {scale} digits after the decimal point")
     out_file = str((pathlib.Path(out_dir) / "scores.txt.gz").resolve())
-    with duckdb.connect(
-        str(db_path),
-        config={"max_memory": max_memory_gb, "threads": str(threads)},
-    ) as conn:
-        score_rel = (
-            conn.table("score_table")
-            .project(
-                f"""
-                sampleset,
-                accession,
-                sample_id,
-                n_matched,
-                allele_count,
-                CAST(dosage_sum AS DECIMAL(18, {scale})) AS dosage_sum,
-                CAST(score AS DECIMAL(18, {scale})) AS score,
-                CAST(score_avg AS DECIMAL(18, {scale})) AS score_avg
-                """
-            )
-            .select(
-                "sampleset",
-                "accession",
-                "sample_id",
-                "n_matched",
-                "allele_count",
-                "dosage_sum",
-                "score",
-                "score_avg",
-            )
-            .order("sampleset, accession, sample_id")
+    score_rel = (
+        conn.table("score_table")
+        .project(
+            f"""
+            sampleset,
+            accession,
+            sample_id,
+            n_matched,
+            allele_count,
+            CAST(dosage_sum AS DECIMAL(18, {scale})) AS dosage_sum,
+            CAST(score AS DECIMAL(18, {scale})) AS score,
+            CAST(score_avg AS DECIMAL(18, {scale})) AS score_avg
+            """
         )
-        logger.info(f"Writing scores to {out_file}")
-        score_rel.write_csv(
-            out_file,
-            header=True,
-            sep=",",
-            compression="gzip",
+        .select(
+            "sampleset",
+            "accession",
+            "sample_id",
+            "n_matched",
+            "allele_count",
+            "dosage_sum",
+            "score",
+            "score_avg",
         )
+        .order("sampleset, accession, sample_id")
+    )
+    logger.info(f"Writing scores to {out_file}")
+    score_rel.write_csv(
+        out_file,
+        header=True,
+        sep=",",
+        compression="gzip",
+    )
 
     logger.info("Finished copying score table")
 
@@ -166,7 +156,7 @@ def calculate_scores(dosage_array: zarr.Array, effect_weights: zarr.Array) -> da
 
 
 def calculate_score_statistics(
-    db_path: Pathish,
+    conn: duckdb.DuckDBPyConnection,
     accessions: list[str],
     dosage_array: zarr.Array,
     is_missing_array: zarr.Array,
@@ -186,8 +176,8 @@ def calculate_score_statistics(
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the DuckDB database file.
+    conn : duckdb.DuckDBPyConnection
+        A connection to the score database (read-only is enough).
     sampleset : str
         Identifier for the sample set in the allele match table.
     accessions : list[str]
@@ -229,46 +219,45 @@ def calculate_score_statistics(
         "sampleset": [],
     }
 
-    with duckdb.connect(str(db_path), read_only=True) as conn:
-        for accession in accessions:
-            query = conn.execute(
-                """
-            -- the match table has one row per shard, so count scoring variants
-            -- (this is the genome-wide count SCORE_COMBINE carries through)
-            SELECT COUNT(DISTINCT row_nr)
-            FROM allele_match_table
-            WHERE match_result.match_summary='matched' AND
-                sampleset = $sampleset AND
-                accession = $accession;
-            """,
-                {"accession": accession, "sampleset": sampleset},
-            ).fetchone()
+    for accession in accessions:
+        query = conn.execute(
+            """
+        -- the match table has one row per shard, so count scoring variants
+        -- (this is the genome-wide count SCORE_COMBINE carries through)
+        SELECT COUNT(DISTINCT row_nr)
+        FROM allele_match_table
+        WHERE match_result.match_summary='matched' AND
+            sampleset = $sampleset AND
+            accession = $accession;
+        """,
+            {"accession": accession, "sampleset": sampleset},
+        ).fetchone()
 
-            if query is None:
-                raise ValueError(f"{accession=} can't count matches")
-            n_matched = query[0]
+        if query is None:
+            raise ValueError(f"{accession=} can't count matches")
+        n_matched = query[0]
 
-            # slice the weight matrix to include variants with non-zero effect weights
-            accession_idx = conn.sql(f"""
-            SELECT weight_mat_row_nr
-            FROM wide_score_variants
-            WHERE "{accession}" != 0
-            """).fetchnumpy()["weight_mat_row_nr"]
+        # slice the weight matrix to include variants with non-zero effect weights
+        accession_idx = conn.sql(f"""
+        SELECT weight_mat_row_nr
+        FROM wide_score_variants
+        WHERE "{accession}" != 0
+        """).fetchnumpy()["weight_mat_row_nr"]
 
-            accession_dosage = calculate_effect_allele_dosage(
-                dosage_array=dosage_array, accession_idx=accession_idx
-            )
-            allele_count = calculate_nonmissing_allele_count(
-                is_missing_array=is_missing_array,
-                dosage_array=dosage_array,
-                accession_idx=accession_idx,
-            )
+        accession_dosage = calculate_effect_allele_dosage(
+            dosage_array=dosage_array, accession_idx=accession_idx
+        )
+        allele_count = calculate_nonmissing_allele_count(
+            is_missing_array=is_missing_array,
+            dosage_array=dosage_array,
+            accession_idx=accession_idx,
+        )
 
-            # per-accession statistics
-            score_stats["accession"].append(accession)
-            score_stats["dosage_sum"].append(accession_dosage)
-            score_stats["allele_count"].append(allele_count)
-            score_stats["n_matched"].append(n_matched)
+        # per-accession statistics
+        score_stats["accession"].append(accession)
+        score_stats["dosage_sum"].append(accession_dosage)
+        score_stats["allele_count"].append(allele_count)
+        score_stats["n_matched"].append(n_matched)
 
     # per-sampleset statistics
     score_stats["score"] = [score for score in score.T]  # noqa: C416
@@ -310,7 +299,8 @@ def calculate_nonmissing_allele_count(
 
     # return a per-sample sum of non-missing allele count in this accession
     # think about X / Y / MT here too
-    per_sample_allele_count: npt.NDArray[np.int64] = da.sum(
-        ~da.isnan(missing_variants[accession_idx,]), axis=0
-    ).compute() * ZARR_PLOIDY
+    per_sample_allele_count: npt.NDArray[np.int64] = (
+        da.sum(~da.isnan(missing_variants[accession_idx,]), axis=0).compute()
+        * ZARR_PLOIDY
+    )
     return per_sample_allele_count

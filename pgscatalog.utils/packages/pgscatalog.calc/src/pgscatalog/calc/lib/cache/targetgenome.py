@@ -16,6 +16,7 @@ from zarr.core.group import GroupMetadata
 from pgscatalog.calc.lib.scorefile import get_position_df
 
 from ._genomefilehandlers import GenomeFileHandler, get_file_handler
+from .genotypecache import leaf_group_path, meta_group_path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -57,7 +58,7 @@ class TargetGenome:
         # create the group hierarchy in a single operation
         zarr.create_hierarchy(
             store=self._zarr_store,
-            nodes={f"{self._zarr_group_path}/meta": GroupMetadata()},
+            nodes={meta_group_path(self._zarr_group_path): GroupMetadata()},
         )
 
     def __repr__(self) -> str:
@@ -112,8 +113,13 @@ class TargetGenome:
                         └── ...
                         └──
                         └──
+
+        The path itself comes from `leaf_group_path`, which samplesheet validation
+        calls too, so the string checked before LOAD is the string written by it.
         """
-        return f"{self.sampleset}/{self.chrom or 'ALL'}/{self.filename}"
+        return leaf_group_path(
+            sampleset=self.sampleset, chromosome=self.chrom, filename=self.filename
+        )
 
     @property
     def _zarr_store(self) -> zarr.storage.LocalStore:

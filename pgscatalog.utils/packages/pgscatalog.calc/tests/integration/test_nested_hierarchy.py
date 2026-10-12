@@ -1,5 +1,5 @@
 """Acceptance tests for the nested /{sampleset}/{chromosome}/{filename} cache
-hierarchy (docs/tickets/0001, ADR 0003).
+hierarchy (ADR 0003).
 
 Scoring these shapes lives in test_four_stage_pipeline.py; this file is only about
 where things land in the cache.
@@ -46,8 +46,7 @@ def test_two_whole_genome_batches(
     sample_batch_targets, scorefile, tmp_path, monkeypatch
 ):
     """Two whole-genome VCFs holding disjoint samples are sample batches, not an
-    ambiguous samplesheet: they load together and land side by side under ALL
-    (docs/tickets/0002)"""
+    ambiguous samplesheet: they load together and land side by side under ALL"""
     # one LOAD, both inputs: the old unsplit-chromosome rule rejected this
     run_cli(
         [
@@ -103,7 +102,7 @@ def test_absence_semantics_lands_on_the_leaf(
 ):
     """LOAD is fanned out per shard and merging zips is last-write-wins on an
     ancestor zarr.json, so the declaration goes on the leaf where a disagreement
-    stays detectable (docs/tickets/0006)"""
+    stays detectable"""
     cache_dir = tmp_path / "cache"
     load_target(str(unsplit_target), cache_dir, scorefile, monkeypatch)
 

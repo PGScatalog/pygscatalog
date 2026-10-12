@@ -10,7 +10,7 @@ point in that space, built from the same records so they all hold the same
 - ``sample_batch_targets``    sample axis only, two whole-genome batches
 - ``grid_targets``            both axes, chromosome x sample batch
 - ``variant_split_targets``   two files per chromosome sharing every sample, which
-                              docs/tickets/0005 rejects
+                              the cache shape invariants reject
 """
 
 import gzip
@@ -152,14 +152,12 @@ def sample_batch_targets(unsplit_target, target_samples, tmp_path_factory) -> li
 
 @pytest.fixture(scope="session")
 def grid_targets(chromosome_targets, target_samples, tmp_path_factory) -> list[tuple]:
-    """Chromosome x sample batch, the shape docs/tickets/0008 has to reduce"""
+    """Chromosome x sample batch, the shape SCORE_COMBINE has to reduce"""
     out_dir = tmp_path_factory.mktemp("grid")
 
     targets = []
     for source, chrom in chromosome_targets:
-        for i, half in enumerate(
-            (target_samples[::2], target_samples[1::2]), start=1
-        ):
+        for i, half in enumerate((target_samples[::2], target_samples[1::2]), start=1):
             path = _subset_samples(
                 source, out_dir / f"chr{chrom}.batch{i}.vcf.gz", half
             )
@@ -172,7 +170,7 @@ def grid_targets(chromosome_targets, target_samples, tmp_path_factory) -> list[t
 def variant_split_targets(target_records, tmp_path_factory) -> list[tuple]:
     """Two files per chromosome sharing every sample, splitting the variants.
 
-    docs/tickets/0005 makes this an error: leaves under one chromosome must have
+    This is an error: leaves under one chromosome must have
     disjoint samples, because the chromosome *is* the variant axis.
     """
     header, by_chrom = target_records
@@ -242,9 +240,7 @@ def load_targets(
             spec = f"{path}:{chrom}"
         else:
             spec = str(target)
-        zips.append(
-            load_target(spec, cache_dir / f"cache{i}", scorefile, monkeypatch)
-        )
+        zips.append(load_target(spec, cache_dir / f"cache{i}", scorefile, monkeypatch))
     return zips
 
 
@@ -255,11 +251,17 @@ def run_pipeline(
     monkeypatch,
     min_overlap: str = "0.75",
     score_paths: list | None = None,
+    max_memory_gb: str = "16",
+    threads: str = "1",
 ) -> pl.DataFrame:
     """Drive MATCH -> MATCH_COMBINE -> SCORE -> SCORE_COMBINE, mirroring the
     Nextflow DAG: one task per chromosome, then one, then one per shard, then one.
+
+    Every stage is its own task with its own resource limits (ADR 0001), so the
+    limits are passed to each one just like Nextflow does.
     """
     score_paths = [str(p) for p in (score_paths or [scorefile])]
+    resources = ["--max_memory_gb", max_memory_gb, "--threads", threads]
     zips = load_targets(targets, work_dir / "load", scorefile, monkeypatch)
 
     # MATCH fans out per chromosome, so group the shards by the chromosome they
@@ -282,6 +284,7 @@ def run_pipeline(
                 *score_paths,
                 "--out_dir",
                 str(out_dir),
+                *resources,
             ],
             monkeypatch,
         )
@@ -305,6 +308,7 @@ def run_pipeline(
             min_overlap,
             "--out_dir",
             str(combine_dir),
+            *resources,
         ],
         monkeypatch,
     )
@@ -325,6 +329,7 @@ def run_pipeline(
                 str(match_table),
                 "--out_dir",
                 str(out_dir),
+                *resources,
             ],
             monkeypatch,
         )
@@ -339,6 +344,7 @@ def run_pipeline(
             *[str(p) for p in partials],
             "--out_dir",
             str(final_dir),
+            *resources,
         ],
         monkeypatch,
     )

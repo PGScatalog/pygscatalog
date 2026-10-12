@@ -28,7 +28,8 @@ def test_vcf_get_sample_list_reads_header_samples_from_fixture(vcf_path):
     assert len(samples) == 3202
 
 
-# Test 2: vcf_buffer_variants <- run_bcftools_view, parse_target_variant <- vcf_get_genotypes
+# Test 2: vcf_buffer_variants <- run_bcftools_view,
+#         parse_target_variant <- vcf_get_genotypes
 # Test 2.1: normal case
 def test_vcf_buffer_variants(
     test_positions, vcf_path, vcf_index_path, tmp_path_factory, sampleset_name

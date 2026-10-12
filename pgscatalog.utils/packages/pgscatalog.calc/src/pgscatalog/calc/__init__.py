@@ -13,7 +13,6 @@ from .lib import (
     PopulationType,
     PrincipalComponents,
     Scorefiles,
-    ScorePipeline,
     TargetGenome,
     TargetVariants,
 )
@@ -22,7 +21,6 @@ __all__ = [
     "Scorefiles",
     "TargetGenome",
     "TargetVariants",
-    "ScorePipeline",
     "GenomeFileType",
     "Pathish",
     "PathishList",

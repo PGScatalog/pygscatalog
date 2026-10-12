@@ -1,17 +1,18 @@
-"""Cache shape invariants checked at MATCH and SCORE_COMBINE
-(docs/tickets/0004, 0005, 0008)"""
+"""Cache shape invariants checked at MATCH and SCORE_COMBINE"""
 
 import duckdb
 import polars as pl
 import pytest
 
-from pgscatalog.calc import ScorePipeline
-from pgscatalog.calc.lib.score.scorepipeline import (
+from pgscatalog.calc.lib.cache.genotypecache import (
+    Shard,
     check_absence_semantics,
-    check_sample_union,
+    check_cache_shape,
     check_samples_disjoint,
     check_shards_are_rectangular,
 )
+from pgscatalog.calc.lib.score.match_combine import check_sample_union
+from pgscatalog.calc.lib.score.score_combine import ScoreCombineStage
 
 
 def _samples_parquet(tmp_path, name, rows):
@@ -151,7 +152,9 @@ def test_shards_differing_by_swapped_variants_are_rejected():
     """Equal counts, different variants: comparing identifiers catches this, and
     comparing counts alone would not"""
     conn = duckdb.connect()
-    conn.execute("CREATE TABLE targetvariants (ref TEXT, variant_id TEXT, zarr_group TEXT);")
+    conn.execute(
+        "CREATE TABLE targetvariants (ref TEXT, variant_id TEXT, zarr_group TEXT);"
+    )
     conn.executemany(
         "INSERT INTO targetvariants VALUES (?, ?, ?)",
         [
@@ -169,6 +172,51 @@ def test_shards_differing_by_swapped_variants_are_rejected():
     message = str(excinfo.value)
     assert "(2 variants)" in message
     assert "1:200:A:G" in message and "1:300:A:T" in message
+
+
+def _shard(path, chromosome, samples=()):
+    """A shard as check_cache_shape sees it: no zarr store behind it, and a
+    chromosome that came from its position in the tree rather than its path"""
+    return Shard(path=path, chromosome=chromosome, attrs={"samples": list(samples)})
+
+
+def test_check_cache_shape_returns_the_chromosome(targetvariants):
+    targetvariants.executemany(
+        "INSERT INTO targetvariants VALUES (?, ?, ?)",
+        [
+            ("A", "1:100:A:C", "test/1/a.vcf.gz"),
+            ("A", "1:100:A:C", "test/1/b.vcf.gz"),
+        ],
+    )
+    shards = [
+        _shard("test/1/a.vcf.gz", "1", ["s1", "s2"]),
+        _shard("test/1/b.vcf.gz", "1", ["s3", "s4"]),
+    ]
+
+    chromosome = check_cache_shape(conn=targetvariants, shards=shards, sampleset="test")
+    assert chromosome == "1"
+
+
+def test_a_cache_holding_two_chromosomes_is_rejected(targetvariants):
+    """MATCH is staged with every shard of one chromosome, so a second chromosome
+    is a fan-out wiring mistake rather than a bigger job (ADR 0003)"""
+    shards = [
+        _shard("test/1/a.vcf.gz", "1", ["s1", "s2"]),
+        _shard("test/8/a.vcf.gz", "8", ["s1", "s2"]),
+    ]
+
+    with pytest.raises(ValueError) as excinfo:
+        check_cache_shape(conn=targetvariants, shards=shards, sampleset="test")
+
+    message = str(excinfo.value)
+    assert "MATCH runs per chromosome" in message
+    # both chromosomes are named, so the user knows what was staged
+    assert "['1', '8']" in message
+
+
+def test_a_cache_with_no_shards_is_rejected(targetvariants):
+    with pytest.raises(ValueError, match="No shards found under 'test'"):
+        check_cache_shape(conn=targetvariants, shards=[], sampleset="test")
 
 
 def _partial_scores(tmp_path, name, zarr_group, score=1.5):
@@ -194,9 +242,9 @@ def _partial_scores(tmp_path, name, zarr_group, score=1.5):
 def _combine(tmp_path, paths):
     out_dir = tmp_path / "combined"
     out_dir.mkdir(exist_ok=True)
-    pipeline = ScorePipeline(max_memory_gb=1, threads=1, out_dir=out_dir)
-    pipeline.combine_scores(paths)
-    with duckdb.connect(str(out_dir / "pgs.db"), read_only=True) as conn:
+    stage = ScoreCombineStage(max_memory_gb=1, threads=1, out_dir=out_dir)
+    stage.combine_scores(paths)
+    with duckdb.connect(str(out_dir / "scratch" / "pgs.db"), read_only=True) as conn:
         return conn.execute(
             "SELECT sample_id, score, allele_count FROM score_table"
         ).fetchall()

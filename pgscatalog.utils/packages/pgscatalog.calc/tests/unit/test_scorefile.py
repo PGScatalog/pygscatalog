@@ -90,20 +90,14 @@ def test_scorefiles(tmp_path, pgs000001, pgs001229):
     assert set(uncached).union(set(cached)) == set(all_variants)
 
 
-def test_load_scoring_files(tmp_path, pgs000001, pgs001229):
+def test_load_scoring_files(pgs000001, pgs001229):
     from pgscatalog.calc.lib.scorefile import load_scoring_files
 
-    db_path = tmp_path / "test.duckdb"
+    # an in-memory connection is enough, so no database on disk
+    with duckdb.connect(":memory:") as conn:
+        load_scoring_files(conn=conn, scorefile_paths=[pgs000001, pgs001229])
 
-    load_scoring_files(
-        db_path=db_path,
-        scorefile_paths=[pgs000001, pgs001229],
-        threads=1,
-        max_memory_gb="4GB",
-    )
-
-    # two unique accessions should be in the db table
-    with duckdb.connect(db_path) as conn:
+        # two unique accessions should be in the db table
         res = frozenset(
             conn.sql(
                 """

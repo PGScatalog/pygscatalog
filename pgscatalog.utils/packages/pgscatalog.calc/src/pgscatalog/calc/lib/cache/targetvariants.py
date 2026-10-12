@@ -36,6 +36,7 @@ import zarr.errors
 from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
+from .genotypecache import meta_group_path
 from .zarrmodels import ZarrSampleMetadata, ZarrVariantMetadata
 
 logger = logging.getLogger(__name__)
@@ -213,7 +214,7 @@ class TargetVariants:
         meta_arrays = self.variant_metadata.to_numpy()
         zarr_chunks = (config.ZARR_VARIANT_CHUNK_SIZE,)
         meta_root = zarr.open_group(
-            store=zarr_group.store, path=f"{zarr_group.path}/meta"
+            store=zarr_group.store, path=meta_group_path(zarr_group.path)
         )
         logger.info(f"Writing variant metadata to zarr group {meta_root.info}")
 

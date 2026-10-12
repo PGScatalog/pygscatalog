@@ -3,25 +3,28 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import duckdb
 import numpy as np
-import polars as pl
-import zarr
 
 from pgscatalog.calc.lib.config import config
 
 if TYPE_CHECKING:
+    import duckdb
     import numpy.typing as npt
+    import polars as pl
+    import zarr
 
-    from pgscatalog.calc.lib.types import Pathish
+    from .scoredb import ScoreDatabase
 
 
 logger = logging.getLogger(__name__)
 
 
 def create_wide_weights_table(
-    db_path: Pathish, sampleset: str, accessions: list[str], zarr_group: str
-) -> list[str]:
+    conn: duckdb.DuckDBPyConnection,
+    sampleset: str,
+    accessions: list[str],
+    zarr_group: str,
+) -> None:
     """
     Create a weight matrix and supporting information in the wide_weights_table table.
 
@@ -30,8 +33,10 @@ def create_wide_weights_table(
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the DuckDB database file.
+    conn : duckdb.DuckDBPyConnection
+        A writable connection to the score database. The PIVOT below is the
+        memory-hungriest query in SCORE, so it matters that this connection carries
+        the stage's resource limits.
     sampleset : str
         Identifier for the set of samples to pivot.
     zarr_group : str
@@ -46,10 +51,9 @@ def create_wide_weights_table(
     - A variant may appear multiple times if different `effect_allele_idx`
       values apply (e.g. REF/ALT vs ALT/REF matches)
     """
-    with duckdb.connect(str(db_path)) as conn:
-        logger.info(f"Creating long score temporary table for {sampleset=}")
-        # create a temporary table first to enforce data integrity
-        conn.sql("""
+    logger.info(f"Creating long score temporary table for {sampleset=}")
+    # create a temporary table first to enforce data integrity
+    conn.sql("""
             CREATE OR REPLACE TEMPORARY TABLE long_scores_temp (
                 sampleset TEXT NOT NULL,
                 accession TEXT NOT NULL,
@@ -67,9 +71,9 @@ def create_wide_weights_table(
             );
         """)
 
-        logger.info("Inserting score data into long scores temporary table")
-        conn.execute(
-            """
+    logger.info("Inserting score data into long scores temporary table")
+    conn.execute(
+        """
         INSERT INTO long_scores_temp
         SELECT COALESCE(m.sampleset, $sampleset) AS sampleset,
                s.accession,
@@ -89,15 +93,15 @@ def create_wide_weights_table(
             m.accession IN $accession
         ORDER BY m.target_row_nr;
         """,
-            {
-                "sampleset": sampleset,
-                "accession": accessions,
-                "zarr_group": zarr_group,
-            },
-        )
+        {
+            "sampleset": sampleset,
+            "accession": accessions,
+            "zarr_group": zarr_group,
+        },
+    )
 
-        logger.info("Pivoting long scores to create weight matrix")
-        conn.sql("""
+    logger.info("Pivoting long scores to create weight matrix")
+    conn.sql("""
             CREATE OR REPLACE TABLE wide_score_variants AS
             WITH pivoted_scores AS (
                 PIVOT long_scores_temp
@@ -125,68 +129,60 @@ def create_wide_weights_table(
             )
             SELECT
                 /*
-                weight_mat_row_nr indexes rows of the dosage array, which is written
-                group-major. target_row_nr is shard-local (it's geno_index), so
-                ordering by it alone interleaves shards and the index stops pointing
-                at the row it names. effect_allele_idx breaks ties within a variant
-                (the REFALT/ALTREF case above), so this is a total order and agrees
-                with get_variant_metadata / get_weight_matrix.
+                weight_mat_row_nr indexes rows of the dosage array. SCORE holds one
+                shard (ADR 0003), so it's simply the position of a row in that
+                shard's own ordering - there's no second group to interleave with.
+                effect_allele_idx breaks ties within a variant (the REFALT/ALTREF
+                case above), so this is a total order and agrees with
+                get_variant_metadata / get_weight_matrix.
                 */
                 row_number() OVER (
-                    ORDER BY zarr_group, target_row_nr, effect_allele_idx
+                    ORDER BY target_row_nr, effect_allele_idx
                 ) - 1 AS weight_mat_row_nr,
                 * EXCLUDE(sampleset)
             FROM pivoted_scores;
             """)
 
-        logger.info("Pivot finished, checking data integrity ")
-        conn.sql("""
+    logger.info("Pivot finished, checking data integrity ")
+    conn.sql("""
             /*
             data integrity check after pivoting:
             - weight data should have been added as columns, so each row must be a
-              single target_row_nr in a zarr group
+              single target_row_nr in this shard
             - however, it's OK for target_row_nr to have multiple rows if the effect
               allele index is different
             - this can happen when score 1 matches REFALT and score 2 matches ALTREF
               at the same variant
             */
             ALTER TABLE wide_score_variants ADD PRIMARY KEY (
-                zarr_group,
                 target_row_nr,
                 effect_allele_idx
             );
-        """)
-
-        zarr_groups = conn.sql("""
-        -- same order as weight_mat_row_nr, so callers walk the groups group-major
-        SELECT DISTINCT zarr_group
-        FROM wide_score_variants
-        ORDER BY zarr_group;
-        """).fetchall()
-
-        return [x for xs in zarr_groups for x in xs]
+    """)
 
 
 def store_group_weight_arrays(
-    db_path: Pathish,
+    db: ScoreDatabase,
     sampleset: str,
     pgs_group: zarr.Group,
     accessions: list[str],
     zarr_group: str,
-) -> dict[str, pl.DataFrame]:
-    """Generate weight matrices for each zarr group by pivoting scoring file weights
+) -> pl.DataFrame:
+    """Generate the weight matrix for one shard by pivoting scoring file weights
     from long to wide form.
 
     Long form = one row per variant per accession
     Wide form = one row per variant, one column per accession
 
     This function materialises a staging table in DuckDB, pivots it, validates variant
-    uniqueness, and yields weight matrices for each distinct Zarr group.
+    uniqueness, and stores the shard's weight matrix in zarr.
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the DuckDB database file.
+    db : ScoreDatabase
+        The score database. This function pivots and then reads back what it
+        pivoted, so it takes the database rather than a connection: the pivot needs
+        a writable connection and the reads keep a read-only one.
     sampleset : str
         Identifier for the set of samples to pivot.
     pgs_group : zarr.Group
@@ -198,37 +194,33 @@ def store_group_weight_arrays(
 
     Returns
     -------
-    dict[str, pl.DataFrame]
-        A dictionary mapping each zarr group name to its index metadata dataframe,
-        which is used to calculate dosage.
+    pl.DataFrame
+        Index metadata for the shard's score variants, used to calculate dosage.
     """
-    group_paths = create_wide_weights_table(
-        db_path=db_path,
-        sampleset=sampleset,
-        accessions=accessions,
-        zarr_group=zarr_group,
-    )
+    with db.connect() as conn:
+        create_wide_weights_table(
+            conn=conn,
+            sampleset=sampleset,
+            accessions=accessions,
+            zarr_group=zarr_group,
+        )
 
-    metadata_dfs = []
-    for group in group_paths:
-        store_results_in_zarr(db_path=db_path, group_path=group, pgs_group=pgs_group)
-        metadata_dfs.append(get_variant_metadata(db_path=db_path, group_path=group))
+    with db.read_only() as conn:
+        logger.info("Creating dataframe with variant/effect allele index metadata")
+        metadata = get_variant_metadata(conn=conn, group_path=zarr_group)
 
-    logger.info("Finished storing arrays in zarr")
+        # checked before writing: an empty pivot has no accession columns to stack
+        if metadata.is_empty():
+            raise ValueError(f"{pgs_group=} {zarr_group=} returned empty dataframe")
 
-    if not metadata_dfs:
-        raise ValueError(f"{pgs_group=} {group_paths=} returned empty dataframe")
-    logger.info("Creating dataframe with variant/effect allele index metadata")
+        store_results_in_zarr(conn=conn, group_path=zarr_group, pgs_group=pgs_group)
+        logger.info("Finished storing arrays in zarr")
 
-    pl_dict = pl.concat(metadata_dfs).partition_by(
-        ["zarr_group"], as_dict=True, include_key=False
-    )
-    # simplify single element tuples to strings
-    return {k[0]: v for k, v in pl_dict.items()}
+    return metadata
 
 
 def store_results_in_zarr(
-    db_path: Pathish, group_path: str, pgs_group: zarr.Group
+    conn: duckdb.DuckDBPyConnection, group_path: str, pgs_group: zarr.Group
 ) -> None:
     """
     Store a weight matrix for a specific Zarr group in a zarr array.
@@ -239,7 +231,8 @@ def store_results_in_zarr(
     Parameters
     ----------
     conn : duckdb.DuckDBPyConnection
-        Active DuckDB connection containing the `wide_score_variants` table.
+        A connection to the score database, which holds the `wide_score_variants`
+        table.
     group_path : str
         Identifier for the Zarr group: the shard's path relative to the store
         root (`sampleset/chromosome/filename`).
@@ -247,28 +240,23 @@ def store_results_in_zarr(
     logger.info(f"Getting weight matrix for {group_path=}")
     logger.info(f"{config.ZARR_VARIANT_CHUNK_SIZE=} {config.ZARR_COMPRESSOR=}")
 
-    accessions, weights = get_weight_matrix(db_path=db_path, group_path=group_path)
+    accessions, weights = get_weight_matrix(conn=conn, group_path=group_path)
 
-    try:
-        # initialise the array and metadata
-        pgs_group.create_array(
-            "weight_matrix",
-            overwrite=False,
-            data=weights,
-            chunks=(config.ZARR_VARIANT_CHUNK_SIZE, weights.shape[1]),
-        )
-        pgs_group.attrs["accessions"] = accessions
-    except zarr.errors.ContainsArrayError:
-        weight_mat = pgs_group["weight_matrix"]
-        if not isinstance(weight_mat, zarr.Array):
-            raise TypeError("weight_matrix must be a zarr array") from None
-
-        weight_mat.append(weights)
+    # SCORE holds one shard, so this array is written once and never appended to
+    pgs_group.create_array(
+        "weight_matrix",
+        overwrite=False,
+        data=weights,
+        chunks=(config.ZARR_VARIANT_CHUNK_SIZE, weights.shape[1]),
+    )
+    pgs_group.attrs["accessions"] = accessions
 
     logger.info("Finished writing to zarr store")
 
 
-def get_variant_metadata(db_path: Pathish, group_path: str) -> pl.DataFrame:
+def get_variant_metadata(
+    conn: duckdb.DuckDBPyConnection, group_path: str
+) -> pl.DataFrame:
     """
     Retrieve index metadata for a specific zarr group from the wide score variants table
 
@@ -277,8 +265,8 @@ def get_variant_metadata(db_path: Pathish, group_path: str) -> pl.DataFrame:
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the DuckDB database file.
+    conn : duckdb.DuckDBPyConnection
+        A connection to the score database (read-only is enough).
     group_path : str
         Identifier of the zarr group to query.
 
@@ -286,7 +274,6 @@ def get_variant_metadata(db_path: Pathish, group_path: str) -> pl.DataFrame:
     -------
     pl.DataFrame
         Dataframe with the following columns:
-        - zarr_group : str
         - weight_mat_row_nr : int64
         - effect_allele_idx : uint8
         - target_row_nr : int64
@@ -296,25 +283,23 @@ def get_variant_metadata(db_path: Pathish, group_path: str) -> pl.DataFrame:
         Rows are ordered by target_row_nr to be consistent with the effect weight
         matrix.
     """
-    with duckdb.connect(str(db_path), read_only=True) as conn:
-        return conn.execute(
-            """
-            SELECT zarr_group,
-                   weight_mat_row_nr,
-                   effect_allele_idx,
-                   target_row_nr,
-                   is_recessive,
-                   is_dominant
-            FROM wide_score_variants
-            WHERE zarr_group = $zarr_group
-            ORDER BY target_row_nr, effect_allele_idx
-            """,
-            {"zarr_group": group_path},
-        ).pl()
+    return conn.execute(
+        """
+        SELECT weight_mat_row_nr,
+               effect_allele_idx,
+               target_row_nr,
+               is_recessive,
+               is_dominant
+        FROM wide_score_variants
+        WHERE zarr_group = $zarr_group
+        ORDER BY target_row_nr, effect_allele_idx
+        """,
+        {"zarr_group": group_path},
+    ).pl()
 
 
 def get_weight_matrix(
-    db_path: Pathish, group_path: str
+    conn: duckdb.DuckDBPyConnection, group_path: str
 ) -> tuple[list[str], npt.NDArray[np.float64]]:
     """
     Extract the weight matrix for a specific zarr group in wide form.
@@ -325,8 +310,8 @@ def get_weight_matrix(
 
     Parameters
     ----------
-    db_path : Pathish
-        Path to the DuckDB database file.
+    conn : duckdb.DuckDBPyConnection
+        A connection to the score database (read-only is enough).
     group_path : str
         Identifier of the zarr group to query.
 
@@ -338,20 +323,19 @@ def get_weight_matrix(
         - matrix : ndarray of shape (n_variants, n_accessions), dtype float64
             Stacked weight values, ordered by target_row_nr.
     """
-    with duckdb.connect(str(db_path), read_only=True) as conn:
-        query = conn.execute(
-            """
-            SELECT * EXCLUDE (weight_mat_row_nr,
-                zarr_group,
-                effect_allele_idx,
-                target_row_nr,
-                is_recessive,
-                is_dominant)
-            FROM wide_score_variants
-            WHERE zarr_group = $zarr_group
-            ORDER BY target_row_nr, effect_allele_idx
-            """,
-            {"zarr_group": group_path},
-        ).fetchnumpy()
-        accessions = [str(key) for key in query]
-        return accessions, np.stack(list(query.values()), axis=1)
+    query = conn.execute(
+        """
+        SELECT * EXCLUDE (weight_mat_row_nr,
+            zarr_group,
+            effect_allele_idx,
+            target_row_nr,
+            is_recessive,
+            is_dominant)
+        FROM wide_score_variants
+        WHERE zarr_group = $zarr_group
+        ORDER BY target_row_nr, effect_allele_idx
+        """,
+        {"zarr_group": group_path},
+    ).fetchnumpy()
+    accessions = [str(key) for key in query]
+    return accessions, np.stack(list(query.values()), axis=1)

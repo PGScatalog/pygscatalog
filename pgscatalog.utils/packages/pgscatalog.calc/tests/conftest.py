@@ -50,16 +50,16 @@ def phased_bgen_path() -> pathlib.Path:
 
 @pytest.fixture
 def phased_bgen_index_path(tmp_path) -> pathlib.Path:
-        index_path = (
-            pathlib.Path(__file__).parent
-            / "data"
-            / "bgen"
-            / "phased"
-            / "tiny1000G.bgen.bgi"
-        )
-        index_dir = tmp_path / "phased_bgen_index"
-        index_dir.mkdir()
-        return pathlib.Path(shutil.copy(index_path, index_dir))
+    index_path = (
+        pathlib.Path(__file__).parent
+        / "data"
+        / "bgen"
+        / "phased"
+        / "tiny1000G.bgen.bgi"
+    )
+    index_dir = tmp_path / "phased_bgen_index"
+    index_dir.mkdir()
+    return pathlib.Path(shutil.copy(index_path, index_dir))
 
 
 @pytest.fixture
@@ -83,7 +83,7 @@ def allele_match_table() -> pathlib.Path:
 
 @pytest.fixture
 def bgen_samples(bgen_sample) -> list[str]:
-    with open(bgen_sample) as f:
+    with bgen_sample.open() as f:
         csvreader = csv.DictReader(f, delimiter=" ")
         return [row["ID_2"] for row in csvreader][1:]
 
@@ -97,10 +97,7 @@ def vcf_path() -> pathlib.Path:
 
 @pytest.fixture
 def vcf_index_path(tmp_path) -> pathlib.Path:
-    index_path = (pathlib.Path(__file__).parent
-                  / "data"
-                  / "vcf"
-                  / "tiny1000G.vcf.gz.tbi")
+    index_path = pathlib.Path(__file__).parent / "data" / "vcf" / "tiny1000G.vcf.gz.tbi"
     index_dir = tmp_path / "vcf_index"
     index_dir.mkdir()
     return pathlib.Path(shutil.copy(index_path, index_dir))
