@@ -534,3 +534,30 @@ def test_match_logs_are_written(grid_targets, scorefile, tmp_path, monkeypatch):
 
     assert summary["is_match_rate_ok"].unique().to_list() == [True]
     assert any(pathlib.Path(logs).rglob("*.csv.gz"))
+
+
+def test_unmatched_chromosome_contributes_an_empty_partial(
+    chromosome_targets, scorefile, tmp_path, monkeypatch
+):
+    score_rows = pl.read_csv(scorefile, separator="\t")
+    unmatched_chrom = chromosome_targets[-1][1]
+    score_rows = score_rows.with_columns(
+        pl.when(pl.col("chr_name").cast(pl.String) == unmatched_chrom)
+        .then(pl.lit("AAA"))
+        .otherwise(pl.col("effect_allele"))
+        .alias("effect_allele")
+    )
+    modified = tmp_path / "unmatched.txt"
+    score_rows.write_csv(modified, separator="\t")
+    scores = run_pipeline(
+        chromosome_targets,
+        tmp_path / "work",
+        modified,
+        monkeypatch,
+        min_overlap="0.01",
+    )
+    expected = score_rows.filter(
+        pl.col("chr_name").cast(pl.String) != unmatched_chrom
+    ).height
+    assert scores["n_matched"].unique().to_list() == [expected]
+    assert pl.read_parquet(tmp_path / "work/score/1/partial_scores.parquet").is_empty()
