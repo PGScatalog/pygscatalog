@@ -185,9 +185,13 @@ def dev(session: nox.Session) -> None:
 
 
 def install_system_binaries(package, session) -> None:
-    """Install bgenix and 7z binaries using conda from bioconda / conda-forge"""
+    """Install the bgenix binary using conda from bioconda / conda-forge
+
+    Only bgen input needs an external binary: the cache is archived with stdlib
+    zipfile (ADR 0012).
+    """
     if package in {"pgscatalog.utils", "pgscatalog.calc"}:
-        if shutil.which("bgenix") is None or shutil.which("7z") is None:
+        if shutil.which("bgenix") is None:
             session.log("Installing system binaries via conda...")
             session.run(
                 "conda",
@@ -200,7 +204,6 @@ def install_system_binaries(package, session) -> None:
                 "-c",
                 "conda-forge",
                 "bgen-cpp",
-                "p7zip",
                 external=True,
             )
         else:

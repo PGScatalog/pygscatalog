@@ -6,16 +6,22 @@ import pathlib
 from pgscatalog.core.cli.download_cli import add_download_args, download_cli
 from pgscatalog.core.cli.format_cli import add_format_args, format_cli
 
-from pgscatalog.calc import GenomeFileType
-from pgscatalog.calc.cli._utils import absence_semantics, check_positive
+from pgscatalog.calc.cli._utils import check_positive
 from pgscatalog.calc.cli.combine import add_combine_args
-from pgscatalog.calc.cli.load import load_cli
+from pgscatalog.calc.cli.load import add_load_input_args, load_cli
 from pgscatalog.calc.cli.match import add_match_args
 from pgscatalog.calc.cli.match_combine import add_match_combine_args
+from pgscatalog.calc.cli.run import add_run_args
 from pgscatalog.calc.cli.score import add_score_args
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """The parser for every subcommand
+
+    A serial run composes argv and parses it here rather than calling stage
+    functions directly, so argparse checks that `run` still speaks each stage's
+    documented argument language (ADR 0013).
+    """
     parser = argparse.ArgumentParser(
         prog="pgsc_calc",
         description="""
@@ -52,6 +58,11 @@ def main() -> None:
     add_combine_args(
         subparsers.add_parser("combine", help="Sum partial scores from every shard")
     )
+    add_run_args(
+        subparsers.add_parser(
+            "run", help="Run every scoring stage in sequence, on one machine"
+        )
+    )
 
     parser_format = subparsers.add_parser(
         "format", help="Format scoring files to a consistent structure "
@@ -63,7 +74,11 @@ def main() -> None:
     )
     parser_download_args(parser_download)
 
-    args = parser.parse_args()
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
 
     # dispatch args to correct function
     args.func(args)
@@ -95,64 +110,13 @@ def parser_load_args(parser: argparse.ArgumentParser) -> None:
         required=False,
         help="An existing zarr cache to update.",
     )
-    parser.add_argument(
-        "--target_genomes",
-        type=str,
-        nargs="+",
-        help="Target genomes to load in the format PATH:CHROM",
-        required=True,
-    )
-    parser.add_argument(
-        "--sampleset",
-        type=str,
-        help="Human label for the target genomes (e.g. UKBiobank)",
-        required=True,
-    )
-    parser.add_argument(
-        "--format",
-        type=GenomeFileType,
-        choices=[x.value for x in GenomeFileType],
-        help="Target genome format",
-        required=True,
-    )
-    parser.add_argument(
-        "--score_paths",
-        type=pathlib.Path,
-        nargs="+",
-        help="PGS Catalog scoring file paths",
-        required=True,
-    )
-    parser.add_argument(
-        "--absence_semantics",
-        type=absence_semantics,
-        default="unobserved",
-        help="""
-            What it means for a variant to be absent from a target genome file:
-            'unobserved' (never assessed, the default and the only mode implemented)
-            or 'homref' (assessed, and every sample here is homozygous reference).
-            The two produce identical files so this can only be declared. bgen is
-            dense - every bgen shard records every variant it assessed - so this
-            declaration cannot change how bgen input behaves.
-        """,
-    )
+    add_load_input_args(parser)
     parser.add_argument("--verbose", action="store_true", help="More logging!")
     parser.add_argument(
         "--threads",
         type=check_positive,
         default=1,
         help="Number of dask threads to use (between 2 - 4 is good)",
-    )
-    parser.add_argument(
-        "--batch_size",
-        type=check_positive,
-        default=5_000,
-        help="Number of variants to buffer before writing to zarr",
-    )
-    parser.add_argument(
-        "--bgen_sample_file",
-        type=pathlib.Path,
-        help="Path to a BGEN sample file",
-        required=False,
     )
     parser.set_defaults(func=load_cli)
 

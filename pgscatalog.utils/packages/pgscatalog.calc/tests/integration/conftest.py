@@ -273,22 +273,30 @@ def load_targets(
     """LOAD every shard into its own cache, one task each"""
     zips = []
     for i, target in enumerate(targets):
-        if isinstance(target, tuple):
-            path, chrom = target
-            spec = f"{path}:{chrom}"
-        else:
-            spec = str(target)
         zips.append(
             load_target(
-                spec, cache_dir / f"cache{i}", scorefile, monkeypatch, fmt, sample_file
+                target_spec(target),
+                cache_dir / f"cache{i}",
+                scorefile,
+                monkeypatch,
+                fmt,
+                sample_file,
             )
         )
     return zips
 
 
-def run_pipeline(
+def target_spec(target) -> str:
+    """PATH or PATH:CHROM, however the fixture spells a target genome"""
+    if isinstance(target, tuple):
+        path, chrom = target
+        return f"{path}:{chrom}"
+    return str(target)
+
+
+def run_serial(
     targets: list,
-    work_dir: pathlib.Path,
+    out_dir: pathlib.Path,
     scorefile,
     monkeypatch,
     min_overlap: str = "0.75",
@@ -298,101 +306,36 @@ def run_pipeline(
     fmt: str = "vcf",
     sample_file=None,
 ) -> pl.DataFrame:
-    """Drive MATCH -> MATCH_COMBINE -> SCORE -> SCORE_COMBINE, mirroring the
-    Nextflow DAG: one task per chromosome, then one, then one per shard, then one.
+    """Drive `pgsc_calc run`: LOAD every target, then the four scoring stages
 
-    Every stage is its own task with its own resource limits (ADR 0001), so the
-    limits are passed to each one just like Nextflow does.
+    One command line, not a stage sequence of the tests' own. The shipped
+    subcommand is the only definition of the stage graph in this repo, and driving
+    it here is what dogfoods it (ADR 0013). Stage output lands under
+    ``out_dir/stages/``, where the tests that assert on it look.
     """
-    score_paths = [str(p) for p in (score_paths or [scorefile])]
-    resources = ["--max_memory_gb", max_memory_gb, "--threads", threads]
-    zips = load_targets(
-        targets, work_dir / "load", scorefile, monkeypatch, fmt, sample_file
-    )
-
-    # MATCH fans out per chromosome, so group the shards by the chromosome they
-    # were loaded under
-    by_chromosome: dict[str, list[pathlib.Path]] = {}
-    for target, zip_path in zip(targets, zips, strict=True):
-        chrom = target[1] if isinstance(target, tuple) else "ALL"
-        by_chromosome.setdefault(chrom, []).append(zip_path)
-
-    matches, samples = [], []
-    for chrom, chrom_zips in by_chromosome.items():
-        out_dir = work_dir / "match" / chrom
-        run_cli(
-            [
-                "pgsc_calc",
-                "match",
-                "--zarr_zip_file",
-                *[str(z) for z in chrom_zips],
-                "--score_paths",
-                *score_paths,
-                "--out_dir",
-                str(out_dir),
-                *resources,
-            ],
-            monkeypatch,
-        )
-        matches.append(out_dir / "matches.parquet")
-        samples.append(out_dir / "samples.parquet")
-
-    combine_dir = work_dir / "match_combine"
     run_cli(
         [
             "pgsc_calc",
-            "match-combine",
-            "--matches",
-            *[str(p) for p in matches],
-            "--samples",
-            *[str(p) for p in samples],
-            "--score_paths",
-            *score_paths,
+            "run",
+            "--target_genomes",
+            *[target_spec(x) for x in targets],
             "--sampleset",
             SAMPLESET,
+            "--format",
+            fmt,
+            "--score_paths",
+            *[str(p) for p in (score_paths or [scorefile])],
             "--min_overlap",
             min_overlap,
             "--out_dir",
-            str(combine_dir),
-            *resources,
-        ],
-        monkeypatch,
-    )
-    match_table = combine_dir / "match_table.parquet"
-
-    partials = []
-    for i, zip_path in enumerate(zips):
-        out_dir = work_dir / "score" / str(i)
-        run_cli(
-            [
-                "pgsc_calc",
-                "score",
-                "--zarr_zip_file",
-                str(zip_path),
-                "--score_paths",
-                *score_paths,
-                "--match_table",
-                str(match_table),
-                "--out_dir",
-                str(out_dir),
-                *resources,
-            ],
-            monkeypatch,
-        )
-        partials.append(out_dir / "partial_scores.parquet")
-
-    final_dir = work_dir / "combine"
-    run_cli(
-        [
-            "pgsc_calc",
-            "combine",
-            "--partial_scores",
-            *[str(p) for p in partials],
-            "--out_dir",
-            str(final_dir),
-            *resources,
+            str(out_dir),
+            "--max_memory_gb",
+            max_memory_gb,
+            "--threads",
+            threads,
+            *(["--bgen_sample_file", str(sample_file)] if sample_file else []),
         ],
         monkeypatch,
     )
 
-    return pl.read_csv(final_dir / "scores.txt.gz")
+    return pl.read_csv(out_dir / "scores.txt.gz")

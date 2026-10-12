@@ -2,11 +2,17 @@
 
 Open work only. A ticket is deleted when it lands — the commit that closes it is its record, and `git log -- docs/tickets/` finds the ones that are gone. Decisions that outlive the work belong in `docs/adr/`, not here.
 
-Derived from ADRs 0001, 0003, 0004, and 0007–0011. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
+Derived from ADRs 0001, 0003, 0004, and 0007–0013. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
 
 ## Open
 
-None. X, Y and MT support (0019–0025) landed first, leaving two bugs it uncovered
+None. A Serial run (ADR 0013) landed last: a convenience entry point for environments
+where Nextflow cannot run, not a second scaling mechanism — `pgsc_calc` remains the
+supported path. 0036 built `pgsc_calc run`, 0037 made it the thing the integration tests
+exercise (which is the dogfooding argument for having built it), and 0038 measured the
+property that makes it usable on real data.
+
+Before it, X, Y and MT support (0019–0025) landed, leaving two bugs it uncovered
 (0026, 0027); multiallelic handling (ADR 0010) added 0028–0032; implementing those
 uncovered two more (0033, 0034), both crashes or wrong answers on `main`
 independently of multiallelic support; and 0035 ported v2's `--ignore_strand_flips`.
@@ -24,6 +30,8 @@ A pre-flight validation process reading VCF headers and bgen `.sample` files wou
 `homref` absence semantics (sparse-called WGS, ragged batches) — design recorded in ADR 0004, strictly additive on top of alpha2.
 
 Reference-database backfill for variants absent from the whole sampleset — needs its own ADR, because it decouples "matched" from "has a dosage" and would otherwise drive the match rate to 100% by construction and kill `min_overlap`.
+
+`_score_shard` in `tests/integration/test_bgen.py` is a third definition of the stage graph, and 0037 deliberately left it alone. It takes an already-loaded zip rather than target genomes, so `pgsc_calc run` doesn't drop into it without teaching `run` to accept a pre-built cache — which is a decision about the subcommand, not a test cleanup.
 
 One finding from the alpha2 architecture review is still unticketed: deciding whether a run has one sampleset. It is asserted three ways and iterated once, with a `_matchlog.py` TODO recording that the multi-sampleset path is untested.
 

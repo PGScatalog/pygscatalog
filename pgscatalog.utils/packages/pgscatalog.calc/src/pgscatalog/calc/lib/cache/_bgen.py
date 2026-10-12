@@ -209,6 +209,14 @@ def run_bgenix_subprocess(
     temp_idx_path: pathlib.Path,
     table_name: str,
 ) -> None:
+    # checked here rather than at import: only bgen input needs bgenix, so a VCF
+    # pipeline shouldn't refuse to start without it (ADR 0012)
+    if shutil.which("bgenix") is None:
+        raise ValueError(
+            "bgenix application not detected on your system. "
+            "Please install bgenix or use bioconda to install this package."
+        )
+
     cmd = [
         "bgenix",
         "-g",

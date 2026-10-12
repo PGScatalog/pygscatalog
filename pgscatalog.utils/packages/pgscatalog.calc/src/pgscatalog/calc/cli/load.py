@@ -7,7 +7,7 @@ import logging
 import logging.handlers
 import pathlib
 import shutil
-import subprocess
+import zipfile
 from dataclasses import dataclass
 from itertools import batched
 from shutil import rmtree
@@ -25,22 +25,71 @@ from pgscatalog.calc import (
     Scorefiles,
     TargetGenome,
 )
+from pgscatalog.calc.cli._utils import absence_semantics, check_positive
 from pgscatalog.calc.lib.cache.genotypecache import leaf_group_path
 from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import canonicalise_chrom
 
 logger = logging.getLogger(__name__)
 
-if shutil.which("7z") is None:
-    raise ValueError(
-        "7z application not detected on your system."
-        "Please install 7z or use bioconda to install this package"
-    )
 
-if shutil.which("bgenix") is None:
-    raise ValueError(
-        "bgenix application not detected on your system."
-        "Please install bgenix or use bioconda to install this package."
+def add_load_input_args(parser: argparse.ArgumentParser) -> None:
+    """The target genomes and scoring files to load, and how to read them
+
+    Shared with `pgsc_calc run`, which LOADs every target itself before running
+    the scoring stages over them (ADR 0013).
+    """
+    parser.add_argument(
+        "--target_genomes",
+        type=str,
+        nargs="+",
+        help="Target genomes to load in the format PATH:CHROM",
+        required=True,
+    )
+    parser.add_argument(
+        "--sampleset",
+        type=str,
+        help="Human label for the target genomes (e.g. UKBiobank)",
+        required=True,
+    )
+    parser.add_argument(
+        "--format",
+        type=GenomeFileType,
+        choices=[x.value for x in GenomeFileType],
+        help="Target genome format",
+        required=True,
+    )
+    parser.add_argument(
+        "--score_paths",
+        type=pathlib.Path,
+        nargs="+",
+        help="PGS Catalog scoring file paths",
+        required=True,
+    )
+    parser.add_argument(
+        "--absence_semantics",
+        type=absence_semantics,
+        default="unobserved",
+        help="""
+            What it means for a variant to be absent from a target genome file:
+            'unobserved' (never assessed, the default and the only mode implemented)
+            or 'homref' (assessed, and every sample here is homozygous reference).
+            The two produce identical files so this can only be declared. bgen is
+            dense - every bgen shard records every variant it assessed - so this
+            declaration cannot change how bgen input behaves.
+        """,
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=check_positive,
+        default=5_000,
+        help="Number of variants to buffer before writing to zarr",
+    )
+    parser.add_argument(
+        "--bgen_sample_file",
+        type=pathlib.Path,
+        help="Path to a BGEN sample file",
+        required=False,
     )
 
 
@@ -270,10 +319,23 @@ def cleanup_empty_zarr_group(group: zarr.Group) -> None:
         del root[group.path]
 
 
+def _members_for_group(names: list[str], group_path: str) -> list[str]:
+    """The archive members that make up one leaf group, and nothing else
+
+    A leaf's own files, plus the `zarr.json` of every ancestor group: without
+    those the hierarchy doesn't parse and a downstream stage can't open the leaf
+    (ADR 0003).
+    """
+    parts = group_path.split("/")
+    ancestors = {"/".join(parts[:i]) + "/zarr.json" for i in range(1, len(parts))}
+    prefix = f"{group_path}/"
+    return [n for n in names if n.startswith(prefix) or n in ancestors]
+
+
 def unzip_zarr(
     zip_path: pathlib.Path, cache_path: pathlib.Path, group_path: str | None = None
 ) -> None:
-    """Run a 7z subprocess to unzip a zarr store
+    """Extract a zarr zip store to a directory
 
     This means zarr can work with a DirectoryStore to update an exising cache
 
@@ -285,56 +347,33 @@ def unzip_zarr(
         )
 
     logger.info(f"Extracting zarr zip store to directory {cache_path}")
-    cmd = ["7z", "x", "-y", str(zip_path), f"-o{str(cache_path)}"]
 
-    if group_path is not None:
-        logger.info(f"Only extracting {group_path=} from zip")
-        cmd.append(f"-ir!{group_path}/*")
-        # also unzip the zarr.json file of every ancestor group
-        # otherwise the zarr hierarchy won't parse properly for downstream processes
-        parts = group_path.split("/")
-        for i in range(1, len(parts)):
-            cmd.append("/".join(parts[:i]) + "/zarr.json")
-
-    logger.info(f"Running subprocess {cmd=}")
-    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-
-    if result.stdout:
-        logger.info(result.stdout)
-
-    if result.stderr:
-        logger.error(result.stderr)
+    with zipfile.ZipFile(zip_path) as archive:
+        members = None
+        if group_path is not None:
+            logger.info(f"Only extracting {group_path=} from zip")
+            members = _members_for_group(archive.namelist(), group_path)
+        archive.extractall(path=cache_path, members=members)
 
     logger.info("Unzipping finished")
 
 
 def zip_zarr(zip_path: pathlib.Path, zarr_path: pathlib.Path) -> None:
-    """Run a 7z subprocess to create a zip archive
+    """Archive a zarr directory store
 
-    zipfile in standard library and other python libraries are pure Python. 7z is
-    written in C++ so shouldn't have problems scaling.
+    Stored, not deflated: zarr has already compressed the arrays, so the bytes are
+    copied rather than recompressed (ADR 0012).
     """
-    cmd = [
-        "7z",
-        "a",
-        "-tzip",  # make a zip archive
-        "-mx0",  # don't compress (zarr already compresses arrays)
-        zip_path.name,  # intentionally only the archive name
-        zarr_path.name,  # intentionally only the directory name
-    ]
+    logger.info(f"Archiving {zarr_path} to {zip_path}")
 
-    logger.info(f"Running subprocess {cmd=}")
-    # change working directory to parent keeps zip files portable
-    # (same internal directory structure, with genotypes.zarr at the top level)
-    result = subprocess.run(
-        cmd, check=True, capture_output=True, text=True, cwd=zarr_path.parent
-    )
+    # paths are relative to the store's parent, so the archive holds
+    # genotypes.zarr at its top level wherever it's extracted
+    root = zarr_path.parent
 
-    if result.stdout:
-        logger.info(result.stdout)
-
-    if result.stderr:
-        logger.error(result.stderr)
+    with zipfile.ZipFile(zip_path, mode="w", compression=zipfile.ZIP_STORED) as archive:
+        for path in sorted(zarr_path.rglob("*")):
+            if path.is_file():
+                archive.write(path, arcname=path.relative_to(root))
 
     logger.info("Zipping finished")
 
