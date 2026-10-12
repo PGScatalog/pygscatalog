@@ -20,7 +20,15 @@ import zarr.storage
 from pgscatalog.calc.cli.load import unzip_zarr
 from pgscatalog.calc.lib.constants import MISSING_GENOTYPE_SENTINEL_VALUE
 
-from .conftest import SAMPLESET, _is_ambiguous, _write_vcf, load_target, run_serial
+from .conftest import (
+    SAMPLESET,
+    _is_ambiguous,
+    _write_vcf,
+    flip_sex_map,
+    load_target,
+    run_cli,
+    run_serial,
+)
 
 # GRCh38 PAR1 ends here, which is only used to place a variant the caller wrote as
 # diploid for everyone. Nothing in the pipeline reads it
@@ -103,7 +111,7 @@ def chrx_scorefile(chrx_records, tmp_path_factory) -> pathlib.Path:
 
 
 def test_mixed_sex_chrx_scores_end_to_end(
-    chrx_records, chrx_target, chrx_scorefile, tmp_path, monkeypatch
+    chrx_records, chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch
 ):
     """A hemizygous effect allele contributes 1, a female heterozygote 1 and a
     female homozygote 2, and each sample's allele count follows its own ploidy.
@@ -115,7 +123,13 @@ def test_mixed_sex_chrx_scores_end_to_end(
     _, par, records = chrx_records
     expected_dosage, expected_alleles = _observed([par, *records])
 
-    scores = run_serial([(chrx_target, "X")], tmp_path, chrx_scorefile, monkeypatch)
+    scores = run_serial(
+        [(chrx_target, "X")], tmp_path, chrx_scorefile, monkeypatch, sex_map=sex_map
+    )
+
+    # LOAD has no --out_dir, so its sex check report lands beside the archive it wrote,
+    # which is the cache dir `run` gave that task
+    assert (tmp_path / "stages" / "load" / "0" / "sex_check.tsv").exists()
 
     assert scores.shape[0] == 3202
     # the padded position can't match, so it counts against the match rate and
@@ -146,7 +160,7 @@ def test_mixed_sex_chrx_scores_end_to_end(
 
 
 def test_a_pseudoautosomal_variant_is_diploid_for_every_sample(
-    chrx_records, chrx_target, tmp_path, monkeypatch
+    chrx_records, chrx_target, sex_map, tmp_path, monkeypatch
 ):
     """No PAR coordinate map is consulted: the same men are hemizygous a few
     kilobases away, and diploid here, because that is what the file says"""
@@ -154,20 +168,26 @@ def test_a_pseudoautosomal_variant_is_diploid_for_every_sample(
     scorefile = tmp_path / "PGS999994.txt.gz"
     _write_scorefile(scorefile, [par])
 
-    scores = run_serial([(chrx_target, "X")], tmp_path, scorefile, monkeypatch)
+    scores = run_serial(
+        [(chrx_target, "X")], tmp_path, scorefile, monkeypatch, sex_map=sex_map
+    )
 
     assert scores["allele_count"].unique().to_list() == [2]
     assert scores["dosage_sum"].max() == 2
 
 
 def test_padded_positions_are_diploid_shaped_but_carry_no_alleles(
-    chrx_target, chrx_scorefile, tmp_path, monkeypatch
+    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch
 ):
     """The other half of the padding evidence: the fabricated row really is width
     2 on a chromosome where most calls are hemizygous. It's harmless because it
     holds no alleles and has no REF, so it never becomes a match candidate"""
     zip_path = load_target(
-        f"{chrx_target}:X", tmp_path / "cache", chrx_scorefile, monkeypatch
+        f"{chrx_target}:X",
+        tmp_path / "cache",
+        chrx_scorefile,
+        monkeypatch,
+        sex_map=sex_map,
     )
     unzip_zarr(zip_path, tmp_path / "unzipped")
     leaf = f"{SAMPLESET}/X/{chrx_target.name}"
@@ -182,3 +202,181 @@ def test_padded_positions_are_diploid_shaped_but_carry_no_alleles(
     assert refs[padded] == ""  # no REF, so update_match_table skips the position
     assert genotypes.shape[1] == 2
     assert np.all(genotypes == MISSING_GENOTYPE_SENTINEL_VALUE)
+
+
+def _report(cache_dir: pathlib.Path) -> pl.DataFrame:
+    return pl.read_csv(cache_dir / "sex_check.tsv", separator="\t")
+
+
+def test_declarations_that_agree_with_the_calls_load_cleanly(
+    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch
+):
+    """The 1000G declarations agree with 1000G's own ploidy, so the check passes and
+    writes a row per sample. HG03511 is hemizygous with no declaration in the source
+    data, so it arrives as a genuine exemption rather than a contrived one"""
+    cache_dir = tmp_path / "cache"
+    load_target(
+        f"{chrx_target}:X", cache_dir, chrx_scorefile, monkeypatch, sex_map=sex_map
+    )
+
+    report = _report(cache_dir)
+
+    assert report.shape[0] == 3202
+    assert set(report["outcome"].unique()) == {"consistent", "exempt"}
+    assert report.filter(pl.col("outcome") == "exempt")["sample_id"].to_list() == [
+        "HG03511"
+    ]
+
+    # the forced-diploid PAR variant is excluded, so 34 of the 35 are informative
+    assert report["n_informative"].unique().to_list() == [34]
+
+    # men land at 1 and women at 0, not merely on the right side of the line
+    declared = dict(zip(report["sample_id"], report["declared"], strict=True))
+    fractions = dict(
+        zip(report["sample_id"], report["hemizygous_fraction"], strict=True)
+    )
+    assert {fractions[s] for s, d in declared.items() if d == 1} == {1.0}
+    assert {fractions[s] for s, d in declared.items() if d == 2} == {0.0}
+
+
+@pytest.mark.parametrize("annotation", [":X", ""])
+def test_a_flipped_declaration_fails_the_load_naming_the_sample(
+    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch, annotation
+):
+    """The point of the feature: a sample swap is not scored silently"""
+    flipped = flip_sex_map(sex_map, tmp_path / "flipped.tsv", {"HG00096": 2})
+    cache_dir = tmp_path / "cache"
+
+    with pytest.raises(ValueError) as excinfo:
+        load_target(
+            f"{chrx_target}{annotation}",
+            cache_dir,
+            chrx_scorefile,
+            monkeypatch,
+            sex_map=flipped,
+        )
+
+    assert "HG00096" in str(excinfo.value)
+
+    # the archive and the report are both written before the exception: the sex map
+    # influences nothing that gets cached, so this cache is complete (ADR 0014)
+    assert (cache_dir / "genotypes.zarr.zip").exists()
+    report = _report(cache_dir)
+    assert report.shape[0] == 3202
+    assert report.filter(pl.col("outcome") == "mismatch")["sample_id"].to_list() == [
+        "HG00096"
+    ]
+
+
+def test_two_flipped_declarations_are_named_by_one_failure(
+    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch
+):
+    """Failing on the first would make a cohort with four hundred mismatches four
+    hundred round trips"""
+    flipped = flip_sex_map(
+        sex_map, tmp_path / "flipped.tsv", {"HG00096": 2, "HG00171": 1}
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        load_target(
+            f"{chrx_target}:X",
+            tmp_path / "cache",
+            chrx_scorefile,
+            monkeypatch,
+            sex_map=flipped,
+        )
+
+    message = str(excinfo.value)
+    assert "HG00096" in message
+    assert "HG00171" in message
+
+
+def test_declaring_a_sample_unknown_exempts_it(
+    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch
+):
+    """0 is the documented recovery path for a sample the pipeline cannot vouch for,
+    including a legitimately aneuploid one, and it is reported rather than silent"""
+    exempted = flip_sex_map(sex_map, tmp_path / "exempt.tsv", {"HG00096": 0})
+    cache_dir = tmp_path / "cache"
+
+    load_target(
+        f"{chrx_target}:X", cache_dir, chrx_scorefile, monkeypatch, sex_map=exempted
+    )
+
+    report = _report(cache_dir)
+    exempt = report.filter(pl.col("outcome") == "exempt")["sample_id"].to_list()
+    assert sorted(exempt) == ["HG00096", "HG03511"]
+    assert not report.filter(pl.col("outcome") == "mismatch").height
+
+
+def test_a_rerun_with_a_corrected_map_rereads_no_genotypes(
+    chrx_target, chrx_scorefile, sex_map, tmp_path, monkeypatch, capsys
+):
+    """The reason LOAD finishes work it is about to reject: fixing the map costs a
+    check, not a re-load, so an override loop over a biobank stays affordable"""
+    flipped = flip_sex_map(sex_map, tmp_path / "flipped.tsv", {"HG00096": 2})
+    cache_dir = tmp_path / "cache"
+
+    with pytest.raises(ValueError):
+        load_target(
+            f"{chrx_target}:X", cache_dir, chrx_scorefile, monkeypatch, sex_map=flipped
+        )
+
+    zip_path = cache_dir / "genotypes.zarr.zip"
+    assert zip_path.exists()
+
+    rerun_dir = tmp_path / "rerun"
+    run_cli(
+        [
+            "pgsc_calc",
+            "load",
+            "--target_genomes",
+            f"{chrx_target}:X",
+            "--sampleset",
+            SAMPLESET,
+            "--format",
+            "vcf",
+            "--cache_dir",
+            str(rerun_dir),
+            "--score_paths",
+            str(chrx_scorefile),
+            "--sex_map",
+            str(sex_map),
+            "--zarr_zip_file",
+            str(zip_path),
+        ],
+        monkeypatch,
+    )
+
+    # every position came back from the archive, so the target genome index was never
+    # queried again: the retry cost a check rather than a re-load
+    assert "All variants are already cached" in capsys.readouterr().out
+
+    report = _report(rerun_dir)
+    assert report.shape[0] == 3202
+    assert not report.filter(pl.col("outcome") == "mismatch").height
+
+
+def test_a_pseudoautosomal_only_scorefile_cannot_conclude(
+    chrx_records, chrx_target, sex_map, tmp_path, monkeypatch, caplog
+):
+    """Every call diploid means either pseudoautosomal or a cohort with no hemizygous
+    samples in it, and nothing tells those apart without PAR coordinates. Reporting
+    every sample female would be inventing an answer (ADR 0014)"""
+    _, par, _ = chrx_records
+    scorefile = tmp_path / "PGS999994.txt.gz"
+    _write_scorefile(scorefile, [par])
+    cache_dir = tmp_path / "cache"
+
+    with caplog.at_level("WARNING"):
+        load_target(
+            f"{chrx_target}:X", cache_dir, scorefile, monkeypatch, sex_map=sex_map
+        )
+
+    report = _report(cache_dir)
+
+    assert report["n_informative"].unique().to_list() == [0]
+    # NULL, never 0.0: 0/0 read as diploid would pass every woman and flag every man
+    assert report["hemizygous_fraction"].null_count() == 3202
+    assert set(report["outcome"].unique()) == {"not_concluded", "exempt"}
+    assert "does not conclude" in caplog.text

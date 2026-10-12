@@ -29,6 +29,13 @@ from pgscatalog.calc.cli._utils import absence_semantics, check_positive
 from pgscatalog.calc.lib.cache.genotypecache import leaf_group_path
 from pgscatalog.calc.lib.config import config
 from pgscatalog.calc.lib.constants import canonicalise_chrom
+from pgscatalog.calc.lib.sexcheck import (
+    check_sex,
+    check_sex_map_covers,
+    read_sex_map,
+    report_sex_check,
+    write_sex_check_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +96,18 @@ def add_load_input_args(parser: argparse.ArgumentParser) -> None:
         "--bgen_sample_file",
         type=pathlib.Path,
         help="Path to a BGEN sample file",
+        required=False,
+    )
+    parser.add_argument(
+        "--sex_map",
+        type=pathlib.Path,
+        help="""
+            Path to a tab separated sample_id / sex file declaring the sex of every
+            genotyped sample. Codes are 0 unknown, 1 male, 2 female. Required when a
+            scoring file carries X or Y variants. The declaration is only ever checked
+            against observed ploidy, never used to derive it, and 0 exempts a sample
+            from the check (ADR 0014).
+        """,
         required=False,
     )
 
@@ -184,6 +203,36 @@ def check_chromosomes(target_genomes: list[TargetGenome]) -> None:
         raise ValueError(f"{names} not supported yet: 1-22, X, Y and MT can be scored")
 
 
+def check_sex_map_required(
+    scorefiles: Scorefiles, sex_map: pathlib.Path | None
+) -> None:
+    """A sex map is mandatory when a scoring file carries sex chromosome variants.
+
+    Keyed on the scoring files, not the target genomes: the cache holds only the
+    positions the scoring files asked for, so they are what decides whether there will
+    be anything to check. Answered with `zarr_group=None`, so this is duckdb over the
+    scoring files alone - no cache read, no target genome opened (ADR 0014).
+
+    X and Y both trigger it. MT does not: MT is hemizygous in everyone and says nothing
+    about sex.
+    """
+    if sex_map is not None:
+        return
+
+    carries = [
+        chrom
+        for chrom in ("X", "Y")
+        if scorefiles.get_unique_positions(chrom=chrom)  # names are already canonical
+    ]
+
+    if carries:
+        raise argparse.ArgumentTypeError(
+            f"--sex_map is required: a scoring file carries "
+            f"{' and '.join(carries)} variants. Supply a tab separated sample_id / sex "
+            f"file (0 unknown, 1 male, 2 female) declaring every genotyped sample."
+        )
+
+
 def load_cli(args: argparse.Namespace) -> None:
     # override zarr chunk size
     config.ZARR_VARIANT_CHUNK_SIZE = args.batch_size
@@ -211,6 +260,17 @@ def load_cli(args: argparse.Namespace) -> None:
 
     print(":test_tube:", "pgsc_calc load", ":dna:", "starting...")
 
+    # the scoring files decide whether a sex map is mandatory, and answering that reads
+    # nothing but them. It sits above parse_genome_paths because TargetGenome.__init__
+    # creates the zarr hierarchy, so the mandate has to fire first to fire before any
+    # target genome is opened (ADR 0014)
+    scorefiles: Scorefiles = Scorefiles(args.score_paths)
+    check_sex_map_required(scorefiles=scorefiles, sex_map=args.sex_map)
+
+    sex_map: dict[str, int] | None = (
+        read_sex_map(args.sex_map) if args.sex_map is not None else None
+    )
+
     # set up input data
     target_genomes: list[TargetGenome] = parse_genome_paths(
         target_genomes=args.target_genomes,
@@ -222,7 +282,16 @@ def load_cli(args: argparse.Namespace) -> None:
     # check chromosome input
     check_chromosomes(target_genomes=target_genomes)
 
-    scorefiles: Scorefiles = Scorefiles(args.score_paths)
+    if sex_map is not None:
+        # every target, not only the sex chromosomes: a map keyed on the wrong sample ID
+        # space then fails at the first target instead of whenever chrX happens to be
+        # dispatched (ADR 0014)
+        for target_genome in target_genomes:
+            check_sex_map_covers(
+                sex_map=sex_map,
+                samples=target_genome.samples,
+                source=str(target_genome.target_path),
+            )
 
     for target_genome in track(
         target_genomes, description="Querying target genome index..."
@@ -278,13 +347,36 @@ def load_cli(args: argparse.Namespace) -> None:
             "If you're not expecting this: do your genotypes have good "
             "variant density? Are they imputed? Are your scorefile positions/build OK?"
         )
+        # nothing was cached, so there is nothing for the sex check to read. Returning
+        # here skips it deliberately rather than by accident
         return
+
+    # read the calls before the directory store is deleted, but hold the verdict until
+    # after the archive is written. The sex map influences nothing that gets cached, so
+    # a cache written before the exception is valid and complete: the user fixes the
+    # map, re-runs with --zarr_zip_file, and get_unique_positions returns nothing, so
+    # the retry costs a check rather than a re-load.
+    #
+    # This looks backwards - LOAD finishes work it is about to reject - and it is
+    # deliberate. Turning it into a fast failure would make every iteration of an
+    # override loop re-read chrX, over a biobank hours at a time (ADR 0014).
+    sex_check_results = (
+        check_sex(cache_dir=args.cache_dir, sampleset=args.sampleset, sex_map=sex_map)
+        if sex_map is not None
+        else []
+    )
 
     zip_zarr(zip_path=zip_path, zarr_path=zarr_path)
 
     # clean up the original directory store
     logger.info("Cleaning up zarr directory store")
     shutil.rmtree(zarr_path)
+
+    if sex_check_results:
+        write_sex_check_report(
+            path=args.cache_dir / "sex_check.tsv", results=sex_check_results
+        )
+        report_sex_check(sex_check_results)
 
     print("Finished caching :tada: Goodbye!")
 

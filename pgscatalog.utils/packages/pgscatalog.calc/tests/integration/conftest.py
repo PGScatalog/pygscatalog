@@ -235,11 +235,13 @@ def load_target(
     monkeypatch,
     fmt: str = "vcf",
     sample_file=None,
+    sex_map=None,
 ) -> pathlib.Path:
     """LOAD one target genome into its own cache, like a Nextflow task would
 
     ``target`` is PATH or PATH:CHROM. ``sample_file`` is bgen's, which carries the
-    sample IDs a bgen doesn't hold itself.
+    sample IDs a bgen doesn't hold itself. ``sex_map`` is mandatory whenever the
+    scoring file carries X or Y variants (ADR 0014).
     """
     run_cli(
         [
@@ -256,6 +258,7 @@ def load_target(
             "--score_paths",
             str(scorefile),
             *(["--bgen_sample_file", str(sample_file)] if sample_file else []),
+            *(["--sex_map", str(sex_map)] if sex_map else []),
         ],
         monkeypatch,
     )
@@ -269,6 +272,7 @@ def load_targets(
     monkeypatch,
     fmt: str = "vcf",
     sample_file=None,
+    sex_map=None,
 ) -> list[pathlib.Path]:
     """LOAD every shard into its own cache, one task each"""
     zips = []
@@ -281,6 +285,7 @@ def load_targets(
                 monkeypatch,
                 fmt,
                 sample_file,
+                sex_map,
             )
         )
     return zips
@@ -305,6 +310,7 @@ def run_serial(
     threads: str = "1",
     fmt: str = "vcf",
     sample_file=None,
+    sex_map=None,
 ) -> pl.DataFrame:
     """Drive `pgsc_calc run`: LOAD every target, then the four scoring stages
 
@@ -334,8 +340,56 @@ def run_serial(
             "--threads",
             threads,
             *(["--bgen_sample_file", str(sample_file)] if sample_file else []),
+            *(["--sex_map", str(sex_map)] if sex_map else []),
         ],
         monkeypatch,
     )
 
     return pl.read_csv(out_dir / "scores.txt.gz")
+
+
+@pytest.fixture(scope="session")
+def sex_map(tmp_path_factory) -> pathlib.Path:
+    """A cohort-wide declaration for every sample in the 1000G fixture.
+
+    Read from the bgen `.sample` file's sex column, which ADR 0014 forbids the
+    *pipeline* from reading but not the tests. That is the point of it: a map derived
+    from the same chrX calls the check reads would make the passing case a tautology,
+    and this column is the only declaration in the repo independent of the calls.
+
+    It declares 1598 male, 1603 female and one NA against an observed 1599 hemizygous
+    and 1603 diploid, so HG03511 is a hemizygous sample with no declaration - a real
+    exemption, mapped to 0, rather than a contrived one.
+    """
+    source = (
+        pathlib.Path(__file__).parent.parent
+        / "data"
+        / "bgen"
+        / "phased"
+        / "tiny1000G.sample"
+    )
+    # line 1 is the header, line 2 is the bgen type row (0 0 0 D D D)
+    rows = source.read_text().splitlines()[2:]
+
+    path = tmp_path_factory.mktemp("sex_map") / "sex.tsv"
+    with path.open("w") as f:
+        f.write("sample_id\tsex\n")
+        for row in rows:
+            fields = row.split()
+            declared = fields[3]
+            f.write(f"{fields[1]}\t{'0' if declared == 'NA' else declared}\n")
+
+    return path
+
+
+def flip_sex_map(
+    source: pathlib.Path, out: pathlib.Path, changes: dict
+) -> pathlib.Path:
+    """The same map with declarations replaced, which is how a mismatch is staged"""
+    lines = source.read_text().splitlines()
+    with out.open("w") as f:
+        f.write(lines[0] + "\n")
+        for line in lines[1:]:
+            sample_id, declared = line.split("\t")
+            f.write(f"{sample_id}\t{changes.get(sample_id, int(declared))}\n")
+    return out

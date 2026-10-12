@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Relaxes one invariant in [ADR 0003](0003-shards-are-zarr-leaf-groups.md).
+Accepted. Relaxes one invariant in [ADR 0003](0003-shards-are-zarr-leaf-groups.md). Amended by [ADR 0014](0014-declared-sex-is-checked-never-used.md), which introduces a sample sex declaration for QC only — see *Amendment* below before reading the rejection of declared sex as a reversal.
 
 The bgen claims below were checked against the library rather than assumed — see the Consequences for what was run, what it showed, and the two cases left untested.
 
@@ -10,7 +10,7 @@ The bgen claims below were checked against the library rather than assumed — s
 
 X, Y and MT are excluded from scoring today in four places, three deliberate and one accidental:
 
-- `check_chromosomes` rejects any target genome outside 1–22 (`cli/load.py:131`)
+- `check_chromosomes` rejects any target genome outside 1–22 (`cli/load.py`)
 - `VALID_CHROMOSOMES` restricts which scoring file positions get cached (`lib/scorefile.py:93`)
 - the VCF reader builds a rectangular array with `np.fromiter(gt_tuples, dtype=(np.uint8, 2))`, whose `ValueError` is caught and re-raised as `NotImplementedError("Sex chromosome genotypes not supported")` (`lib/cache/_vcf.py:126`). That guard is weaker than it looks: numpy broadcasts a haploid `(1,)` to `[1, 1]` rather than raising (checked on numpy 2.3.4), so a haploid **called** genotype was silently doubled, and only a `None` in the tuple ever reached the re-raise. The LOAD gate, not this, is what kept X out
 - `vcf_buffer_variants` sorts its region list with `key=lambda t: (int(t[0]), t[1])` (`lib/cache/_vcf.py:65`), so the VCF path actually dies on `int("X")` *before* reaching the ploidy problem. This is why `test_vcf_buffer_sex_variants` asserts `pysam.SamtoolsError` while its docstring claims `NotImplementedError` — the test passes for the wrong reason.
@@ -74,6 +74,14 @@ The residual risk is stated rather than removed: at a mixed-sex chrX variant, a 
 
 Unlike X, where ploidy genuinely differs between people and the caller is the authority on which, MT ploidy is a fact about mitochondria. That is what makes this an exception rather than an inconsistency.
 
+## Amendment: a sex declaration exists, and is never used
+
+[ADR 0014](0014-declared-sex-is-checked-never-used.md) adds a mandatory `--sex_map` when a scoring file carries sex chromosome variants. A reader who finds that flag and this ADR's "no pipeline-wide sample sex column is introduced" together should not conclude one of them lost.
+
+Nothing above is reversed. Declared sex never derives ploidy, never fills a ploidy a format could not express, and never reaches a dosage or a score. The rejection of *declared sex plus a PAR coordinate map* below is unchanged, no PAR coordinates are in the repository, and the limitations this ADR accepts on principle — the mixed-sex chrY VCF, the woman's no-call miswritten `.` — are still accepted rather than resolved by the new declaration. The `_vcf.py` comment and `test_vcf.py` docstring that cite this ADR as refusing a declared sample sex remain correct as written.
+
+What 0014 adds is the opposite operation. This ADR's argument against a declaration is that it produces a second answer free to disagree with the file, with no principled way to resolve the conflict. A declaration that can only be *checked* inverts that objection: the disagreement is the output, and 0014 stops the run rather than picking a winner. The genotype file remains the sole authority on how a sample is scored.
+
 ## Considered and rejected
 
 **Declared sex plus a PAR coordinate map** (plink's model). Rejected because both VCF and bgen already record ploidy, so this discards real information in favour of a derivation that can contradict it, requires a mandatory samplesheet column for formats that need no such thing, and puts genome-build-specific PAR coordinates into the repository to be maintained. It remains the right mechanism *inside* a `PlinkHandler`, where the format leaves no alternative.
@@ -101,7 +109,7 @@ Unlike X, where ploidy genuinely differs between people and the caller is the au
 - Ploidy 3 and 4 were observed in the BGEN spec's reference file, which is what moves the ploidy bound from theoretical to reachable.
 - **Correction — a phased ploidy-0 bgen variant is readable, and is now tested.** This bullet originally recorded the case as untestable because "the library's writer refuses to create one". On the pinned `bgen==1.9.3` it does not refuse: `BgenWriter.add_variant(..., ploidy=[0, 1, 1, 1], phased=True)` writes, and the reader returns `ploidy == 0` with an all-NaN probability row, exactly as in the unphased case. `parse_target_variants` reads such a file correctly. It works because a ploidy-0 sample never reaches the `(phased, ploidy)` selector — it is encoded nullploid before phasing is consulted, which is why phasing cannot matter here. Found while implementing 0025 and confirmed independently.
 - **Verified:** `add_missing_positions_to_lists` fabricates padding rows at `shape=(n_samples, 2)` filled with the missing sentinel (`lib/cache/targetvariants.py:265`). On a haploid chromosome those rows imply diploidy for every sample, and they are harmless for a stronger reason than being all-missing: a padded position has no REF, and `update_match_table` filters candidates on `WHERE target.ref IS NOT NULL`, so it never gets a `target_row_nr` and is never sliced into the dosage or ploidy arrays. Being all-missing is the second line of defence — an unmatched position contributes no alleles either way. They also can't trip the mixed-ploidy guard, being uniformly diploid-shaped.
-- `check_chromosomes`' `NotImplementedError` (`cli/load.py:131`) and the `NotImplementedError` in `parse_target_variants` (`lib/cache/_vcf.py:126`) are both deleted. `test_vcf_buffer_sex_variants` is rewritten — it asserted the wrong exception.
+- `check_chromosomes`' `NotImplementedError` (`cli/load.py`) and the `NotImplementedError` in `parse_target_variants` (`lib/cache/_vcf.py`) are both deleted — so neither carries a line number here, because neither exists any more. `test_vcf_buffer_sex_variants` is rewritten — it asserted the wrong exception.
 - Users who chopped a mixed-sex chrY VCF are not served by this ADR. A male-only chrY file works; a mixed-sex one depends on the reader determining nullploidy, which VCF cannot. This is the same trade [ADR 0004](0004-absence-semantics-is-declared.md) makes: a clear limit rather than a fabricated genotype.
 - A misdeclared ploidy has a plausibility check available later, mirroring the one ADR 0004 describes for `homref`: a variant hemizygous in every sample of one shard and diploid in every sample of a sibling shard of the same sampleset is a callset inconsistency, not biology. Not worth building yet.
 

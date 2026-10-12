@@ -2,11 +2,19 @@
 
 Open work only. A ticket is deleted when it lands — the commit that closes it is its record, and `git log -- docs/tickets/` finds the ones that are gone. Decisions that outlive the work belong in `docs/adr/`, not here.
 
-Derived from ADRs 0001, 0003, 0004, and 0007–0013. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
+Derived from ADRs 0001, 0003, 0004, and 0007–0014. Read `CONTEXT.md` and those ADRs before starting — they carry the reasoning, these carry the work.
 
 ## Open
 
-None. A Serial run (ADR 0013) landed last: a convenience entry point for environments
+Nothing open.
+
+The last to land was the Sex check ([ADR 0014](../adr/0014-declared-sex-is-checked-never-used.md)),
+which amends ADR 0007 without reversing it: a **Declared sex** is checked and never used,
+so ploidy stays observed per call and no PAR coordinates enter the repository. 0039 was
+the declaration and the mandate, provable without genotypes; 0040 was the comparison,
+which raises on a mismatch and is exempted per sample by declaring `0`.
+
+Before it, a Serial run (ADR 0013) landed: a convenience entry point for environments
 where Nextflow cannot run, not a second scaling mechanism — `pgsc_calc` remains the
 supported path. 0036 built `pgsc_calc run`, 0037 made it the thing the integration tests
 exercise (which is the dogfooding argument for having built it), and 0038 measured the
