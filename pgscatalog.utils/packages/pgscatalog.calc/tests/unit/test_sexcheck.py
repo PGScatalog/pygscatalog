@@ -207,7 +207,9 @@ class TestOutcome:
         assert _outcome(declared=0, fraction=0.0, n_informative=34) == "exempt"
 
 
-def _shard(calls: list[list[list[int]]]) -> tuple[list[float | None], int]:
+def _shard(
+    calls: list[list[list[int]]], x_variants=None
+) -> tuple[list[float | None], list[int]]:
     """Fractions for a hand-built shard of (n_variants, n_samples, 2) calls"""
     gts = np.array(calls, dtype=np.uint8)
     store = zarr.storage.MemoryStore()
@@ -215,7 +217,7 @@ def _shard(calls: list[list[list[int]]]) -> tuple[list[float | None], int]:
     genotypes = root.create_array("genotypes", shape=gts.shape, dtype=np.uint8)
     genotypes[:] = gts
     samples = [f"sample{i}" for i in range(gts.shape[1])]
-    return _shard_fractions(genotypes, samples)
+    return _shard_fractions(genotypes, samples, x_variants)
 
 
 HET = [0, 1]
@@ -230,7 +232,7 @@ class TestShardFractions:
     def test_a_mixed_sex_variant_separates_the_two(self):
         fractions, n_informative = _shard([[HEMI_ALT, HET], [HEMI_REF, HOM_ALT]])
 
-        assert n_informative == 2
+        assert n_informative == [2, 2]
         assert fractions == [1.0, 0.0]
 
     def test_a_variant_diploid_in_everyone_is_not_informative(self):
@@ -238,7 +240,7 @@ class TestShardFractions:
         nothing tells those apart without PAR coordinates (ADR 0007 declined them)"""
         fractions, n_informative = _shard([[HET, HET], [HEMI_ALT, HOM_ALT]])
 
-        assert n_informative == 1
+        assert n_informative == [1, 1]
         assert fractions == [1.0, 0.0]
 
     def test_an_all_female_shard_cannot_be_checked_and_says_so(self):
@@ -247,14 +249,14 @@ class TestShardFractions:
         silently and flag every man, on a check that never ran (ADR 0014)"""
         fractions, n_informative = _shard([[HET, HOM_ALT], [HET, HET]])
 
-        assert n_informative == 0
+        assert n_informative == [0, 0]
         assert fractions == [None, None]
 
     def test_a_hemizygous_no_call_makes_a_variant_informative(self):
         """The file declared ploidy one there, which is the signal being read"""
         _, n_informative = _shard([[HEMI_NOCALL, HET]])
 
-        assert n_informative == 1
+        assert n_informative == [0, 1]
 
     def test_a_hemizygous_no_call_is_in_neither_half_of_its_own_fraction(self):
         """Informative for the variant, absent from the sample's own ratio: the
@@ -267,5 +269,20 @@ class TestShardFractions:
     def test_a_sample_with_no_called_genotype_gets_a_null_fraction(self):
         fractions, n_informative = _shard([[HEMI_ALT, DIPLOID_NOCALL]])
 
-        assert n_informative == 1
+        assert n_informative == [1, 0]
         assert fractions == [1.0, None]
+
+
+def test_informative_floor_counts_each_samples_called_variants():
+    fractions, counts = _shard([[HEMI_ALT, HET]] + [[HEMI_ALT, DIPLOID_NOCALL]] * 9)
+    assert counts == [10, 1]
+    assert _outcome(1, fractions[1], counts[1]) == "not_concluded"
+
+
+def test_whole_genome_check_excludes_other_chromosomes():
+    fractions, counts = _shard(
+        [[HEMI_ALT, HET]] * 10 + [[HEMI_ALT, HEMI_ALT]] * 20,
+        x_variants=np.array([True] * 10 + [False] * 20),
+    )
+    assert fractions == [1.0, 0.0]
+    assert counts == [10, 10]

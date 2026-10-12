@@ -126,6 +126,7 @@ class ScoreStage:
                     """
                     SELECT DISTINCT accession FROM allele_match_table
                     WHERE sampleset = ? AND zarr_group = ?
+                      AND match_result.match_summary = 'matched'
                     ORDER BY accession
                     """,
                     [sampleset, shard.path],
@@ -133,7 +134,10 @@ class ScoreStage:
             ]
 
         if not accessions_to_calculate:
-            raise ValueError(f"No accessions matched any variant in {shard.path!r}")
+            logger.info(
+                f"No matched variants in {shard.path!r}; exporting no contributions"
+            )
+            return
 
         # get wide effect weights (a matrix) for this shard's genotypes
         variant_metadata: pl.DataFrame = store_group_weight_arrays(

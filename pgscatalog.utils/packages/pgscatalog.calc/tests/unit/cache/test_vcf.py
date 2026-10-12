@@ -1,5 +1,6 @@
 import gzip
 import pathlib
+from itertools import product
 
 import numpy as np
 import pysam
@@ -48,7 +49,11 @@ def one_variant(tmp_path, calls: list[str]) -> pysam.VariantRecord:
 
 
 def indexed_target(
-    tmp_path, calls: list[str], alts: str = "C,G", name: str = "multiallelic"
+    tmp_path,
+    calls: list[str],
+    alts: str = "C,G",
+    name: str = "multiallelic",
+    ref: str = "A",
 ) -> tuple[pathlib.Path, pathlib.Path]:
     """An indexed one-variant target holding `A -> {alts}` at 1:100
 
@@ -59,7 +64,7 @@ def indexed_target(
     samples = "\t".join(f"sample{i}" for i in range(len(calls)))
     with path.open("w") as f:
         f.write(VCF_HEADER.format(samples=samples))
-        f.write(f"1\t100\t.\tA\t{alts}\t.\t.\t.\tGT\t" + "\t".join(calls) + "\n")
+        f.write(f"1\t100\t.\t{ref}\t{alts}\t.\t.\t.\tGT\t" + "\t".join(calls) + "\n")
 
     compressed = pathlib.Path(pysam.tabix_index(str(path), preset="vcf", force=True))
     return compressed, pathlib.Path(str(compressed) + ".tbi")
@@ -472,3 +477,24 @@ def test_a_spanning_deletion_loads_and_is_reported_unmatched(tmp_path, sampleset
         ).fetchall()
 
     assert rows == [("NO_MATCH", "unmatched", False)]
+
+
+@pytest.mark.parametrize("n_alts", [253, 254, 255])
+def test_multiallelic_indices_cannot_overlap_sentinels(tmp_path, n_alts):
+    alts = ["".join(bases) for bases in product("ACGT", repeat=4)][1 : n_alts + 1]
+    target, index = indexed_target(
+        tmp_path, [f"{n_alts}/{n_alts}", "0/0"], alts=",".join(alts), ref="AAAA"
+    )
+    kwargs = {
+        "position_batch": [("1", 100)],
+        "target_path": target,
+        "index_path": index,
+        "cache_dir": tmp_path,
+        "sampleset": "test",
+    }
+    if n_alts >= 254:
+        with pytest.raises(ValueError, match="reserved for genotype sentinels"):
+            vcf_buffer_variants(**kwargs)
+    else:
+        variants = vcf_buffer_variants(**kwargs)
+        assert variants.genotypes[0, 0].tolist() == [253, 253]

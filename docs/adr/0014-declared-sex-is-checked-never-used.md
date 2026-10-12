@@ -260,3 +260,7 @@ meanings without another code.
   hemizygous. Enough such calls could move the fraction across the majority
   threshold. The floor of ten is the only protection. This is an actual limit,
   not a theoretical concern.
+
+## Review corrections
+
+The floor and reported `n_informative` apply to each sample's called informative X variants. Missing calls cannot supply the evidence required to make a conclusion. Whole-genome (`ALL`) shards select X rows from cached chromosome metadata; other chromosomes do not contribute to this check.

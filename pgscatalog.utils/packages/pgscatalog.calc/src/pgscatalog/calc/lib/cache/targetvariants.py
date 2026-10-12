@@ -86,6 +86,14 @@ class TargetVariants:
         # alternative alleles - so the ceiling moves with the record instead of being
         # pinned at 1 (ADR 0010). A padded-absent row declares no alleles at all, and
         # carries nothing but missing sentinels
+        if any(
+            alts is not None and len(alts) >= NO_ALLELE_SENTINEL_VALUE
+            for alts in self._alts
+        ):
+            raise ValueError(
+                "Variants with 254 or more ALT alleles cannot be encoded: "
+                "allele indices 254 and 255 are reserved for genotype sentinels"
+            )
         n_alts = np.array(
             [0 if alt is None else len(alt) for alt in self._alts], dtype=np.uint16
         )
