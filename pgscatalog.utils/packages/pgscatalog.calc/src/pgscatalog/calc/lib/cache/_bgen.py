@@ -71,7 +71,7 @@ from .targetvariants import (
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Iterable
 
     from pgscatalog.calc.lib.types import Pathish
 
@@ -191,21 +191,15 @@ def prepare_region_query(
 ) -> list[tuple[str, int, int]]:
     logger.info(f"Preparing regions for bgenix query, {target_chroms=}")
 
-    # set up transform function for chromosome
-    transform: Callable
-    if any(x.startswith("0") for x in target_chroms):
-        # are they padded? e.g. UK Biobank
-        logger.info("Padded chromosomes detected")
-        transform = add_chrom_padding
-    elif any(x.startswith("chr") for x in target_chroms):
-        logger.info("Prefixed chromosones detected")
-        # are they prefixed? e.g. some imputation servers
-        transform = add_chrom_prefix
-    else:
-        logger.info("PGS Catalog format chromosomes detected")
-        transform = lambda x: x  # noqa: E731
-
-    return [(transform(chrom), pos, pos) for chrom, pos in regions]
+    # Query the actual index names, including aliases such as chrM, 23, and 0X.
+    dialects: dict[str, list[str]] = {}
+    for chrom in dict.fromkeys(target_chroms):
+        dialects.setdefault(canonicalise_chrom(chrom), []).append(chrom)
+    return [
+        (native, pos, pos)
+        for chrom, pos in regions
+        for native in dialects.get(chrom, [chrom])
+    ]
 
 
 def run_bgenix_subprocess(
