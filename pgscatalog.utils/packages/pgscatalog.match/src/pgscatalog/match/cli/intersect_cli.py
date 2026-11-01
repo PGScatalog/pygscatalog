@@ -239,7 +239,8 @@ def read_var_general(path, chrom=None):
     :return: row of a df as a dict
     """
     with xopen(path, "rt") as f:
-        if "bim" in pathlib.Path(path).name:
+        # check the extension: sort chunks have random names that can contain "bim"
+        if pathlib.Path(path).name.endswith((".bim", ".bim.zst")):
             reader = csv.reader(f, delimiter="\t")
             # yes, A1/A2 in bim isn't ref/alt
             fields = ["#CHROM", "ID", "pos_cm", "POS", "REF", "ALT"]
