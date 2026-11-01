@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from pgscatalog.match.cli.intersect_cli import read_var_general, run_intersect
 import pytest
+from xopen import xopen
 
 
 @pytest.fixture(scope="module")
@@ -110,8 +111,10 @@ def test_intersect_cli_pvar_name_contains_bim(tmp_path, ref):
     assert count_lines(tmp_path / "matched_variants.txt.gz") == 101
 
 
-def test_read_var_general_uncompressed_bim(tmp_path):
-    bim = tmp_path / "target.bim"
-    bim.write_text("1\trs1\t0\t100\tA\tG\n")
+@pytest.mark.parametrize("name", ["target.bim", "target.bim.gz"])
+def test_read_var_general_bim_extensions(tmp_path, name):
+    bim = tmp_path / name
+    with xopen(bim, "wt") as f:
+        f.write("1\trs1\t0\t100\tA\tG\n")
 
     assert next(read_var_general(bim))["ID"] == "rs1"
