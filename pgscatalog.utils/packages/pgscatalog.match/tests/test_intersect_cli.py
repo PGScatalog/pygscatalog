@@ -1,10 +1,14 @@
+import functools
 import itertools
 import os
 import gzip
+import shutil
+import tempfile
 from unittest.mock import patch
 
-from pgscatalog.match.cli.intersect_cli import run_intersect
+from pgscatalog.match.cli.intersect_cli import read_var_general, run_intersect
 import pytest
+from xopen import xopen
 
 
 @pytest.fixture(scope="module")
@@ -73,3 +77,44 @@ def test_intersect_cli(tmp_path_factory, ref, target, afreq, vmiss):
         # 200 variants in reference
         # 100 variants intersected successfully
         assert intersect_counts == ["100", "200", "100"]
+
+
+def count_lines(path):
+    with gzip.open(path) as f:
+        return sum(1 for _ in f)
+
+
+def test_intersect_cli_sort_chunk_name_contains_bim(tmp_path, ref, target):
+    # sort chunks are random temporary files, which are headered tsv and not bim
+    args = ["pgscatalog-intersect", "-r", str(ref), "-t", str(target)]
+    args += ["--outdir", str(tmp_path), "--batch_size", "100"]
+    chunk = functools.partial(tempfile.NamedTemporaryFile, prefix="tmpbim")
+
+    with patch("sys.argv", args), patch("tempfile.NamedTemporaryFile", chunk):
+        run_intersect()
+
+    assert count_lines(tmp_path / "matched_variants.txt.gz") == 101
+
+
+def test_intersect_cli_pvar_name_contains_bim(tmp_path, ref):
+    for extension in ("pvar.zst", "afreq.gz", "vmiss.gz"):
+        shutil.copy(
+            ref.parent / f"target.{extension}", tmp_path / f"testbim_22.{extension}"
+        )
+    target = tmp_path / "testbim_22.pvar.zst"
+    args = ["pgscatalog-intersect", "-r", str(ref), "-t", str(target)]
+    args += ["--outdir", str(tmp_path)]
+
+    with patch("sys.argv", args):
+        run_intersect()
+
+    assert count_lines(tmp_path / "matched_variants.txt.gz") == 101
+
+
+@pytest.mark.parametrize("name", ["target.bim", "target.bim.gz"])
+def test_read_var_general_bim_extensions(tmp_path, name):
+    bim = tmp_path / name
+    with xopen(bim, "wt") as f:
+        f.write("1\trs1\t0\t100\tA\tG\n")
+
+    assert next(read_var_general(bim))["ID"] == "rs1"
