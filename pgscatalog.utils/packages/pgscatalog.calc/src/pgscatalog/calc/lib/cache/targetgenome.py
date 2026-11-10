@@ -97,6 +97,11 @@ class TargetGenome:
         return pathlib.Path(self._target_path)
 
     @property
+    def index_path(self) -> pathlib.Path:
+        """The index selected by the input handler, before any scratch copy."""
+        return self._handler.index_path
+
+    @property
     def _zarr_archive_name(self) -> pathlib.Path:
         """The name of the directory containing the zarr array root"""
         return self.cache_dir / "genotypes.zarr"
