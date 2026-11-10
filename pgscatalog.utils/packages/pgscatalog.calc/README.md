@@ -22,6 +22,8 @@ This Python package contains:
 | `pgscatalog-aggregate`       | Aggregate calculated PGS split across multiple files     | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/aggregate.html) |
 | `pgscatalog-ancestry-adjust` | Adjust calculated PGS in the context of genetic ancestry | [README](https://pygscatalog.readthedocs.io/en/latest/how-to/guides/ancestry.html)  |
 
+LOAD precalculates per-allele counts from complete genotype calls. MATCH pools these counts across sample batches, so SCORE imputes missing dosages using one frequency per allele across the sampleset. Splitting the same samples into different files does not change their imputed dosages. The default imputation floor is 50 samples in the sampleset; a matched variant that needs imputation but has no called alleles stops scoring with an error. Population-aware frequencies are planned for a future release.
+
 If you want to write Python code to work with PGS data, the library may be helpful for you.
 
 ## Installation 

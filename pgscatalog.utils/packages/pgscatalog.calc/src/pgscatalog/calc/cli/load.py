@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import atexit
 import contextlib
+import json
 import logging
 import logging.handlers
 import pathlib
@@ -233,6 +234,62 @@ def check_sex_map_required(
         )
 
 
+CACHE_VERSION = 1
+UNSUPPORTED_CACHE = (
+    "Unsupported cache version. "
+    "Run without `--genotype_cache_zip` to create a new cache."
+)
+
+
+def source_metadata(paths: dict[str, pathlib.Path]) -> dict[str, dict[str, int]]:
+    """File metadata follows symlinks and excludes location, allowing relocation."""
+    metadata = {}
+    for role, path in paths.items():
+        stat = path.stat()
+        metadata[role] = {"size": stat.st_size, "mtime_ns": stat.st_mtime_ns}
+    return metadata
+
+
+def validate_cached_source(
+    zip_path: pathlib.Path,
+    shard: str,
+    paths: dict[str, pathlib.Path],
+    current: dict[str, dict[str, int]],
+) -> None:
+    """Reject incompatible input before extracting a leaf from a read-only archive."""
+    with zipfile.ZipFile(zip_path) as archive:
+        try:
+            attrs = json.loads(archive.read(f"genotypes.zarr/{shard}/zarr.json"))[
+                "attributes"
+            ]
+            recorded = attrs["source_files"]
+            valid = (
+                type(attrs["cache_version"]) is int
+                and attrs["cache_version"] == CACHE_VERSION
+                and isinstance(recorded, dict)
+                and set(recorded) == set(current)
+                and all(
+                    isinstance(value, dict)
+                    and set(value) == {"size", "mtime_ns"}
+                    and all(type(n) is int for n in value.values())
+                    for value in recorded.values()
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(UNSUPPORTED_CACHE) from exc
+        if not valid:
+            raise ValueError(UNSUPPORTED_CACHE)
+    for role, metadata in current.items():
+        if recorded[role] != metadata:
+            raise ValueError(
+                f"Cache input metadata mismatch for shard {shard!r}, "
+                f"{role} file {str(paths[role])!r}: "
+                f"recorded={recorded[role]}, current={metadata}. "
+                "Run without `--genotype_cache_zip` to create a fresh cache "
+                "and publish a replacement."
+            )
+
+
 def load_cli(args: argparse.Namespace) -> None:
     # override zarr chunk size
     config.ZARR_VARIANT_CHUNK_SIZE = args.batch_size
@@ -242,6 +299,14 @@ def load_cli(args: argparse.Namespace) -> None:
             "--bgen_sample_file is required when --format is 'bgen'"
         )
 
+    if (
+        args.zarr_zip_file is not None
+        and args.zarr_zip_file.resolve()
+        == (args.cache_dir / "genotypes.zarr.zip").resolve()
+    ):
+        raise ValueError(
+            "Use a different cache directory to preserve the supplied archive."
+        )
     args.cache_dir.mkdir(parents=True, exist_ok=True)
 
     logging.basicConfig(
@@ -282,6 +347,21 @@ def load_cli(args: argparse.Namespace) -> None:
     # check chromosome input
     check_chromosomes(target_genomes=target_genomes)
 
+    cache_inputs = []
+    for target_genome in target_genomes:
+        paths = {
+            "genotype": target_genome.target_path,
+            "index": target_genome.index_path,
+        }
+        if args.bgen_sample_file is not None:
+            paths["sample"] = args.bgen_sample_file
+        metadata = source_metadata(paths)
+        if args.zarr_zip_file is not None:
+            validate_cached_source(
+                args.zarr_zip_file, target_genome._zarr_group_path, paths, metadata
+            )
+        cache_inputs.append((target_genome, metadata))
+
     if sex_map is not None:
         # every target, not only the sex chromosomes: a map keyed on the wrong sample ID
         # space then fails at the first target instead of whenever chrX happens to be
@@ -293,8 +373,17 @@ def load_cli(args: argparse.Namespace) -> None:
                 source=str(target_genome.target_path),
             )
 
-    for target_genome in track(
-        target_genomes, description="Querying target genome index..."
+    manifests = [
+        {"shard": target._zarr_group_path, "samples": target.samples}
+        for target in target_genomes
+    ]
+    (args.cache_dir / "samples.json").write_text(
+        json.dumps(manifests[0] if len(manifests) == 1 else {"shards": manifests})
+        + "\n"
+    )
+
+    for target_genome, metadata in track(
+        cache_inputs, description="Querying target genome index..."
     ):
         if args.zarr_zip_file is not None:
             group_path = f"genotypes.zarr/{target_genome._zarr_group_path}"
@@ -306,6 +395,9 @@ def load_cli(args: argparse.Namespace) -> None:
             )
             logger.info("Cache set up")
 
+        target_genome.zarr_group.attrs.update(
+            {"cache_version": CACHE_VERSION, "source_files": metadata}
+        )
         positions_to_query = scorefiles.get_unique_positions(
             chrom=target_genome.chrom, zarr_group=target_genome.zarr_group
         )

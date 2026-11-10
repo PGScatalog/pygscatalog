@@ -42,7 +42,7 @@ from .conftest import (
 )
 
 # how many samples lose their call at the imputed variant, which has to clear
-# nothing in particular - the sample floor is about the shard, not the variant
+# nothing in particular - the sample floor is about the sampleset, not the variant
 N_MISSING = 40
 
 # enough chrX variants to make a readable dosage sum, few enough to stay quick
@@ -383,7 +383,7 @@ def test_a_dot_at_a_mixed_sex_chrx_variant_is_stored_hemizygous(
     assert genotypes[samples.index(woman)][1] != NO_ALLELE_SENTINEL_VALUE
 
 
-def _score_one_variant(gts):
+def _score_one_variant(gts, frequency):
     """Drive one shard through the real dosage path and read back its dosages"""
     store = zarr.storage.MemoryStore()
     root = zarr.open_group(store=store)
@@ -406,6 +406,9 @@ def _score_one_variant(gts):
                 "effect_allele_idx": [1],
                 "is_recessive": [False],
                 "is_dominant": [False],
+                "effect_allele_frequency": [frequency],
+                "sampleset_n_samples": [gts.shape[1]],
+                "target_variant_id": ["X:1:A:G"],
             }
         ),
         n_minimum_impute=1,
@@ -428,7 +431,7 @@ def test_a_missing_call_imputes_from_its_own_ploidy():
         dtype=np.uint8,
     )
 
-    dosage, ploidy = _score_one_variant(gts)
+    dosage, ploidy = _score_one_variant(gts, 4 / 6)
 
     # by hand: effect alleles 1 + 0 + 2 + 1 = 4, called alleles 1 + 1 + 2 + 2 = 6
     freq = 4 / 6
@@ -454,7 +457,7 @@ def test_a_nullploid_sample_is_never_given_a_genotype():
         dtype=np.uint8,
     )
 
-    dosage, ploidy = _score_one_variant(gts)
+    dosage, ploidy = _score_one_variant(gts, 0.5)
 
     # by hand: 1 effect allele over 2 called ones. The nullploid samples are in
     # neither the numerator nor the denominator
@@ -468,9 +471,12 @@ def test_a_variant_nobody_called_still_stops_the_pipeline():
     gts = np.full((1, 4, 2), MISSING_GENOTYPE_SENTINEL_VALUE, dtype=np.uint8)
 
     with pytest.raises(ValueError) as e:
-        _score_one_variant(gts)
+        _score_one_variant(gts, np.nan)
 
-    assert "no called alleles because every call is missing" in str(e.value)
+    assert (
+        "no called alleles across the sampleset because every call is missing"
+        in str(e.value)
+    )
 
 
 def test_a_shard_below_the_floor_warns_instead_of_concluding(

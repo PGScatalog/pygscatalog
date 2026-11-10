@@ -53,7 +53,7 @@ class ScoreStage:
     threads : int
         Maximum number of threads duckdb and dask may use.
     minimum_samples_for_impute : int
-        Minimum number of samples required to impute a missing dosage from mean
+        Minimum number of distinct samples in the sampleset to impute from mean
         effect allele frequency. Only SCORE calculates dosage, so only SCORE has
         anything to say about the floor.
     """

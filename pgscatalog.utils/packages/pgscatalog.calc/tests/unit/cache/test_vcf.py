@@ -235,6 +235,31 @@ def test_vcf_buffer_variants(
     ]
 
 
+@pytest.mark.parametrize(
+    ("call", "expected_gt"),
+    [("./.", MISSING_GENOTYPE_TUPLE), (".", HEMIZYGOUS_NO_CALL)],
+)
+def test_all_missing_site_keeps_alleles_ploidy_and_zero_counts(
+    tmp_path, call, expected_gt
+):
+    target, index = indexed_target(tmp_path, [call, call], alts="G")
+    genome = TargetGenome(
+        target_path=target,
+        target_index_path=index,
+        cache_dir=tmp_path,
+        sampleset="test",
+    )
+    genome.cache_variants([("1", 100), ("1", 200)])
+    group = genome.zarr_group
+    meta = zarr.open_group(store=group.store, path=meta_group_path(group.path))
+
+    # An explicit no-call is assessed; an absent record still has no alleles.
+    assert list(meta["ref"][...]) == ["A", ""]
+    assert list(meta["alts"][...]) == ["G", ""]
+    assert meta["allele_counts"][0] == "0/0"
+    np.testing.assert_array_equal(group["genotypes"][0], [expected_gt] * 2)
+
+
 # Test 2.2: missing positions
 def test_vcf_buffer_variants_with_missing(
     test_positions,

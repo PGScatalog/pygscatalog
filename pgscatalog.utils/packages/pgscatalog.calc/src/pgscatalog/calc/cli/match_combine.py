@@ -80,7 +80,12 @@ def match_combine_cli(args: argparse.Namespace) -> None:
     )
 
     with duckdb.connect() as conn:
-        check_sample_union(conn=conn, paths=check_paths_exist(args.samples))
+        sample_paths = check_paths_exist(args.samples)
+        check_sample_union(conn=conn, paths=sample_paths)
+        n_samples = conn.execute(
+            "SELECT COUNT(DISTINCT sample_id) FROM read_parquet(?) WHERE sampleset = ?",
+            [[str(p) for p in sample_paths], args.sampleset],
+        ).fetchall()[0][0]
 
     # reloading the scoring files is required, not redundant: the min_overlap
     # denominator is every variant in the scoring file, including variants on
@@ -89,7 +94,9 @@ def match_combine_cli(args: argparse.Namespace) -> None:
     stage.import_match_tables(check_paths_exist(args.matches))
 
     stage.combine_matches(
-        min_overlap=args.min_overlap, out_path=out_dir / "match_table.parquet"
+        min_overlap=args.min_overlap,
+        out_path=out_dir / "match_table.parquet",
+        n_samples=n_samples,
     )
     stage.export_full_match_log(out_directory=out_dir / "logs")
     stage.export_summary_match_log(out_path=out_dir / "logs" / "summary.csv")

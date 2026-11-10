@@ -38,6 +38,7 @@ _TARGET_VARIANTS_COLUMNS = [
     "variant_id",
     "zarr_group",
     "sampleset",
+    "allele_counts",
 ]
 
 
@@ -97,7 +98,8 @@ class MatchStage:
             alts TEXT[],
             variant_id TEXT,
             zarr_group TEXT,
-            sampleset TEXT
+            sampleset TEXT,
+            allele_counts UBIGINT[]
         );
         """)
 
@@ -117,6 +119,7 @@ class MatchStage:
                         pl.lit(zarr_group).alias("zarr_group"),
                         pl.lit(sampleset).alias("sampleset"),
                         pl.col("alts").str.split("/"),
+                        pl.col("allele_counts").str.split("/").cast(pl.List(pl.UInt64)),
                     ]
                 )
                 # row index is really important!
@@ -150,7 +153,8 @@ class MatchStage:
                     alts,
                     variant_id,
                     zarr_group,
-                    sampleset
+                    sampleset,
+                    allele_counts
                 FROM _df""")
             logger.info(f"{_df.shape=} finished loading into targetvariants table")
 
@@ -194,6 +198,30 @@ class MatchStage:
                 match_flipped=match_flipped,
                 sampleset=self._cache.sampleset,
             )
+            # Pool once per target allele, before score rows can duplicate counts.
+            conn.sql("""
+                CREATE TEMP TABLE pooled_counts AS
+                SELECT variant_id, allele_idx, SUM(allele_count) AS allele_count
+                FROM targetvariants,
+                     UNNEST(allele_counts) WITH ORDINALITY
+                         AS a(allele_count, allele_idx)
+                GROUP BY variant_id, allele_idx;
+
+                CREATE TEMP TABLE pooled_frequencies AS
+                SELECT variant_id, allele_idx - 1 AS allele_idx,
+                       allele_count / NULLIF(SUM(allele_count) OVER
+                           (PARTITION BY variant_id), 0) AS frequency
+                FROM pooled_counts;
+
+                UPDATE allele_match_table AS m
+                SET effect_allele_frequency = f.frequency,
+                    target_variant_id = t.variant_id
+                FROM targetvariants t, pooled_frequencies f
+                WHERE m.zarr_group = t.zarr_group
+                  AND m.target_row_nr = t.geno_index
+                  AND t.variant_id = f.variant_id
+                  AND m.match_result.effect_allele_idx = f.allele_idx;
+            """)
             return chromosome
 
     def export_match_table(self, out_path: Pathish) -> None:

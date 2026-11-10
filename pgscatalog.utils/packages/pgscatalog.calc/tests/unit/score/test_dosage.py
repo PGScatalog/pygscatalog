@@ -137,7 +137,11 @@ def test_small_shard_without_missing_calls_skips_the_floor():
     ploidy = da.full(dosage.shape, 2, dtype=np.uint8)
 
     is_nan, filled = fill_missing_dosages(
-        dosage_array=dosage, ploidy_array=ploidy, n_minimum_samples=50
+        dosage_array=dosage,
+        ploidy_array=ploidy,
+        n_minimum_samples=50,
+        effect_allele_frequencies=np.full(4, 0.5),
+        n_samples=10,
     )
 
     assert not bool(is_nan.any().compute())
@@ -153,7 +157,11 @@ def test_small_shard_with_missing_calls_still_raises():
 
     with pytest.raises(ValueError) as e:
         fill_missing_dosages(
-            dosage_array=dosage, ploidy_array=ploidy, n_minimum_samples=50
+            dosage_array=dosage,
+            ploidy_array=ploidy,
+            n_minimum_samples=50,
+            effect_allele_frequencies=np.full(4, 0.5),
+            n_samples=10,
         )
 
     assert "n_minimum_samples=50" in str(e.value)
@@ -167,7 +175,11 @@ def test_a_missing_call_is_imputed_from_its_own_ploidy():
     ploidy = da.from_array(np.array([[1, 1, 2, 2, 1, 2]], dtype=np.uint8))
 
     _, filled = fill_missing_dosages(
-        dosage_array=da.from_array(array), ploidy_array=ploidy, n_minimum_samples=1
+        dosage_array=da.from_array(array),
+        ploidy_array=ploidy,
+        n_minimum_samples=1,
+        effect_allele_frequencies=np.array([4 / 6]),
+        n_samples=6,
     )
 
     # by hand: 4 effect alleles over 6 called ones

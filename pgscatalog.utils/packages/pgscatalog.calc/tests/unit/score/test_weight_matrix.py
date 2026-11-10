@@ -33,7 +33,8 @@ def _load_test_tables(conn, score_variant_table, allele_match_table) -> None:
     conn.execute(
         """
         CREATE TABLE allele_match_table AS
-        SELECT *
+        SELECT *, 0.5::DOUBLE AS effect_allele_frequency,
+               '1:1:A:C' AS target_variant_id, 100::UBIGINT AS sampleset_n_samples
         FROM read_json(?, format='nd');
         """,
         [str(allele_match_table)],
@@ -91,7 +92,10 @@ def empty_scoredb(tmp_path) -> ScoreDatabase:
                 row_nr UBIGINT,
                 match_result STRUCT(effect_allele_idx UINT8),
                 target_row_nr UBIGINT,
-                zarr_group TEXT
+                zarr_group TEXT,
+                effect_allele_frequency DOUBLE,
+                target_variant_id TEXT,
+                sampleset_n_samples UBIGINT
             );
             """
         )
@@ -174,7 +178,7 @@ def test_get_variant_metadata(db_with_scores):
     df = get_variant_metadata(conn=conn, group_path=group_path)
 
     assert isinstance(df, pl.DataFrame)
-    assert df.shape == (1, 5)  # (n_variants, n_columns)
+    assert df.shape == (1, 8)  # (n_variants, n_columns)
 
     # Columns
     assert df.columns == [
@@ -183,6 +187,9 @@ def test_get_variant_metadata(db_with_scores):
         "target_row_nr",
         "is_recessive",
         "is_dominant",
+        "effect_allele_frequency",
+        "target_variant_id",
+        "sampleset_n_samples",
     ]
 
 
@@ -242,7 +249,7 @@ def test_store_group_weight_arrays_success(scoredb_with_scores, zarr_group):
     )
 
     assert isinstance(df, pl.DataFrame)
-    assert df.shape == (1, 5)  # (n_variants, n_columns)
+    assert df.shape == (1, 8)  # (n_variants, n_columns)
     assert df["weight_mat_row_nr"].to_list() == [0]
     assert df["target_row_nr"].to_list() == [0]
 
@@ -297,7 +304,9 @@ def db_two_shards():
             CREATE VIEW allele_match_table AS
             SELECT sampleset, accession, row_nr,
                    struct_pack(effect_allele_idx := effect_allele_idx) AS match_result,
-                   target_row_nr, zarr_group
+                   target_row_nr, zarr_group,
+                   0.5::DOUBLE AS effect_allele_frequency,
+                   '1:1:A:C' AS target_variant_id, 100::UBIGINT AS sampleset_n_samples
             FROM allele_match_raw;
         """)
 
