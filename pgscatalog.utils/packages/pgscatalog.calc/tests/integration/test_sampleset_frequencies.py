@@ -10,7 +10,7 @@ import pytest
 from .conftest import _subset_samples, _write_vcf, run_serial
 
 
-def _inputs(tmp_path, n_samples=60, all_missing=False):
+def _inputs(tmp_path, n_samples=60, all_missing=False, partial_first=False):
     header = pysam.VariantHeader()
     for chrom in ("1", "2"):
         header.contigs.add(chrom)
@@ -22,7 +22,7 @@ def _inputs(tmp_path, n_samples=60, all_missing=False):
         record = header.new_record(contig=chrom, start=9, alleles=("A", alt))
         for i, sample in enumerate(header.samples):
             if all_missing or i < 10:
-                gt = (None, None)
+                gt = (0, None) if partial_first and i == 0 else (None, None)
             else:
                 allele = int(i >= 20) if chrom == "1" else int(i < 20)
                 gt = (allele, allele)
@@ -44,10 +44,11 @@ def _inputs(tmp_path, n_samples=60, all_missing=False):
 
 
 @pytest.mark.parametrize("by_chromosome", [False, True])
+@pytest.mark.parametrize("partial_first", [False, True])
 def test_sample_partitions_preserve_scores_and_dosages(
-    tmp_path, monkeypatch, by_chromosome
+    tmp_path, monkeypatch, by_chromosome, partial_first
 ):
-    target, scorefile, header, records = _inputs(tmp_path)
+    target, scorefile, header, records = _inputs(tmp_path, partial_first=partial_first)
     whole = run_serial([target], tmp_path / "whole", scorefile, monkeypatch)
     samples = list(header.samples)
     targets = []
@@ -59,7 +60,7 @@ def test_sample_partitions_preserve_scores_and_dosages(
             _write_vcf(path, header, [record])
             sources.append((path, record.chrom))
     for source, chrom in sources:
-        # Unequal batches; the first has no called alleles at either variant.
+        # Unequal batches; the first has no complete calls at either variant.
         for i, batch in enumerate((samples[:10], samples[10:20], samples[20:])):
             path = tmp_path / f"{chrom}.batch{i}.vcf.gz"
             _subset_samples(source, path, batch)
@@ -73,6 +74,9 @@ def test_sample_partitions_preserve_scores_and_dosages(
     assert split.filter(pl.col("sample_id") == "sample0")["score"][0] == pytest.approx(
         2.4
     )
+    missing = split.filter(pl.col("sample_id").is_in(samples[:10]))
+    assert missing["allele_count"].to_list() == [0] * 10
+    np.testing.assert_allclose(missing["dosage_sum"], 2.0)
     matches = pl.read_parquet(
         tmp_path / "split/stages/match_combine/match_table.parquet"
     )

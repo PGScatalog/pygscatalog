@@ -273,6 +273,7 @@ def run_bcftools_view(
     #   a record that also carries a sequence allele - a `G,<NON_REF>` record passes
     #   it untouched, verified against bcftools - so nothing here promises the allele
     #   list is ACGT-only. The matcher skips alleles it can't read instead
+    # Keep all-missing sites: another sample batch can supply imputation evidence.
     # --write-index: suppress annoying htslib warnings when working with the file
     # --min-alleles 2: skip sites declaring no ALT at all, which carry no dosage.
     #   There is deliberately no --max-alleles: multiallelic records are ingested
